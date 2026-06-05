@@ -1,0 +1,8 @@
+{
+  "dependencies": {
+    "@nestjs/cache-manager": "^3.1.2",
+    "@types/ioredis": "^4.28.10",
+    "cache-manager-redis-store": "^3.0.1",
+    "ioredis": "^5.11.1"
+  }
+}

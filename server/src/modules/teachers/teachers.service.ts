@@ -1,4 +1,4 @@
-import { Injectable, NotFoundException, ConflictException } from '@nestjs/common';
+import { Injectable, NotFoundException, ConflictException, ForbiddenException } from '@nestjs/common';
 import { PrismaService } from '../../database/prisma.service';
 import { CreateTeacherDto } from './dto/create-teacher.dto';
 import { UpdateTeacherDto } from './dto/update-teacher.dto';
@@ -29,6 +29,27 @@ export class TeachersService {
   }
 
   async create(dto: CreateTeacherDto, currentUser: AuthenticatedUser) {
+    // Check subscription limit for users (teachers count as users)
+    const subscription = await this.prisma.schoolSubscription.findFirst({
+      where: { schoolId: currentUser.schoolId, status: 'ACTIVE' },
+      include: { plan: true },
+    });
+
+    if (!subscription) {
+      throw new ForbiddenException('No active subscription found');
+    }
+
+    // Check current teacher count (users)
+    const currentUserCount = await this.prisma.user.count({
+      where: { schoolId: currentUser.schoolId, deletedAt: null },
+    });
+
+    if (currentUserCount >= subscription.plan.maxUsers) {
+      throw new ForbiddenException(
+        `User limit reached (${subscription.plan.maxUsers}). Upgrade your plan to add more users.`
+      );
+    }
+
     const employeeId = await this.generateEmployeeId(currentUser.schoolId);
 
     const teacher = await this.prisma.teacher.create({

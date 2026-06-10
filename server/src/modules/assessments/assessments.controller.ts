@@ -21,6 +21,8 @@ import { TenantGuard } from '../../common/guards/tenant.guard';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
 import { Roles } from '../../common/decorators/roles.decorator';
 import { AuthenticatedUser } from '../../common/types/express.types';
+import { RateLimit } from '../../common/decorators/rate-limit.decorator';
+import { RATE_LIMIT_PRESETS } from '../../common/constants/rate-limit.constants';
 
 @ApiTags('Assessments')
 @ApiBearerAuth()
@@ -31,6 +33,7 @@ export class AssessmentsController {
 
   @Post()
   @Roles('SCHOOL_ADMIN', 'TEACHER')
+  @RateLimit(RATE_LIMIT_PRESETS.WRITE)
   @ApiOperation({ summary: 'Create a new assessment' })
   create(@Body() dto: CreateAssessmentDto, @CurrentUser() user: AuthenticatedUser) {
     return this.assessmentsService.create(dto, user);
@@ -38,6 +41,7 @@ export class AssessmentsController {
 
   @Post('bulk')
   @Roles('SCHOOL_ADMIN', 'TEACHER')
+  @RateLimit(RATE_LIMIT_PRESETS.BULK)
   @ApiOperation({ summary: 'Create multiple assessments' })
   bulkCreate(@Body() dto: BulkAssessmentDto, @CurrentUser() user: AuthenticatedUser) {
     return this.assessmentsService.bulkCreate(dto, user);

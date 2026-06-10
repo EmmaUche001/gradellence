@@ -20,6 +20,8 @@ import { RolesGuard } from '../../common/guards/roles.guard';
 import { Roles } from '../../common/decorators/roles.decorator';
 import { ROLES } from '../../common/constants/roles.constants';
 import { AuthenticatedRequest } from '../../common/types/express.types';
+import { RateLimit } from '../../common/decorators/rate-limit.decorator';
+import { RATE_LIMIT_PRESETS } from '../../common/constants/rate-limit.constants';
 
 @ApiTags('Enrollments')
 @Controller('v1/enrollments')
@@ -30,6 +32,7 @@ export class EnrollmentsController {
 
   @Post()
   @Roles(ROLES.SUPER_ADMIN, ROLES.SCHOOL_ADMIN)
+  @RateLimit(RATE_LIMIT_PRESETS.WRITE)
   @ApiOperation({ summary: 'Enroll a student in a class' })
   @ApiResponse({ status: 201, description: 'Student enrolled successfully' })
   @ApiResponse({ status: 400, description: 'Bad request' })
@@ -41,6 +44,7 @@ export class EnrollmentsController {
 
   @Post('bulk')
   @Roles(ROLES.SUPER_ADMIN, ROLES.SCHOOL_ADMIN)
+  @RateLimit(RATE_LIMIT_PRESETS.BULK)
   @ApiOperation({ summary: 'Bulk enroll students in a class' })
   @ApiResponse({ status: 201, description: 'Bulk enrollment completed' })
   @ApiResponse({ status: 400, description: 'Bad request' })

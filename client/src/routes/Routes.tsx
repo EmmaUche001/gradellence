@@ -14,6 +14,15 @@ import { SubjectsListPage } from '../features/subjects/pages/SubjectsListPage';
 import { SubjectFormPage } from '../features/subjects/pages/SubjectFormPage';
 import { SessionsListPage } from '../features/sessions/pages/SessionsListPage';
 import { SessionFormPage } from '../features/sessions/pages/SessionFormPage';
+import { EnrollmentsListPage } from '../features/enrollments/pages/EnrollmentsListPage';
+import { EnrollmentFormPage } from '../features/enrollments/pages/EnrollmentFormPage';
+import { BulkEnrollmentPage } from '../features/enrollments/pages/BulkEnrollmentPage';
+import { AssessmentsListPage } from '../features/assessments/pages/AssessmentsListPage';
+import { AssessmentFormPage } from '../features/assessments/pages/AssessmentFormPage';
+import { ResultsListPage } from '../features/results/pages/ResultsListPage';
+import { BroadsheetPage } from '../features/results/pages/BroadsheetPage';
+import { GradeScalesListPage } from '../features/grade-scales/pages/GradeScalesListPage';
+import { GradeScaleFormPage } from '../features/grade-scales/pages/GradeScaleFormPage';
 
 export function Routes() {
   const { isAuthenticated } = useAuthStore();
@@ -51,6 +60,17 @@ export function Routes() {
         <Route path="sessions" element={<SessionsListPage />} />
         <Route path="sessions/new" element={<SessionFormPage />} />
         <Route path="sessions/:id/edit" element={<SessionFormPage />} />
+        <Route path="enrollments" element={<EnrollmentsListPage />} />
+        <Route path="enrollments/new" element={<EnrollmentFormPage />} />
+        <Route path="enrollments/bulk" element={<BulkEnrollmentPage />} />
+        <Route path="assessments" element={<AssessmentsListPage />} />
+        <Route path="assessments/new" element={<AssessmentFormPage />} />
+        <Route path="assessments/:id/edit" element={<AssessmentFormPage />} />
+        <Route path="results" element={<ResultsListPage />} />
+        <Route path="results/broadsheet" element={<BroadsheetPage />} />
+        <Route path="grade-scales" element={<GradeScalesListPage />} />
+        <Route path="grade-scales/new" element={<GradeScaleFormPage />} />
+        <Route path="grade-scales/:id/edit" element={<GradeScaleFormPage />} />
       </Route>
 
       {/* Also accessible without /dashboard prefix */}
@@ -72,6 +92,17 @@ export function Routes() {
         <Route path="sessions" element={<SessionsListPage />} />
         <Route path="sessions/new" element={<SessionFormPage />} />
         <Route path="sessions/:id/edit" element={<SessionFormPage />} />
+        <Route path="enrollments" element={<EnrollmentsListPage />} />
+        <Route path="enrollments/new" element={<EnrollmentFormPage />} />
+        <Route path="enrollments/bulk" element={<BulkEnrollmentPage />} />
+        <Route path="assessments" element={<AssessmentsListPage />} />
+        <Route path="assessments/new" element={<AssessmentFormPage />} />
+        <Route path="assessments/:id/edit" element={<AssessmentFormPage />} />
+        <Route path="results" element={<ResultsListPage />} />
+        <Route path="results/broadsheet" element={<BroadsheetPage />} />
+        <Route path="grade-scales" element={<GradeScalesListPage />} />
+        <Route path="grade-scales/new" element={<GradeScaleFormPage />} />
+        <Route path="grade-scales/:id/edit" element={<GradeScaleFormPage />} />
       </Route>
 
       {/* Default redirect */}

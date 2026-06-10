@@ -1,4 +1,4 @@
-import { Injectable, NotFoundException, ConflictException, BadRequestException } from '@nestjs/common';
+import { Injectable, NotFoundException, ConflictException, BadRequestException, ForbiddenException } from '@nestjs/common';
 import { PrismaService } from '../../database/prisma.service';
 import { CreateEnrollmentDto } from './dto/create-enrollment.dto';
 import { UpdateEnrollmentDto } from './dto/update-enrollment.dto';
@@ -10,6 +10,27 @@ export class EnrollmentsService {
   constructor(private readonly prisma: PrismaService) {}
 
   async create(dto: CreateEnrollmentDto, currentUser: AuthenticatedUser) {
+    // Check subscription limit for students
+    const subscription = await this.prisma.schoolSubscription.findFirst({
+      where: { schoolId: currentUser.schoolId, status: 'ACTIVE' },
+      include: { plan: true },
+    });
+
+    if (!subscription) {
+      throw new ForbiddenException('No active subscription found');
+    }
+
+    // Check current student count
+    const currentStudentCount = await this.prisma.student.count({
+      where: { schoolId: currentUser.schoolId, deletedAt: null },
+    });
+
+    if (currentStudentCount >= subscription.plan.maxStudents) {
+      throw new ForbiddenException(
+        `Student limit reached (${subscription.plan.maxStudents}). Upgrade your plan to add more students.`
+      );
+    }
+
     // Validate student exists
     const student = await this.prisma.student.findFirst({
       where: { id: dto.studentId, schoolId: currentUser.schoolId, deletedAt: null },
@@ -101,6 +122,28 @@ export class EnrollmentsService {
   }
 
   async bulkCreate(dto: BulkEnrollmentDto, currentUser: AuthenticatedUser) {
+    // Check subscription limit for students
+    const subscription = await this.prisma.schoolSubscription.findFirst({
+      where: { schoolId: currentUser.schoolId, status: 'ACTIVE' },
+      include: { plan: true },
+    });
+
+    if (!subscription) {
+      throw new ForbiddenException('No active subscription found');
+    }
+
+    // Check current student count
+    const currentStudentCount = await this.prisma.student.count({
+      where: { schoolId: currentUser.schoolId, deletedAt: null },
+    });
+
+    // Check if adding these students would exceed the limit
+    if (currentStudentCount + dto.studentIds.length > subscription.plan.maxStudents) {
+      throw new ForbiddenException(
+        `Student limit would be exceeded. Current: ${currentStudentCount}, Adding: ${dto.studentIds.length}, Limit: ${subscription.plan.maxStudents}. Upgrade your plan to add more students.`
+      );
+    }
+
     // Validate class exists
     const classEntity = await this.prisma.class.findFirst({
       where: { id: dto.classId, schoolId: currentUser.schoolId, deletedAt: null },
@@ -363,6 +406,12 @@ export class EnrollmentsService {
           select: {
             id: true,
             name: true,
+            session: {
+              select: {
+                id: true,
+                name: true,
+              },
+            },
           },
         },
       },

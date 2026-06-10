@@ -1,13 +1,6 @@
-import axios from 'axios';
+import apiClient from './apiClient';
 
-const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3000/api';
-
-const api = axios.create({
-  baseURL: API_URL,
-  headers: {
-    'Content-Type': 'application/json',
-  },
-});
+const api = apiClient;
 
 interface LoginCredentials {
   email: string;
@@ -15,7 +8,8 @@ interface LoginCredentials {
 }
 
 interface RegisterData {
-  schoolId: string;
+  schoolName: string;
+  schoolAlias: string;
   email: string;
   password: string;
   firstName: string;

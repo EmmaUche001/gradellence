@@ -10,6 +10,27 @@ export class AssessmentsService {
   constructor(private readonly prisma: PrismaService) {}
 
   async create(dto: CreateAssessmentDto, currentUser: AuthenticatedUser) {
+    // Check subscription limit for students
+    const subscription = await this.prisma.schoolSubscription.findFirst({
+      where: { schoolId: currentUser.schoolId, status: 'ACTIVE' },
+      include: { plan: true },
+    });
+
+    if (!subscription) {
+      throw new ForbiddenException('No active subscription found');
+    }
+
+    // Check current student count
+    const currentStudentCount = await this.prisma.student.count({
+      where: { schoolId: currentUser.schoolId, deletedAt: null },
+    });
+
+    if (currentStudentCount >= subscription.plan.maxStudents) {
+      throw new ForbiddenException(
+        `Student limit reached (${subscription.plan.maxStudents}). Upgrade your plan to add more students.`
+      );
+    }
+
     const student = await this.prisma.student.findFirst({
       where: { id: dto.studentId, schoolId: currentUser.schoolId, deletedAt: null },
     });
@@ -97,6 +118,31 @@ export class AssessmentsService {
   }
 
   async bulkCreate(dto: BulkAssessmentDto, currentUser: AuthenticatedUser) {
+    // Check subscription limit for students
+    const subscription = await this.prisma.schoolSubscription.findFirst({
+      where: { schoolId: currentUser.schoolId, status: 'ACTIVE' },
+      include: { plan: true },
+    });
+
+    if (!subscription) {
+      throw new ForbiddenException('No active subscription found');
+    }
+
+    // Check current student count
+    const currentStudentCount = await this.prisma.student.count({
+      where: { schoolId: currentUser.schoolId, deletedAt: null },
+    });
+
+    // Count unique student IDs in the bulk request
+    const uniqueStudentIds = [...new Set(dto.assessments.map(a => a.studentId))];
+    
+    // Check if adding these students would exceed the limit
+    if (currentStudentCount + uniqueStudentIds.length > subscription.plan.maxStudents) {
+      throw new ForbiddenException(
+        `Student limit would be exceeded. Current: ${currentStudentCount}, Adding: ${uniqueStudentIds.length}, Limit: ${subscription.plan.maxStudents}. Upgrade your plan to add more students.`
+      );
+    }
+
     const subject = await this.prisma.subject.findFirst({
       where: { id: dto.subjectId, schoolId: currentUser.schoolId, deletedAt: null },
     });
@@ -362,6 +408,19 @@ export class AssessmentsService {
           select: {
             id: true,
             name: true,
+            session: {
+              select: {
+                id: true,
+                name: true,
+              },
+            },
+          },
+        },
+        teacher: {
+          select: {
+            id: true,
+            firstName: true,
+            lastName: true,
           },
         },
       },
@@ -483,7 +542,6 @@ export class AssessmentsService {
     });
 
     const studentIds = enrollments.map((e) => e.studentId);
-
     const assessments = await this.prisma.assessment.findMany({
       where: {
         studentId: { in: studentIds },

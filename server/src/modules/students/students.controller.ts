@@ -19,6 +19,7 @@ import { RolesGuard } from '../../common/guards/roles.guard';
 import { Roles } from '../../common/decorators/roles.decorator';
 import { ROLES } from '../../common/constants/roles.constants';
 import { AuthenticatedRequest } from '../../common/types/express.types';
+import { Cache } from '../../common/decorators/cache.decorator';
 
 @ApiTags('Students')
 @Controller('v1/students')
@@ -37,6 +38,7 @@ export class StudentsController {
   }
 
   @Get()
+  @Cache({ ttl: 60 })
   @ApiOperation({ summary: 'Get all students' })
   @ApiResponse({ status: 200, description: 'Students retrieved successfully' })
   async findAll(

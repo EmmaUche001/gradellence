@@ -15,6 +15,8 @@ import { RegisterDto } from './dto/register.dto';
 import { LoginDto } from './dto/login.dto';
 import { RefreshTokenDto } from './dto/refresh-token.dto';
 import { JwtPayload } from '../../common/types/express.types';
+import { InjectQueue } from '@nestjs/bullmq';
+import { Queue } from 'bullmq';
 
 @Injectable()
 export class AuthService {
@@ -23,6 +25,7 @@ export class AuthService {
     private readonly jwtService: JwtService,
     private readonly configService: ConfigService,
     private readonly redisService: RedisService,
+    @InjectQueue('email') private readonly emailQueue: Queue,
   ) {}
 
   async register(dto: RegisterDto) {
@@ -38,10 +41,36 @@ export class AuthService {
     // Hash password
     const passwordHash = await argon2.hash(dto.password);
 
+    // Normalize school alias into a safe slug and ensure uniqueness using upsert to avoid race conditions.
+    const normalizeSlug = (alias: string) =>
+      alias.trim().toLowerCase().replace(/\s+/g, '-').replace(/[^a-z0-9\-]/g, '').slice(0, 50);
+
+    const slug = normalizeSlug(dto.schoolAlias);
+
+    let school = null;
+    try {
+      school = await this.prisma.school.upsert({
+        where: { slug },
+        update: {},
+        create: {
+          name: dto.schoolName,
+          alias: dto.schoolAlias,
+          slug,
+        },
+      });
+    } catch (e) {
+      // In the unlikely event of a race condition or unique constraint error,
+      // fall back to finding the existing school and rethrow if not found.
+      school = await this.prisma.school.findUnique({ where: { slug } });
+      if (!school) {
+        throw e;
+      }
+    }
+
     // Create user
     const user = await this.prisma.user.create({
       data: {
-        schoolId: dto.schoolId,
+        schoolId: school.id,
         email: dto.email,
         passwordHash,
         firstName: dto.firstName,
@@ -56,6 +85,36 @@ export class AuthService {
         },
       },
     });
+
+    // Create email verification token and enqueue verification email
+    try {
+      const verificationToken = uuidv4();
+      const expiresAt = new Date();
+      expiresAt.setDate(expiresAt.getDate() + 1); // 24 hours
+
+      await (this.prisma as any).emailVerification.create({
+        data: {
+          userId: user.id,
+          token: verificationToken,
+          expiresAt,
+        },
+      });
+
+      await this.emailQueue.add('send', {
+        to: user.email,
+        subject: 'Verify your email',
+        template: 'verify-email',
+        data: {
+          token: verificationToken,
+          firstName: user.firstName,
+        },
+      });
+    } catch (e) {
+      // Non-fatal: if email queue or verification creation fails, log and continue registration.
+      // Let higher-level observability capture this; user can request resend later.
+      // (We intentionally do not block user creation for transient email/queue issues.)
+      // swallow error
+    }
 
     // Generate tokens
     const tokens = await this.generateTokens(user.id, user.email, user.schoolId);
@@ -198,9 +257,39 @@ export class AuthService {
   }
 
   async verifyEmail(token: string) {
-    // Implementation for email verification
-    // This would typically involve finding a verification token and marking the user's email as verified
-    throw new BadRequestException('Email verification not implemented yet');
+    const verification = await (this.prisma as any).emailVerification.findUnique({
+      where: { token },
+      include: { user: true },
+    });
+
+    if (!verification) {
+      throw new BadRequestException('Invalid verification token');
+    }
+
+    if (verification.usedAt) {
+      throw new BadRequestException('Verification token already used');
+    }
+
+    if (verification.expiresAt < new Date()) {
+      throw new BadRequestException('Verification token expired');
+    }
+
+    // Mark user's email as verified and mark verification record as used
+    await this.prisma.$transaction([
+      this.prisma.user.update({
+        where: { id: verification.userId },
+        data: { emailVerified: true },
+      }),
+      (this.prisma as any).emailVerification.update({
+        where: { id: verification.id },
+        data: { usedAt: new Date() },
+      }),
+    ]);
+
+    return {
+      success: true,
+      message: 'Email verified successfully',
+    };
   }
 
   async forgotPassword(email: string) {

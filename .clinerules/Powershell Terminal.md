@@ -1,0 +1,1 @@
+the terminal hereis powershell, always use powershell syntax.

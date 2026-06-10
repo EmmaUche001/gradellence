@@ -1,6 +1,7 @@
 import { Module } from '@nestjs/common';
 import { ConfigModule, ConfigService } from '@nestjs/config';
 import { ThrottlerModule } from '@nestjs/throttler';
+import { APP_GUARD, APP_INTERCEPTOR } from '@nestjs/core';
 import { PrismaModule } from './database/prisma.module';
 import { RedisModule } from './common/redis/redis.module';
 import { AuthModule } from './modules/auth/auth.module';
@@ -17,7 +18,12 @@ import { ResultsModule } from './modules/results/results.module';
 import { GradeScalesModule } from './modules/grade-scales/grade-scales.module';
 import { HealthModule } from './modules/health/health.module';
 import { AuditLogsModule } from './modules/audit-logs/audit-logs.module';
+import { SubscriptionsModule } from './modules/subscriptions/subscriptions.module';
+import { BillingModule } from './modules/billing/billing.module';
 import { configValidationSchema } from './config/config.validation';
+import { RateLimitGuard } from './common/guards/rate-limit.guard';
+import { CacheInterceptor } from './common/interceptors/cache.interceptor';
+import { BullMQModule } from './common/jobs/bullmq.module';
 
 @Module({
   imports: [
@@ -50,6 +56,9 @@ import { configValidationSchema } from './config/config.validation';
       inject: [ConfigService],
     }),
 
+    // Job processing
+    BullMQModule,
+
     // Feature modules
     AuthModule,
     SchoolsModule,
@@ -65,6 +74,16 @@ import { configValidationSchema } from './config/config.validation';
     GradeScalesModule,
     HealthModule,
     AuditLogsModule,
+  ],
+  providers: [
+    {
+      provide: APP_GUARD,
+      useClass: RateLimitGuard,
+    },
+    {
+      provide: APP_INTERCEPTOR,
+      useClass: CacheInterceptor,
+    },
   ],
 })
 export class AppModule {}

@@ -14,6 +14,17 @@ export class CreateSchoolDto {
   @MaxLength(50)
   slug!: string;
 
+  @ApiPropertyOptional({
+    example: 'springfield',
+    description:
+      'Optional human-friendly alias. If provided during registration it will be normalized into the school slug. Only lowercase letters, numbers and hyphens are allowed in the resulting slug.',
+  })
+  @IsString()
+  @IsOptional()
+  @MinLength(2)
+  @MaxLength(50)
+  alias?: string;
+
   @ApiPropertyOptional({ example: '123 Main St, Springfield' })
   @IsString()
   @IsOptional()

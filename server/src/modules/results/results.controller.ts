@@ -7,6 +7,9 @@ import {
   Body,
   UseGuards,
   ParseIntPipe,
+  Res,
+  HttpCode,
+  HttpStatus,
 } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiBearerAuth } from '@nestjs/swagger';
 import { ResultsService } from './results.service';
@@ -17,16 +20,24 @@ import { TenantGuard } from '../../common/guards/tenant.guard';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
 import { Roles } from '../../common/decorators/roles.decorator';
 import { AuthenticatedUser } from '../../common/types/express.types';
+import { RateLimit } from '../../common/decorators/rate-limit.decorator';
+import { RATE_LIMIT_PRESETS } from '../../common/constants/rate-limit.constants';
+import { PdfService } from '../../common/pdf/pdf.service';
+import { Response } from 'express';
 
 @ApiTags('Results')
 @ApiBearerAuth()
 @Controller('results')
 @UseGuards(JwtAuthGuard, RolesGuard, TenantGuard)
 export class ResultsController {
-  constructor(private readonly resultsService: ResultsService) {}
+  constructor(
+    private readonly resultsService: ResultsService,
+    private readonly pdfService: PdfService,
+  ) {}
 
   @Post('compute/:classId/:termId')
   @Roles('SCHOOL_ADMIN')
+  @RateLimit(RATE_LIMIT_PRESETS.COMPUTE)
   @ApiOperation({ summary: 'Compute results for a class in a term' })
   compute(
     @Param('classId') classId: string,
@@ -39,6 +50,7 @@ export class ResultsController {
 
   @Post('publish')
   @Roles('SCHOOL_ADMIN')
+  @RateLimit(RATE_LIMIT_PRESETS.PUBLISH)
   @ApiOperation({ summary: 'Publish results for a class and term' })
   publish(@Body() dto: PublishResultDto, @CurrentUser() user: AuthenticatedUser) {
     return this.resultsService.publishResults(dto, user);
@@ -46,6 +58,7 @@ export class ResultsController {
 
   @Post('unpublish')
   @Roles('SCHOOL_ADMIN')
+  @RateLimit(RATE_LIMIT_PRESETS.PUBLISH)
   @ApiOperation({ summary: 'Unpublish results for a class and term' })
   unpublish(@Body() dto: PublishResultDto, @CurrentUser() user: AuthenticatedUser) {
     return this.resultsService.unpublishResults(dto, user);
@@ -105,5 +118,69 @@ export class ResultsController {
     @CurrentUser() user: AuthenticatedUser,
   ) {
     return this.resultsService.getBroadsheet(classId, termId, user);
+  }
+
+  @Get('report-card/:studentId/:termId')
+  @Roles('SCHOOL_ADMIN', 'TEACHER', 'PARENT')
+  @ApiOperation({ summary: 'Generate PDF report card for a student in a term' })
+  async generateReportCard(
+    @Param('studentId') studentId: string,
+    @Param('termId') termId: string,
+    @CurrentUser() user: AuthenticatedUser,
+    @Res() res: Response,
+  ) {
+    const pdfBuffer = await this.pdfService.generateReportCard(
+      studentId,
+      termId,
+      user.schoolId,
+    );
+
+    res.set({
+      'Content-Type': 'application/pdf',
+      'Content-Disposition': `attachment; filename="report-card-${studentId}-${termId}.pdf"`,
+    });
+
+    res.send(pdfBuffer);
+  }
+
+  @Get('broadsheet-pdf/:classId/:termId')
+  @Roles('SCHOOL_ADMIN')
+  @ApiOperation({ summary: 'Generate PDF broadsheet for a class in a term' })
+  async generateBroadsheetPdf(
+    @Param('classId') classId: string,
+    @Param('termId') termId: string,
+    @CurrentUser() user: AuthenticatedUser,
+    @Res() res: Response,
+  ) {
+    const pdfBuffer = await this.pdfService.generateBroadsheet(
+      classId,
+      termId,
+      user.schoolId,
+    );
+
+    res.set({
+      'Content-Type': 'application/pdf',
+      'Content-Disposition': `attachment; filename="broadsheet-${classId}-${termId}.pdf"`,
+    });
+
+    res.send(pdfBuffer);
+  }
+
+  @Get('transcript/:studentId')
+  @Roles('SCHOOL_ADMIN', 'TEACHER', 'PARENT')
+  @ApiOperation({ summary: 'Generate PDF academic transcript for a student' })
+  async generateTranscript(
+    @Param('studentId') studentId: string,
+    @CurrentUser() user: AuthenticatedUser,
+    @Res() res: Response,
+  ) {
+    const pdfBuffer = await this.resultsService.getTranscriptData(studentId, user);
+
+    res.set({
+      'Content-Type': 'application/pdf',
+      'Content-Disposition': `attachment; filename="transcript-${studentId}.pdf"`,
+    });
+
+    res.send(pdfBuffer);
   }
 }

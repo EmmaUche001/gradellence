@@ -1,11 +1,15 @@
-import { Injectable, NotFoundException, BadRequestException } from '@nestjs/common';
+import { Injectable, NotFoundException, BadRequestException, ForbiddenException } from '@nestjs/common';
 import { PrismaService } from '../../database/prisma.service';
 import { PublishResultDto } from './dto/publish-result.dto';
 import { AuthenticatedUser } from '../../common/types/express.types';
+import { PdfService } from '../../common/pdf/pdf.service';
 
 @Injectable()
 export class ResultsService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly pdfService: PdfService,
+  ) {}
 
   async computeResults(
     classId: string,
@@ -13,6 +17,27 @@ export class ResultsService {
     currentUser: AuthenticatedUser,
     subjectIds?: string[],
   ) {
+    // Check subscription limit for students
+    const subscription = await this.prisma.schoolSubscription.findFirst({
+      where: { schoolId: currentUser.schoolId, status: 'ACTIVE' },
+      include: { plan: true },
+    });
+
+    if (!subscription) {
+      throw new ForbiddenException('No active subscription found');
+    }
+
+    // Check current student count
+    const currentStudentCount = await this.prisma.student.count({
+      where: { schoolId: currentUser.schoolId, deletedAt: null },
+    });
+
+    if (currentStudentCount >= subscription.plan.maxStudents) {
+      throw new ForbiddenException(
+        `Student limit reached (${subscription.plan.maxStudents}). Upgrade your plan to add more students.`
+      );
+    }
+
     const classEntity = await this.prisma.class.findFirst({
       where: { id: classId, schoolId: currentUser.schoolId, deletedAt: null },
     });
@@ -170,6 +195,27 @@ export class ResultsService {
   }
 
   async publishResults(dto: PublishResultDto, currentUser: AuthenticatedUser) {
+    // Check subscription limit for students
+    const subscription = await this.prisma.schoolSubscription.findFirst({
+      where: { schoolId: currentUser.schoolId, status: 'ACTIVE' },
+      include: { plan: true },
+    });
+
+    if (!subscription) {
+      throw new ForbiddenException('No active subscription found');
+    }
+
+    // Check current student count
+    const currentStudentCount = await this.prisma.student.count({
+      where: { schoolId: currentUser.schoolId, deletedAt: null },
+    });
+
+    if (currentStudentCount >= subscription.plan.maxStudents) {
+      throw new ForbiddenException(
+        `Student limit reached (${subscription.plan.maxStudents}). Upgrade your plan to add more students.`
+      );
+    }
+
     const classEntity = await this.prisma.class.findFirst({
       where: { id: dto.classId, schoolId: currentUser.schoolId, deletedAt: null },
     });
@@ -465,7 +511,6 @@ export class ResultsService {
     });
 
     const studentIds = enrollments.map((e) => e.studentId);
-
     const results = await this.prisma.result.findMany({
       where: {
         studentId: { in: studentIds },
@@ -557,7 +602,6 @@ export class ResultsService {
     });
 
     const studentIds = enrollments.map((e) => e.studentId);
-
     const results = await this.prisma.result.findMany({
       where: {
         studentId: { in: studentIds },
@@ -641,5 +685,17 @@ export class ResultsService {
         students: broadsheetData,
       },
     };
+  }
+
+  async getTranscriptData(studentId: string, currentUser: AuthenticatedUser): Promise<Buffer> {
+    const student = await this.prisma.student.findFirst({
+      where: { id: studentId, schoolId: currentUser.schoolId, deletedAt: null },
+    });
+
+    if (!student) {
+      throw new NotFoundException('Student not found');
+    }
+
+    return this.pdfService.generateTranscript(studentId, currentUser.schoolId);
   }
 }

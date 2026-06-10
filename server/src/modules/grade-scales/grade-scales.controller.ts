@@ -21,6 +21,7 @@ import { TenantGuard } from '../../common/guards/tenant.guard';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
 import { Roles } from '../../common/decorators/roles.decorator';
 import { AuthenticatedUser } from '../../common/types/express.types';
+import { Cache } from '../../common/decorators/cache.decorator';
 
 @ApiTags('Grade Scales')
 @ApiBearerAuth()
@@ -38,6 +39,7 @@ export class GradeScalesController {
 
   @Get()
   @Roles('SCHOOL_ADMIN')
+  @Cache({ ttl: 120 })
   @ApiOperation({ summary: 'Get all grade scales with pagination' })
   findAll(
     @CurrentUser() user: AuthenticatedUser,
@@ -51,6 +53,7 @@ export class GradeScalesController {
 
   @Get(':id')
   @Roles('SCHOOL_ADMIN')
+  @Cache({ ttl: 300 })
   @ApiOperation({ summary: 'Get grade scale by ID' })
   findOne(@Param('id') id: string, @CurrentUser() user: AuthenticatedUser) {
     return this.gradeScalesService.findOne(id, user);

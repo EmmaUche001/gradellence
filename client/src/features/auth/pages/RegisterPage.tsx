@@ -8,7 +8,8 @@ import { authService } from '@services/authService';
 
 const registerSchema = z
   .object({
-    schoolId: z.string().uuid('Invalid school ID'),
+    schoolName: z.string().min(2, 'School name must be at least 2 characters'),
+    schoolAlias: z.string().min(2, 'School alias must be at least 2 characters'),
     email: z.string().email('Invalid email address'),
     password: z.string().min(8, 'Password must be at least 8 characters'),
     confirmPassword: z.string(),
@@ -73,6 +74,27 @@ export function RegisterPage() {
           )}
 
           <div className="space-y-4">
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <label htmlFor="schoolName" className="label">
+                  School name
+                </label>
+                <input {...register('schoolName')} type="text" className="input" />
+                {errors.schoolName && (
+                  <p className="mt-1 text-sm text-red-600">{errors.schoolName.message}</p>
+                )}
+              </div>
+              <div>
+                <label htmlFor="schoolAlias" className="label">
+                  School alias
+                </label>
+                <input {...register('schoolAlias')} type="text" className="input" />
+                {errors.schoolAlias && (
+                  <p className="mt-1 text-sm text-red-600">{errors.schoolAlias.message}</p>
+                )}
+              </div>
+            </div>
+
             <div className="grid grid-cols-2 gap-4">
               <div>
                 <label htmlFor="firstName" className="label">

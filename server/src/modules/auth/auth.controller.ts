@@ -6,13 +6,16 @@ import { LoginDto } from './dto/login.dto';
 import { RefreshTokenDto } from './dto/refresh-token.dto';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
 import { AuthenticatedRequest } from '../../common/types/express.types';
+import { RateLimit } from '../../common/decorators/rate-limit.decorator';
+import { RATE_LIMIT_PRESETS } from '../../common/constants/rate-limit.constants';
 
 @ApiTags('Authentication')
-@Controller('v1/auth')
+@Controller('auth')
 export class AuthController {
   constructor(private readonly authService: AuthService) {}
 
   @Post('register')
+  @RateLimit(RATE_LIMIT_PRESETS.AUTH_STRICT)
   @HttpCode(HttpStatus.CREATED)
   @ApiOperation({ summary: 'Register a new user' })
   @ApiResponse({ status: 201, description: 'User registered successfully' })
@@ -23,6 +26,7 @@ export class AuthController {
   }
 
   @Post('login')
+  @RateLimit(RATE_LIMIT_PRESETS.AUTH_STRICT)
   @HttpCode(HttpStatus.OK)
   @ApiOperation({ summary: 'Login user' })
   @ApiResponse({ status: 200, description: 'Login successful' })
@@ -32,6 +36,7 @@ export class AuthController {
   }
 
   @Post('refresh')
+  @RateLimit(RATE_LIMIT_PRESETS.AUTH_MODERATE)
   @HttpCode(HttpStatus.OK)
   @ApiOperation({ summary: 'Refresh access token' })
   @ApiResponse({ status: 200, description: 'Token refreshed successfully' })
@@ -51,6 +56,7 @@ export class AuthController {
   }
 
   @Post('verify-email')
+  @RateLimit(RATE_LIMIT_PRESETS.AUTH_STRICT)
   @HttpCode(HttpStatus.OK)
   @ApiOperation({ summary: 'Verify email address' })
   @ApiResponse({ status: 200, description: 'Email verified successfully' })
@@ -59,6 +65,7 @@ export class AuthController {
   }
 
   @Post('forgot-password')
+  @RateLimit(RATE_LIMIT_PRESETS.AUTH_PASSWORD)
   @HttpCode(HttpStatus.OK)
   @ApiOperation({ summary: 'Request password reset' })
   @ApiResponse({ status: 200, description: 'Password reset email sent' })
@@ -67,6 +74,7 @@ export class AuthController {
   }
 
   @Post('reset-password')
+  @RateLimit(RATE_LIMIT_PRESETS.AUTH_PASSWORD)
   @HttpCode(HttpStatus.OK)
   @ApiOperation({ summary: 'Reset password' })
   @ApiResponse({ status: 200, description: 'Password reset successful' })

@@ -38,18 +38,19 @@ export function RegisterPage() {
   });
 
   const onSubmit = async (data: RegisterFormData) => {
-    setIsLoading(true);
-    setError(null);
+  setIsLoading(true);
+  setError(null);
 
-    try {
-      const response = await authService.register(data);
-      setAuth(response.user, response.accessToken, response.refreshToken);
-    } catch (err: any) {
-      setError(err.response?.data?.error?.message || 'Registration failed');
-    } finally {
-      setIsLoading(false);
-    }
-  };
+  try {
+    const { confirmPassword, ...registerPayload } = data;
+    const response = await authService.register(registerPayload);
+    setAuth(response.user, response.accessToken, response.refreshToken);
+  } catch (err: any) {
+    setError(err.response?.data?.error?.message || 'Registration failed');
+  } finally {
+    setIsLoading(false);
+  }
+};
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-gray-50 py-12 px-4 sm:px-6 lg:px-8">

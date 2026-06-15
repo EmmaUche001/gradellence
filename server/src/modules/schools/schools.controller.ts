@@ -8,6 +8,8 @@ import {
   Delete,
   UseGuards,
   Query,
+  DefaultValuePipe,
+  ParseIntPipe,
 } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiResponse, ApiBearerAuth } from '@nestjs/swagger';
 import { SchoolsService } from './schools.service';
@@ -19,7 +21,7 @@ import { Roles } from '../../common/decorators/roles.decorator';
 import { ROLES } from '../../common/constants/roles.constants';
 
 @ApiTags('Schools')
-@Controller('v1/schools')
+@Controller('schools')
 @UseGuards(JwtAuthGuard, RolesGuard)
 @ApiBearerAuth()
 export class SchoolsController {
@@ -39,7 +41,10 @@ export class SchoolsController {
   @Roles(ROLES.SUPER_ADMIN)
   @ApiOperation({ summary: 'Get all schools' })
   @ApiResponse({ status: 200, description: 'Schools retrieved successfully' })
-  async findAll(@Query('page') page = 1, @Query('limit') limit = 20) {
+  async findAll(
+    @Query('page', new DefaultValuePipe(1), ParseIntPipe) page: number,
+    @Query('limit', new DefaultValuePipe(20), ParseIntPipe) limit: number,
+  ) {
     return this.schoolsService.findAll(page, limit);
   }
 

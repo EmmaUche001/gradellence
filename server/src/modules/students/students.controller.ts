@@ -9,6 +9,8 @@ import {
   UseGuards,
   Query,
   Request,
+  DefaultValuePipe,
+  ParseIntPipe,
 } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiResponse, ApiBearerAuth } from '@nestjs/swagger';
 import { StudentsService } from './students.service';
@@ -22,7 +24,7 @@ import { AuthenticatedRequest } from '../../common/types/express.types';
 import { Cache } from '../../common/decorators/cache.decorator';
 
 @ApiTags('Students')
-@Controller('v1/students')
+@Controller('students')
 @UseGuards(JwtAuthGuard, RolesGuard)
 @ApiBearerAuth()
 export class StudentsController {
@@ -43,8 +45,8 @@ export class StudentsController {
   @ApiResponse({ status: 200, description: 'Students retrieved successfully' })
   async findAll(
     @Request() req: AuthenticatedRequest,
-    @Query('page') page = 1,
-    @Query('limit') limit = 20,
+    @Query('page', new DefaultValuePipe(1), ParseIntPipe) page: number,
+    @Query('limit', new DefaultValuePipe(20), ParseIntPipe) limit: number,
     @Query('search') search?: string,
   ) {
     return this.studentsService.findAll(req.user, page, limit, search);

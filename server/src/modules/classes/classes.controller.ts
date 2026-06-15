@@ -9,6 +9,8 @@ import {
   UseGuards,
   Query,
   Request,
+  DefaultValuePipe,
+  ParseIntPipe,
 } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiResponse, ApiBearerAuth } from '@nestjs/swagger';
 import { ClassesService } from './classes.service';
@@ -21,7 +23,7 @@ import { ROLES } from '../../common/constants/roles.constants';
 import { AuthenticatedRequest } from '../../common/types/express.types';
 
 @ApiTags('Classes')
-@Controller('v1/classes')
+@Controller('classes')
 @UseGuards(JwtAuthGuard, RolesGuard)
 @ApiBearerAuth()
 export class ClassesController {
@@ -42,8 +44,8 @@ export class ClassesController {
   @ApiResponse({ status: 200, description: 'Classes retrieved successfully' })
   async findAll(
     @Request() req: AuthenticatedRequest,
-    @Query('page') page = 1,
-    @Query('limit') limit = 20,
+    @Query('page', new DefaultValuePipe(1), ParseIntPipe) page: number,
+    @Query('limit', new DefaultValuePipe(20), ParseIntPipe) limit: number,
     @Query('level') level?: number,
   ) {
     return this.classesService.findAll(req.user, page, limit, level);

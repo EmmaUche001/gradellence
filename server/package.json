@@ -30,7 +30,7 @@
     "@nestjs/platform-express": "^10.0.0",
     "@nestjs/swagger": "^7.1.0",
     "@nestjs/throttler": "^5.0.0",
-    "@prisma/client": "^5.2.0",
+    "@prisma/client": "^5.22.0",
     "@types/ioredis": "^4.28.10",
     "@types/pdfkit": "^0.17.6",
     "argon2": "^0.31.0",

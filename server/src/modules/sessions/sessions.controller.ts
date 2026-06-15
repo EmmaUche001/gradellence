@@ -9,6 +9,8 @@ import {
   UseGuards,
   Query,
   Request,
+  DefaultValuePipe,
+  ParseIntPipe,
 } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiResponse, ApiBearerAuth } from '@nestjs/swagger';
 import { SessionsService } from './sessions.service';
@@ -23,7 +25,7 @@ import { ROLES } from '../../common/constants/roles.constants';
 import { AuthenticatedRequest } from '../../common/types/express.types';
 
 @ApiTags('Sessions & Terms')
-@Controller('v1/sessions')
+@Controller('sessions')
 @UseGuards(JwtAuthGuard, RolesGuard)
 @ApiBearerAuth()
 export class SessionsController {
@@ -45,8 +47,8 @@ export class SessionsController {
   @ApiResponse({ status: 200, description: 'Sessions retrieved successfully' })
   async findAllSessions(
     @Request() req: AuthenticatedRequest,
-    @Query('page') page = 1,
-    @Query('limit') limit = 20,
+    @Query('page', new DefaultValuePipe(1), ParseIntPipe) page: number,
+    @Query('limit', new DefaultValuePipe(20), ParseIntPipe) limit: number,
   ) {
     return this.sessionsService.findAllSessions(req.user, page, limit);
   }

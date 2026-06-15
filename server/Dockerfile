@@ -1,5 +1,5 @@
 # Build stage
-FROM node:18-alpine AS builder
+FROM node:22-alpine AS builder
 
 WORKDIR /app
 
@@ -14,7 +14,7 @@ RUN npx prisma generate
 RUN npm run build
 
 # Production stage - Use Debian-based image for Prisma compatibility
-FROM node:18-slim
+FROM node:22-slim
 
 WORKDIR /app
 
@@ -33,4 +33,4 @@ RUN npm ci --only=production && npm rebuild argon2
 
 EXPOSE 3000
 
-CMD ["node", "dist/main"]
+CMD ["node", "dist/src/main"]

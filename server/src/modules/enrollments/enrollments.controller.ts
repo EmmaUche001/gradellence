@@ -9,6 +9,8 @@ import {
   UseGuards,
   Query,
   Request,
+  DefaultValuePipe,
+  ParseIntPipe,
 } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiResponse, ApiBearerAuth } from '@nestjs/swagger';
 import { EnrollmentsService } from './enrollments.service';
@@ -24,7 +26,7 @@ import { RateLimit } from '../../common/decorators/rate-limit.decorator';
 import { RATE_LIMIT_PRESETS } from '../../common/constants/rate-limit.constants';
 
 @ApiTags('Enrollments')
-@Controller('v1/enrollments')
+@Controller('enrollments')
 @UseGuards(JwtAuthGuard, RolesGuard)
 @ApiBearerAuth()
 export class EnrollmentsController {
@@ -58,8 +60,8 @@ export class EnrollmentsController {
   @ApiResponse({ status: 200, description: 'Enrollments retrieved successfully' })
   async findAll(
     @Request() req: AuthenticatedRequest,
-    @Query('page') page = 1,
-    @Query('limit') limit = 20,
+    @Query('page', new DefaultValuePipe(1), ParseIntPipe) page: number,
+    @Query('limit', new DefaultValuePipe(20), ParseIntPipe) limit: number,
     @Query('classId') classId?: string,
     @Query('termId') termId?: string,
   ) {

@@ -80,7 +80,9 @@ export class BulkEnrollmentProcessor extends WorkerHost {
           results.success++;
         } catch (err) {
           results.failed++;
-          results.errors.push(`Student ${studentId}: ${err instanceof Error ? err.message : 'Unknown error'}`);
+          results.errors.push(
+            `Student ${studentId}: ${err instanceof Error ? err.message : 'Unknown error'}`,
+          );
         }
       }
 

@@ -1,4 +1,9 @@
-import { Injectable, NotFoundException, ConflictException, ForbiddenException } from '@nestjs/common';
+import {
+  Injectable,
+  NotFoundException,
+  ConflictException,
+  ForbiddenException,
+} from '@nestjs/common';
 import { PrismaService } from '../../database/prisma.service';
 import { CreateAssessmentDto } from './dto/create-assessment.dto';
 import { UpdateAssessmentDto } from './dto/update-assessment.dto';
@@ -27,7 +32,7 @@ export class AssessmentsService {
 
     if (currentStudentCount >= subscription.plan.maxStudents) {
       throw new ForbiddenException(
-        `Student limit reached (${subscription.plan.maxStudents}). Upgrade your plan to add more students.`
+        `Student limit reached (${subscription.plan.maxStudents}). Upgrade your plan to add more students.`,
       );
     }
 
@@ -65,7 +70,9 @@ export class AssessmentsService {
     });
 
     if (existingAssessment) {
-      throw new ConflictException('Assessment already exists for this student, subject, term, and type');
+      throw new ConflictException(
+        'Assessment already exists for this student, subject, term, and type',
+      );
     }
 
     if (dto.score > dto.maxScore) {
@@ -134,12 +141,12 @@ export class AssessmentsService {
     });
 
     // Count unique student IDs in the bulk request
-    const uniqueStudentIds = [...new Set(dto.assessments.map(a => a.studentId))];
-    
+    const uniqueStudentIds = [...new Set(dto.assessments.map((a) => a.studentId))];
+
     // Check if adding these students would exceed the limit
     if (currentStudentCount + uniqueStudentIds.length > subscription.plan.maxStudents) {
       throw new ForbiddenException(
-        `Student limit would be exceeded. Current: ${currentStudentCount}, Adding: ${uniqueStudentIds.length}, Limit: ${subscription.plan.maxStudents}. Upgrade your plan to add more students.`
+        `Student limit would be exceeded. Current: ${currentStudentCount}, Adding: ${uniqueStudentIds.length}, Limit: ${subscription.plan.maxStudents}. Upgrade your plan to add more students.`,
       );
     }
 

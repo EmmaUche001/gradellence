@@ -1,12 +1,4 @@
-import {
-  Controller,
-  Get,
-  Post,
-  Delete,
-  Param,
-  Body,
-  UseGuards,
-} from '@nestjs/common';
+import { Controller, Get, Post, Delete, Param, Body, UseGuards } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiBearerAuth } from '@nestjs/swagger';
 import { SubscriptionsService } from './subscriptions.service';
 import { CreatePlanDto } from './dto/create-plan.dto';
@@ -64,10 +56,7 @@ export class SubscriptionsController {
   @UseGuards(JwtAuthGuard, RolesGuard, TenantGuard)
   @Roles('SCHOOL_ADMIN')
   @ApiOperation({ summary: 'Subscribe to a plan' })
-  subscribe(
-    @Param('planId') planId: string,
-    @CurrentUser() user: AuthenticatedUser,
-  ) {
+  subscribe(@Param('planId') planId: string, @CurrentUser() user: AuthenticatedUser) {
     return this.subscriptionsService.subscribe(user.schoolId, planId);
   }
 

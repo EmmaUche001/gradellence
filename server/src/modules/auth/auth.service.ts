@@ -43,7 +43,12 @@ export class AuthService {
 
     // Normalize school alias into a safe slug and ensure uniqueness using upsert to avoid race conditions.
     const normalizeSlug = (alias: string) =>
-      alias.trim().toLowerCase().replace(/\s+/g, '-').replace(/[^a-z0-9\-]/g, '').slice(0, 50);
+      alias
+        .trim()
+        .toLowerCase()
+        .replace(/\s+/g, '-')
+        .replace(/[^a-z0-9\-]/g, '')
+        .slice(0, 50);
 
     const slug = normalizeSlug(dto.schoolAlias);
 
@@ -67,6 +72,19 @@ export class AuthService {
       }
     }
 
+    let schoolAdminRole = await this.prisma.role.findFirst({
+      where: { schoolId: school.id, name: 'SCHOOL_ADMIN' },
+    });
+    if (!schoolAdminRole) {
+      schoolAdminRole = await this.prisma.role.create({
+        data: {
+          schoolId: school.id,
+          name: 'SCHOOL_ADMIN',
+          description: 'School administrator with full access',
+        },
+      });
+    }
+
     // Create user
     const user = await this.prisma.user.create({
       data: {
@@ -76,6 +94,11 @@ export class AuthService {
         firstName: dto.firstName,
         lastName: dto.lastName,
         phone: dto.phone,
+        roles: {
+          create: {
+            roleId: schoolAdminRole.id,
+          },
+        },
       },
       include: {
         roles: {
@@ -85,6 +108,38 @@ export class AuthService {
         },
       },
     });
+
+    // Auto-create default trial subscription if none exists (non-fatal)
+    try {
+      const existingSub = await this.prisma.schoolSubscription.findFirst({
+        where: { schoolId: school.id },
+      });
+      if (!existingSub) {
+        // Prefer planId from DTO, otherwise pick any available plan
+        let planId = (dto as any).planId;
+        if (!planId) {
+          const plan = await this.prisma.subscriptionPlan.findFirst({ where: { isActive: true } });
+          planId = plan ? plan.id : null;
+        }
+
+        if (planId) {
+          const startDate = new Date();
+          const endDate = new Date(startDate);
+          endDate.setDate(endDate.getDate() + 30); // 30-day trial
+          await this.prisma.schoolSubscription.create({
+            data: {
+              schoolId: school.id,
+              planId,
+              startDate,
+              endDate,
+              status: 'ACTIVE',
+            },
+          });
+        }
+      }
+    } catch (e) {
+      // Non-fatal: do not block registration on subscription creation errors
+    }
 
     // Create email verification token and enqueue verification email
     try {
@@ -117,7 +172,13 @@ export class AuthService {
     }
 
     // Generate tokens
-    const tokens = await this.generateTokens(user.id, user.email, user.schoolId);
+    const tokens = await this.generateTokens(
+      user.id,
+      user.email,
+      user.schoolId,
+      user.roles.map((ur) => ur.role.name),
+      [],
+    );
 
     return {
       success: true,
@@ -171,7 +232,13 @@ export class AuthService {
     });
 
     // Generate tokens
-    const tokens = await this.generateTokens(user.id, user.email, user.schoolId);
+    const tokens = await this.generateTokens(
+      user.id,
+      user.email,
+      user.schoolId,
+      user.roles.map((ur) => ur.role.name),
+      [],
+    );
 
     return {
       success: true,
@@ -231,6 +298,8 @@ export class AuthService {
       refreshToken.user.id,
       refreshToken.user.email,
       refreshToken.user.schoolId,
+      [],
+      [],
     );
 
     return {
@@ -319,13 +388,19 @@ export class AuthService {
     throw new BadRequestException('Password reset not implemented yet');
   }
 
-  private async generateTokens(userId: string, email: string, schoolId: string) {
+  private async generateTokens(
+    userId: string,
+    email: string,
+    schoolId: string,
+    roles: string[] = [],
+    permissions: string[] = [],
+  ) {
     const payload: JwtPayload = {
       sub: userId,
       email,
       schoolId,
-      roles: [],
-      permissions: [],
+      roles,
+      permissions,
     };
 
     const accessToken = this.jwtService.sign(payload);

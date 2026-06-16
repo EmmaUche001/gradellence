@@ -21,7 +21,7 @@ export class ResultComputationProcessor extends WorkerHost {
 
   async process(job: Job<ResultComputationJob>): Promise<any> {
     const { classId, termId, schoolId, subjectIds, userId } = job.data;
-    
+
     this.logger.log(
       `Processing result computation for class ${classId}, term ${termId}, school ${schoolId}`,
     );
@@ -29,8 +29,8 @@ export class ResultComputationProcessor extends WorkerHost {
     try {
       // Get all enrollments for this class and term (through student's school)
       const enrollments = await this.prisma.enrollment.findMany({
-        where: { 
-          classId, 
+        where: {
+          classId,
           termId,
           student: { schoolId },
         },
@@ -49,9 +49,7 @@ export class ResultComputationProcessor extends WorkerHost {
       // Compute results for each student
       const results = [];
       for (const enrollment of enrollments) {
-        const studentAssessments = assessments.filter(
-          (a) => a.studentId === enrollment.studentId,
-        );
+        const studentAssessments = assessments.filter((a) => a.studentId === enrollment.studentId);
 
         // Group by subject
         const subjectGroups = new Map<string, typeof studentAssessments>();
@@ -62,10 +60,7 @@ export class ResultComputationProcessor extends WorkerHost {
         }
 
         for (const [subjectId, subjectAssessments] of subjectGroups) {
-          const totalScore = subjectAssessments.reduce(
-            (sum, a) => sum + (a.score || 0),
-            0,
-          );
+          const totalScore = subjectAssessments.reduce((sum, a) => sum + (a.score || 0), 0);
 
           results.push({
             studentId: enrollment.studentId,
@@ -96,17 +91,12 @@ export class ResultComputationProcessor extends WorkerHost {
         });
       }
 
-      this.logger.log(
-        `Result computation completed: ${results.length} results computed`,
-      );
+      this.logger.log(`Result computation completed: ${results.length} results computed`);
 
       return { success: true, count: results.length };
     } catch (error) {
       const err = error as Error;
-      this.logger.error(
-        `Result computation failed: ${err.message}`,
-        err.stack,
-      );
+      this.logger.error(`Result computation failed: ${err.message}`, err.stack);
       throw error;
     }
   }

@@ -1,9 +1,4 @@
-import {
-  CallHandler,
-  ExecutionContext,
-  Injectable,
-  NestInterceptor,
-} from '@nestjs/common';
+import { CallHandler, ExecutionContext, Injectable, NestInterceptor } from '@nestjs/common';
 import { Reflector } from '@nestjs/core';
 import { Observable, from, of } from 'rxjs';
 import { switchMap, tap } from 'rxjs/operators';
@@ -19,7 +14,7 @@ export class CacheInterceptor implements NestInterceptor {
 
   intercept(context: ExecutionContext, next: CallHandler): Observable<any> {
     const options = this.reflector.get<CacheOptions>(CACHE_KEY, context.getHandler());
-    
+
     // No cache decorator - pass through
     if (!options) {
       return next.handle();
@@ -50,11 +45,11 @@ export class CacheInterceptor implements NestInterceptor {
             // If parsing fails, fall through to controller
           }
         }
-        
+
         // Cache miss - proceed to controller
         const response = context.switchToHttp().getResponse();
         response.setHeader('X-Cache', 'MISS');
-        
+
         return next.handle().pipe(
           tap((responseData) => {
             // Only cache successful responses (2xx)
@@ -66,37 +61,40 @@ export class CacheInterceptor implements NestInterceptor {
                 // Silently fail on cache write errors
               }
             }
-          })
+          }),
         );
-      })
+      }),
     );
   }
 
   private generateCacheKey(context: ExecutionContext, options: CacheOptions): string {
     const request = context.switchToHttp().getRequest();
-    
+
     // Base key from method, path
     let key = `${request.method}:${request.path}`;
-    
+
     // Add query parameters (sorted for consistent keys)
     const queryParams = Object.keys(request.query)
-      .filter(k => k !== undefined && k !== null)
+      .filter((k) => k !== undefined && k !== null)
       .sort()
-      .reduce((acc, k) => {
-        acc[k] = request.query[k];
-        return acc;
-      }, {} as Record<string, any>);
-    
+      .reduce(
+        (acc, k) => {
+          acc[k] = request.query[k];
+          return acc;
+        },
+        {} as Record<string, any>,
+      );
+
     if (Object.keys(queryParams).length > 0) {
       key += `:${JSON.stringify(queryParams)}`;
     }
-    
+
     // Add user ID for authenticated requests to prevent cross-user cache leakage
     const user = request.user;
     if (user && user.id) {
       key += `:user:${user.id}`;
     }
-    
+
     // Add custom key generator if provided
     if (options.keyGenerator) {
       try {
@@ -108,7 +106,7 @@ export class CacheInterceptor implements NestInterceptor {
         // If key generator fails, continue with base key
       }
     }
-    
+
     return `srms:cache:${key}`;
   }
 }

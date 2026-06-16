@@ -77,7 +77,15 @@ export class ResultsController {
     @Query('isPublished') isPublished?: string,
   ) {
     const publishedBool = isPublished !== undefined ? isPublished === 'true' : undefined;
-    return this.resultsService.findAll(user, page, limit, studentId, subjectId, termId, publishedBool);
+    return this.resultsService.findAll(
+      user,
+      page,
+      limit,
+      studentId,
+      subjectId,
+      termId,
+      publishedBool,
+    );
   }
 
   @Get(':id')
@@ -129,11 +137,7 @@ export class ResultsController {
     @CurrentUser() user: AuthenticatedUser,
     @Res() res: Response,
   ) {
-    const pdfBuffer = await this.pdfService.generateReportCard(
-      studentId,
-      termId,
-      user.schoolId,
-    );
+    const pdfBuffer = await this.pdfService.generateReportCard(studentId, termId, user.schoolId);
 
     res.set({
       'Content-Type': 'application/pdf',
@@ -152,11 +156,7 @@ export class ResultsController {
     @CurrentUser() user: AuthenticatedUser,
     @Res() res: Response,
   ) {
-    const pdfBuffer = await this.pdfService.generateBroadsheet(
-      classId,
-      termId,
-      user.schoolId,
-    );
+    const pdfBuffer = await this.pdfService.generateBroadsheet(classId, termId, user.schoolId);
 
     res.set({
       'Content-Type': 'application/pdf',

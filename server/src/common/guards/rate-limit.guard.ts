@@ -40,21 +40,18 @@ export class RateLimitGuard implements CanActivate {
     const response = context.switchToHttp().getResponse();
 
     // Identifier = IP address (or X-Forwarded-For in production behind proxy)
-    const ip = (request.headers['x-forwarded-for'] as string)?.split(',')[0]?.trim()
-      || request.ip
-      || request.socket?.remoteAddress
-      || 'unknown';
+    const ip =
+      (request.headers['x-forwarded-for'] as string)?.split(',')[0]?.trim() ||
+      request.ip ||
+      request.socket?.remoteAddress ||
+      'unknown';
 
     const routeKey = `${request.method}:${request.route?.path || request.url}`;
 
     const windowSec = Math.ceil(options.windowMs / 1000);
 
     try {
-      const currentCount = await this.redisService.incrementRateLimit(
-        ip,
-        routeKey,
-        windowSec,
-      );
+      const currentCount = await this.redisService.incrementRateLimit(ip, routeKey, windowSec);
 
       // Set standard rate-limit headers
       response.setHeader('X-RateLimit-Limit', options.limit);

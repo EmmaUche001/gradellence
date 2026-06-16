@@ -1,11 +1,4 @@
-import {
-  Controller,
-  Get,
-  Post,
-  Param,
-  Body,
-  UseGuards,
-} from '@nestjs/common';
+import { Controller, Get, Post, Param, Body, UseGuards } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiBearerAuth } from '@nestjs/swagger';
 import { BillingService } from './billing.service';
 import { CreateInvoiceDto } from './dto/create-invoice.dto';
@@ -26,9 +19,7 @@ export class BillingController {
   @UseGuards(JwtAuthGuard, RolesGuard, TenantGuard)
   @Roles('SCHOOL_ADMIN', 'TEACHER')
   @ApiOperation({ summary: 'Get school invoices' })
-  getInvoices(
-    @CurrentUser() user: AuthenticatedUser,
-  ) {
+  getInvoices(@CurrentUser() user: AuthenticatedUser) {
     return this.billingService.getInvoices(user.schoolId);
   }
 
@@ -36,10 +27,7 @@ export class BillingController {
   @UseGuards(JwtAuthGuard, RolesGuard, TenantGuard)
   @Roles('SCHOOL_ADMIN', 'TEACHER')
   @ApiOperation({ summary: 'Get invoice details' })
-  getInvoice(
-    @Param('id') id: string,
-    @CurrentUser() user: AuthenticatedUser,
-  ) {
+  getInvoice(@Param('id') id: string, @CurrentUser() user: AuthenticatedUser) {
     return this.billingService.getInvoice(id);
   }
 
@@ -47,10 +35,7 @@ export class BillingController {
   @UseGuards(JwtAuthGuard, RolesGuard, TenantGuard)
   @Roles('SCHOOL_ADMIN')
   @ApiOperation({ summary: 'Create a manual invoice' })
-  createInvoice(
-    @Body() dto: CreateInvoiceDto,
-    @CurrentUser() user: AuthenticatedUser,
-  ) {
+  createInvoice(@Body() dto: CreateInvoiceDto, @CurrentUser() user: AuthenticatedUser) {
     // Ensure schoolId matches current user's school
     dto.schoolId = user.schoolId;
     return this.billingService.createInvoice(dto);
@@ -72,10 +57,7 @@ export class BillingController {
   @UseGuards(JwtAuthGuard, RolesGuard, TenantGuard)
   @Roles('SCHOOL_ADMIN')
   @ApiOperation({ summary: 'Mark invoice as failed' })
-  failInvoice(
-    @Param('id') id: string,
-    @CurrentUser() user: AuthenticatedUser,
-  ) {
+  failInvoice(@Param('id') id: string, @CurrentUser() user: AuthenticatedUser) {
     return this.billingService.failInvoice(id);
   }
 }

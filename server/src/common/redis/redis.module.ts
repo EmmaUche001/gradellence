@@ -65,17 +65,17 @@ export class RedisModule {
   static registerCache(options: RedisModuleOptions = {}): DynamicModule {
     return CacheModule.registerAsync({
       imports: [ConfigModule],
-        useFactory: async (configService: ConfigService) => ({
-          store: await redisStore({
-            host: configService.get<string>('REDIS_HOST') ?? options.host ?? 'localhost',
-            port: configService.get<number>('REDIS_PORT') ?? options.port ?? 6379,
-            password: configService.get<string>('REDIS_PASSWORD') ?? options.password,
-            db: configService.get<number>('REDIS_DB') ?? options.db ?? 0,
-            ttl: options.ttl || 60,
-            max: options.max || 100,
-          }),
-          isGlobal: true,
+      useFactory: async (configService: ConfigService) => ({
+        store: await redisStore({
+          host: configService.get<string>('REDIS_HOST') ?? options.host ?? 'localhost',
+          port: configService.get<number>('REDIS_PORT') ?? options.port ?? 6379,
+          password: configService.get<string>('REDIS_PASSWORD') ?? options.password,
+          db: configService.get<number>('REDIS_DB') ?? options.db ?? 0,
+          ttl: options.ttl || 60,
+          max: options.max || 100,
         }),
+        isGlobal: true,
+      }),
       inject: [ConfigService],
     });
   }

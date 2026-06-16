@@ -8,11 +8,7 @@ export class PdfService {
 
   constructor(private readonly prisma: PrismaService) {}
 
-  async generateReportCard(
-    studentId: string,
-    termId: string,
-    schoolId: string,
-  ): Promise<Buffer> {
+  async generateReportCard(studentId: string, termId: string, schoolId: string): Promise<Buffer> {
     const student = await this.prisma.student.findFirst({
       where: { id: studentId, schoolId },
       include: {
@@ -98,11 +94,7 @@ export class PdfService {
     });
   }
 
-  async generateBroadsheet(
-    classId: string,
-    termId: string,
-    schoolId: string,
-  ): Promise<Buffer> {
+  async generateBroadsheet(classId: string, termId: string, schoolId: string): Promise<Buffer> {
     const classData = await this.prisma.class.findFirst({
       where: { id: classId, schoolId },
       include: {
@@ -148,7 +140,9 @@ export class PdfService {
 
       doc.fontSize(16).text(classData.school.name.toUpperCase(), { align: 'center' });
       doc.fontSize(12).text('ACADEMIC BROADSHEET', { align: 'center' });
-      doc.fontSize(10).text(`Class: ${classData.name} | Term: ${term?.name || 'N/A'}`, { align: 'center' });
+      doc
+        .fontSize(10)
+        .text(`Class: ${classData.name} | Term: ${term?.name || 'N/A'}`, { align: 'center' });
       doc.moveDown();
 
       const subjectColWidth = 50;
@@ -162,12 +156,18 @@ export class PdfService {
       x += 100;
 
       for (const [, subjectName] of subjects) {
-        doc.text(subjectName.substring(0, 6), x, startY, { width: subjectColWidth, align: 'center' });
+        doc.text(subjectName.substring(0, 6), x, startY, {
+          width: subjectColWidth,
+          align: 'center',
+        });
         x += subjectColWidth;
       }
       doc.text('Avg', x, startY, { width: 40, align: 'center' });
 
-      doc.moveTo(30, doc.y + 5).lineTo(820, doc.y).stroke();
+      doc
+        .moveTo(30, doc.y + 5)
+        .lineTo(820, doc.y)
+        .stroke();
       doc.moveDown();
 
       doc.font('Helvetica').fontSize(7);
@@ -219,10 +219,7 @@ export class PdfService {
     return 'F';
   }
 
-  async generateTranscript(
-    studentId: string,
-    schoolId: string,
-  ): Promise<Buffer> {
+  async generateTranscript(studentId: string, schoolId: string): Promise<Buffer> {
     const student = await this.prisma.student.findFirst({
       where: { id: studentId, schoolId },
       include: {
@@ -332,7 +329,8 @@ export class PdfService {
       doc.moveTo(50, doc.y).lineTo(550, doc.y).stroke();
       doc.moveDown(0.5);
       doc.font('Helvetica-Bold').fontSize(12);
-      const cumulativeGPA = cumulativeTotalUnits > 0 ? cumulativeTotalPoints / cumulativeTotalUnits : 0;
+      const cumulativeGPA =
+        cumulativeTotalUnits > 0 ? cumulativeTotalPoints / cumulativeTotalUnits : 0;
       doc.text(`Cumulative Total Units: ${cumulativeTotalUnits}`);
       doc.text(`Cumulative GPA: ${cumulativeGPA.toFixed(2)}`);
 
@@ -340,7 +338,9 @@ export class PdfService {
       doc.font('Helvetica').fontSize(8).fillColor('gray');
       doc.text(`Generated on ${new Date().toLocaleDateString()}`, { align: 'center' });
       doc.text('This is a computer-generated document.', { align: 'center' });
-      doc.text('Transcript is valid only with the institution seal and signature.', { align: 'center' });
+      doc.text('Transcript is valid only with the institution seal and signature.', {
+        align: 'center',
+      });
 
       doc.end();
     });

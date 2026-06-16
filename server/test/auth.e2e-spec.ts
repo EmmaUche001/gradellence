@@ -106,14 +106,12 @@ describe('AuthController (e2e)', () => {
   describe('POST /api/v1/auth/login', () => {
     beforeEach(async () => {
       // Register a test user
-      await request(app.getHttpServer())
-        .post('/api/v1/auth/register')
-        .send({
-          email: testEmail,
-          password: testPassword,
-          firstName: 'Test',
-          lastName: 'User',
-        });
+      await request(app.getHttpServer()).post('/api/v1/auth/register').send({
+        email: testEmail,
+        password: testPassword,
+        firstName: 'Test',
+        lastName: 'User',
+      });
     });
 
     it('should login with valid credentials', async () => {
@@ -156,14 +154,12 @@ describe('AuthController (e2e)', () => {
     let refreshToken: string;
 
     beforeEach(async () => {
-      const res = await request(app.getHttpServer())
-        .post('/api/v1/auth/register')
-        .send({
-          email: testEmail,
-          password: testPassword,
-          firstName: 'Test',
-          lastName: 'User',
-        });
+      const res = await request(app.getHttpServer()).post('/api/v1/auth/register').send({
+        email: testEmail,
+        password: testPassword,
+        firstName: 'Test',
+        lastName: 'User',
+      });
       refreshToken = res.body.data.refreshToken;
     });
 
@@ -190,14 +186,12 @@ describe('AuthController (e2e)', () => {
     let accessToken: string;
 
     beforeEach(async () => {
-      const res = await request(app.getHttpServer())
-        .post('/api/v1/auth/register')
-        .send({
-          email: testEmail,
-          password: testPassword,
-          firstName: 'Test',
-          lastName: 'User',
-        });
+      const res = await request(app.getHttpServer()).post('/api/v1/auth/register').send({
+        email: testEmail,
+        password: testPassword,
+        firstName: 'Test',
+        lastName: 'User',
+      });
       accessToken = res.body.data.accessToken;
     });
 
@@ -209,9 +203,7 @@ describe('AuthController (e2e)', () => {
     });
 
     it('should return 401 without token', async () => {
-      await request(app.getHttpServer())
-        .post('/api/v1/auth/logout')
-        .expect(401);
+      await request(app.getHttpServer()).post('/api/v1/auth/logout').expect(401);
     });
   });
 

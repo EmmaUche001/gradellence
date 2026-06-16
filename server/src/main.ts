@@ -57,13 +57,13 @@ async function bootstrap() {
       .setTitle('Gradellence SRMS API')
       .setDescription(
         'School Result Management System (SRMS) API Documentation.\n\n' +
-        '## Authentication\n' +
-        'All protected endpoints require a Bearer token in the Authorization header.\n' +
-        'Use the `/v1/auth/login` endpoint to obtain an access token.\n\n' +
-        '## Rate Limiting\n' +
-        'API endpoints are rate-limited. Check response headers for rate limit status.\n\n' +
-        '## Multi-Tenancy\n' +
-        'All data is isolated by school. The school context is derived from the authenticated user.',
+          '## Authentication\n' +
+          'All protected endpoints require a Bearer token in the Authorization header.\n' +
+          'Use the `/v1/auth/login` endpoint to obtain an access token.\n\n' +
+          '## Rate Limiting\n' +
+          'API endpoints are rate-limited. Check response headers for rate limit status.\n\n' +
+          '## Multi-Tenancy\n' +
+          'All data is isolated by school. The school context is derived from the authenticated user.',
       )
       .setVersion('1.0.0')
       .setContact('Gradellence Support', 'https://gradellence.com', 'support@gradellence.com')

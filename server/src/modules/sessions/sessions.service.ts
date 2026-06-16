@@ -1,4 +1,9 @@
-import { Injectable, NotFoundException, ConflictException, BadRequestException } from '@nestjs/common';
+import {
+  Injectable,
+  NotFoundException,
+  ConflictException,
+  BadRequestException,
+} from '@nestjs/common';
 import { PrismaService } from '../../database/prisma.service';
 import { CreateSessionDto } from './dto/create-session.dto';
 import { UpdateSessionDto } from './dto/update-session.dto';
@@ -207,10 +212,7 @@ export class SessionsService {
     }
 
     // Check if term dates are within session dates
-    if (
-      new Date(dto.startDate) < session.startDate ||
-      new Date(dto.endDate) > session.endDate
-    ) {
+    if (new Date(dto.startDate) < session.startDate || new Date(dto.endDate) > session.endDate) {
       throw new BadRequestException('Term dates must be within session dates');
     }
 

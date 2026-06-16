@@ -1,11 +1,4 @@
-import {
-  Controller,
-  Get,
-  Param,
-  Query,
-  UseGuards,
-  ParseIntPipe,
-} from '@nestjs/common';
+import { Controller, Get, Param, Query, UseGuards, ParseIntPipe } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiBearerAuth } from '@nestjs/swagger';
 import { AuditLogsService } from './audit-logs.service';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
@@ -37,7 +30,15 @@ export class AuditLogsController {
     @Query('endDate') endDate?: string,
   ) {
     return this.auditLogsService.findAll(
-      user, page, limit, actorId, action, entityType, entityId, startDate, endDate,
+      user,
+      page,
+      limit,
+      actorId,
+      action,
+      entityType,
+      entityId,
+      startDate,
+      endDate,
     );
   }
 

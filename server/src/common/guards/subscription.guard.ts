@@ -26,10 +26,7 @@ export class SubscriptionGuard implements CanActivate {
       context.getHandler(),
     );
 
-    const requiredFeature = this.reflector.get<string>(
-      REQUIRED_FEATURE_KEY,
-      context.getHandler(),
-    );
+    const requiredFeature = this.reflector.get<string>(REQUIRED_FEATURE_KEY, context.getHandler());
 
     if (!limitConfig && !requiredFeature) {
       return true;

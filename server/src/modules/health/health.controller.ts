@@ -39,8 +39,8 @@ export class HealthController {
           latencyMs: dbLatency,
         },
         memory: {
-          heapUsed: Math.round(process.memoryUsage().heapUsed / 1024 / 1024 * 100) / 100,
-          heapTotal: Math.round(process.memoryUsage().heapTotal / 1024 / 1024 * 100) / 100,
+          heapUsed: Math.round((process.memoryUsage().heapUsed / 1024 / 1024) * 100) / 100,
+          heapTotal: Math.round((process.memoryUsage().heapTotal / 1024 / 1024) * 100) / 100,
           unit: 'MB',
         },
         responseTimeMs: Date.now() - start,

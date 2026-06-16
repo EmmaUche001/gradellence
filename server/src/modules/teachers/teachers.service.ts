@@ -1,18 +1,30 @@
-import { Injectable, NotFoundException, ConflictException, ForbiddenException } from '@nestjs/common';
+import {
+  Injectable,
+  NotFoundException,
+  ConflictException,
+  ForbiddenException,
+} from '@nestjs/common';
 import { PrismaService } from '../../database/prisma.service';
 import { CreateTeacherDto } from './dto/create-teacher.dto';
 import { UpdateTeacherDto } from './dto/update-teacher.dto';
 import { AssignTeacherDto } from './dto/assign-teacher.dto';
 import { AuthenticatedUser } from '../../common/types/express.types';
+import * as crypto from 'crypto';
+import * as argon2 from 'argon2';
+import { InjectQueue } from '@nestjs/bullmq';
+import { Queue } from 'bullmq';
 
 @Injectable()
 export class TeachersService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    @InjectQueue('email') private readonly emailQueue: Queue,
+  ) {}
 
   async generateEmployeeId(schoolId: string): Promise<string> {
     const year = new Date().getFullYear().toString().slice(-2);
     const schoolPrefix = schoolId.slice(0, 3).toUpperCase();
-    
+
     const lastTeacher = await this.prisma.teacher.findFirst({
       where: { schoolId },
       orderBy: { createdAt: 'desc' },
@@ -46,7 +58,7 @@ export class TeachersService {
 
     if (currentUserCount >= subscription.plan.maxUsers) {
       throw new ForbiddenException(
-        `User limit reached (${subscription.plan.maxUsers}). Upgrade your plan to add more users.`
+        `User limit reached (${subscription.plan.maxUsers}). Upgrade your plan to add more users.`,
       );
     }
 
@@ -68,6 +80,86 @@ export class TeachersService {
       },
     });
 
+    // Provision login account for teacher (non-fatal)
+    (async () => {
+      try {
+        if (!dto.email) return;
+        // Generate temporary password (12 chars, alphanumeric)
+        let tempPassword = crypto
+          .randomBytes(9)
+          .toString('base64')
+          .replace(/[^a-zA-Z0-9]/g, '')
+          .slice(0, 12);
+        if (tempPassword.length < 12) {
+          // fallback to hex if base64 trimmed short
+          tempPassword = crypto.randomBytes(6).toString('hex').slice(0, 12);
+        }
+        const passwordHash = await argon2.hash(tempPassword);
+
+        // Find or create TEACHER role scoped to the school
+        let teacherRole = await this.prisma.role.findFirst({
+          where: { schoolId: teacher.schoolId, name: 'TEACHER' },
+        });
+        if (!teacherRole) {
+          teacherRole = await this.prisma.role.create({
+            data: {
+              schoolId: teacher.schoolId,
+              name: 'TEACHER',
+              description: 'Teacher account',
+            },
+          });
+        }
+
+        // Create user and link role
+        try {
+          const user = await this.prisma.user.create({
+            data: {
+              schoolId: teacher.schoolId,
+              email: dto.email,
+              passwordHash,
+              firstName: dto.firstName,
+              lastName: dto.lastName,
+              roles: { create: { roleId: teacherRole.id } },
+            },
+          });
+
+          // Link user back to teacher
+          await this.prisma.teacher.update({
+            where: { id: teacher.id },
+            // Cast to any to avoid type mismatch until Prisma client is regenerated after schema changes
+            data: { userId: user.id } as any,
+          });
+
+          // Queue credentials email
+          try {
+            await this.emailQueue.add('send', {
+              to: dto.email,
+              subject: 'Your Teacher Account Credentials',
+              template: 'teacher-credentials',
+              data: {
+                firstName: dto.firstName,
+                email: dto.email,
+                temporaryPassword: tempPassword,
+                loginUrl: process.env.FRONTEND_URL || '',
+              },
+            });
+          } catch (e) {
+            // Non-fatal: log and continue
+            // eslint-disable-next-line no-console
+            console.error('Failed to queue teacher credentials email:', e);
+          }
+        } catch (e) {
+          // Non-fatal: user creation failed (e.g., duplicate email). Log and continue.
+          // eslint-disable-next-line no-console
+          console.error('Failed to provision teacher user account:', e);
+        }
+      } catch (e) {
+        // Catch-all for provisioning errors; do not block teacher creation.
+        // eslint-disable-next-line no-console
+        console.error('Teacher provisioning error:', e);
+      }
+    })();
+
     return {
       success: true,
       message: 'Teacher created successfully',
@@ -79,7 +171,7 @@ export class TeachersService {
     const skip = (page - 1) * limit;
 
     const where: any = { schoolId: currentUser.schoolId, deletedAt: null };
-    
+
     if (search) {
       where.OR = [
         { firstName: { contains: search, mode: 'insensitive' } },

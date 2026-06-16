@@ -1,4 +1,9 @@
-import { Injectable, NotFoundException, ConflictException, ForbiddenException } from '@nestjs/common';
+import {
+  Injectable,
+  NotFoundException,
+  ConflictException,
+  ForbiddenException,
+} from '@nestjs/common';
 import { PrismaService } from '../../database/prisma.service';
 import { CreateStudentDto } from './dto/create-student.dto';
 import { UpdateStudentDto } from './dto/update-student.dto';
@@ -11,7 +16,7 @@ export class StudentsService {
   async generateAdmissionNumber(schoolId: string): Promise<string> {
     const year = new Date().getFullYear().toString().slice(-2);
     const schoolPrefix = schoolId.slice(0, 3).toUpperCase();
-    
+
     // Get the last admission number for this school
     const lastStudent = await this.prisma.student.findFirst({
       where: { schoolId },
@@ -46,7 +51,7 @@ export class StudentsService {
 
     if (currentStudentCount >= subscription.plan.maxStudents) {
       throw new ForbiddenException(
-        `Student limit reached (${subscription.plan.maxStudents}). Upgrade your plan to add more students.`
+        `Student limit reached (${subscription.plan.maxStudents}). Upgrade your plan to add more students.`,
       );
     }
 
@@ -82,7 +87,7 @@ export class StudentsService {
     const skip = (page - 1) * limit;
 
     const where: any = { schoolId: currentUser.schoolId, deletedAt: null };
-    
+
     if (search) {
       where.OR = [
         { firstName: { contains: search, mode: 'insensitive' } },

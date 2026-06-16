@@ -56,6 +56,11 @@ services:
       JWT_REFRESH_SECRET: your-refresh-secret-key-change-in-production
       JWT_ACCESS_EXPIRATION: 15m
       JWT_REFRESH_EXPIRATION: 7d
+      SMTP_HOST: smtp.gmail.com
+      SMTP_PORT: 587
+      SMTP_USER: gradellence.noreply@gmail.com
+      SMTP_PASS: qpufeglgmmbanwzm
+      SMTP_FROM: "Gradellence <gradellence.noreply@gmail.com>"
       FRONTEND_URL: http://localhost
     depends_on:
       postgres:

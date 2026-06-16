@@ -69,7 +69,8 @@ model User {
   refreshTokens RefreshToken[]
   emailVerifications EmailVerification[]
   auditLogs     AuditLog[]
-
+  teacher       Teacher?
+ 
   @@index([schoolId])
   @@map("users")
 }
@@ -204,13 +205,15 @@ model Teacher {
   deletedAt     DateTime? @map("deleted_at")
   createdBy     String?   @map("created_by")
   updatedBy     String?   @map("updated_by")
-
+  userId        String?   @unique @map("user_id")
+  user          User?     @relation(fields: [userId], references: [id])
+ 
   // Relations
   school             School           @relation(fields: [schoolId], references: [id])
   classTeacher       Class[]
   subjectAssignments TeacherSubject[]
   assessments        Assessment[]
-
+ 
   @@unique([schoolId, employeeId])
   @@index([schoolId])
   @@map("teachers")

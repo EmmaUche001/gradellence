@@ -115,7 +115,11 @@ export class RedisService implements OnModuleInit, OnModuleDestroy {
 
   // ==================== Rate Limiting ====================
 
-  async incrementRateLimit(identifier: string, route: string, windowSec: number = REDIS_TTL.RATE_LIMIT_WINDOW): Promise<number> {
+  async incrementRateLimit(
+    identifier: string,
+    route: string,
+    windowSec: number = REDIS_TTL.RATE_LIMIT_WINDOW,
+  ): Promise<number> {
     if (!this.isReady()) return 0;
     const key = REDIS_KEYS.RATE_LIMIT(identifier, route);
     const count = await this.client.incr(key);
@@ -140,7 +144,13 @@ export class RedisService implements OnModuleInit, OnModuleDestroy {
 
   // ==================== Caching ====================
 
-  async setCache<T>(schoolId: string, feature: string, key: string, value: T, ttl: number = REDIS_TTL.CACHE_MEDIUM): Promise<void> {
+  async setCache<T>(
+    schoolId: string,
+    feature: string,
+    key: string,
+    value: T,
+    ttl: number = REDIS_TTL.CACHE_MEDIUM,
+  ): Promise<void> {
     if (!this.isReady()) return;
     const redisKey = REDIS_KEYS.CACHE(schoolId, feature, key);
     await this.client.set(redisKey, JSON.stringify(value), 'EX', ttl);
@@ -170,7 +180,11 @@ export class RedisService implements OnModuleInit, OnModuleDestroy {
 
   // ==================== Distributed Locks ====================
 
-  async acquireLock(schoolId: string, resource: string, ttl: number = REDIS_TTL.LOCK): Promise<boolean> {
+  async acquireLock(
+    schoolId: string,
+    resource: string,
+    ttl: number = REDIS_TTL.LOCK,
+  ): Promise<boolean> {
     if (!this.isReady()) return false;
     const key = REDIS_KEYS.LOCK(schoolId, resource);
     const result = await this.client.set(key, '1', 'EX', ttl, 'NX');

@@ -14,6 +14,11 @@ export class RegisterDto {
   @MaxLength(50)
   schoolAlias!: string;
 
+  @ApiPropertyOptional({ example: 'plan-id-if-applicable' })
+  @IsString()
+  @IsOptional()
+  planId?: string;
+
   @ApiProperty({ example: 'user@example.com' })
   @IsEmail()
   email!: string;

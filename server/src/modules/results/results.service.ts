@@ -1,4 +1,9 @@
-import { Injectable, NotFoundException, BadRequestException, ForbiddenException } from '@nestjs/common';
+import {
+  Injectable,
+  NotFoundException,
+  BadRequestException,
+  ForbiddenException,
+} from '@nestjs/common';
 import { PrismaService } from '../../database/prisma.service';
 import { PublishResultDto } from './dto/publish-result.dto';
 import { AuthenticatedUser } from '../../common/types/express.types';
@@ -34,7 +39,7 @@ export class ResultsService {
 
     if (currentStudentCount >= subscription.plan.maxStudents) {
       throw new ForbiddenException(
-        `Student limit reached (${subscription.plan.maxStudents}). Upgrade your plan to add more students.`
+        `Student limit reached (${subscription.plan.maxStudents}). Upgrade your plan to add more students.`,
       );
     }
 
@@ -92,9 +97,10 @@ export class ResultsService {
       },
     });
 
-    const targetSubjects = subjectIds && subjectIds.length > 0
-      ? classSubjects.filter((cs) => subjectIds.includes(cs.subjectId))
-      : classSubjects;
+    const targetSubjects =
+      subjectIds && subjectIds.length > 0
+        ? classSubjects.filter((cs) => subjectIds.includes(cs.subjectId))
+        : classSubjects;
 
     if (targetSubjects.length === 0) {
       throw new BadRequestException('No subjects found for this class');
@@ -212,7 +218,7 @@ export class ResultsService {
 
     if (currentStudentCount >= subscription.plan.maxStudents) {
       throw new ForbiddenException(
-        `Student limit reached (${subscription.plan.maxStudents}). Upgrade your plan to add more students.`
+        `Student limit reached (${subscription.plan.maxStudents}). Upgrade your plan to add more students.`,
       );
     }
 
@@ -409,11 +415,7 @@ export class ResultsService {
     };
   }
 
-  async getStudentResults(
-    studentId: string,
-    termId: string,
-    currentUser: AuthenticatedUser,
-  ) {
+  async getStudentResults(studentId: string, termId: string, currentUser: AuthenticatedUser) {
     const student = await this.prisma.student.findFirst({
       where: { id: studentId, schoolId: currentUser.schoolId, deletedAt: null },
     });
@@ -479,11 +481,7 @@ export class ResultsService {
     };
   }
 
-  async getClassResults(
-    classId: string,
-    termId: string,
-    currentUser: AuthenticatedUser,
-  ) {
+  async getClassResults(classId: string, termId: string, currentUser: AuthenticatedUser) {
     const classEntity = await this.prisma.class.findFirst({
       where: { id: classId, schoolId: currentUser.schoolId, deletedAt: null },
     });
@@ -534,10 +532,7 @@ export class ResultsService {
           },
         },
       },
-      orderBy: [
-        { student: { firstName: 'asc' } },
-        { subject: { name: 'asc' } },
-      ],
+      orderBy: [{ student: { firstName: 'asc' } }, { subject: { name: 'asc' } }],
     });
 
     const subjectIds = [...new Set(results.map((r) => r.subjectId))];
@@ -569,11 +564,7 @@ export class ResultsService {
     };
   }
 
-  async getBroadsheet(
-    classId: string,
-    termId: string,
-    currentUser: AuthenticatedUser,
-  ) {
+  async getBroadsheet(classId: string, termId: string, currentUser: AuthenticatedUser) {
     const classEntity = await this.prisma.class.findFirst({
       where: { id: classId, schoolId: currentUser.schoolId, deletedAt: null },
     });
@@ -634,9 +625,7 @@ export class ResultsService {
     });
 
     const broadsheetData = enrollments.map((enrollment) => {
-      const studentResults = results.filter(
-        (r) => r.studentId === enrollment.studentId,
-      );
+      const studentResults = results.filter((r) => r.studentId === enrollment.studentId);
 
       const subjectScores: Record<string, { score: number; grade: string | null }> = {};
       let totalScore = 0;

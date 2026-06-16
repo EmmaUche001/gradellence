@@ -80,15 +80,13 @@ export async function registerAndLogin(
   const schoolName = overrides.schoolName || `Test School ${Date.now()}`;
 
   // Register
-  const registerRes = await request(app.getHttpServer())
-    .post('/api/v1/auth/register')
-    .send({
-      schoolId: null, // Will be created
-      email,
-      password,
-      firstName,
-      lastName,
-    });
+  const registerRes = await request(app.getHttpServer()).post('/api/v1/auth/register').send({
+    schoolId: null, // Will be created
+    email,
+    password,
+    firstName,
+    lastName,
+  });
 
   // If registration requires existing school, create one first
   if (registerRes.status === 400) {
@@ -103,15 +101,13 @@ export async function registerAndLogin(
 
     const schoolId = schoolRes.body?.data?.id || schoolRes.body?.id;
 
-    await request(app.getHttpServer())
-      .post('/api/v1/auth/register')
-      .send({
-        schoolId,
-        email,
-        password,
-        firstName,
-        lastName,
-      });
+    await request(app.getHttpServer()).post('/api/v1/auth/register').send({
+      schoolId,
+      email,
+      password,
+      firstName,
+      lastName,
+    });
   }
 
   // Login

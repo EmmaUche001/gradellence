@@ -1,4 +1,9 @@
-import { Injectable, NotFoundException, ConflictException, ForbiddenException } from '@nestjs/common';
+import {
+  Injectable,
+  NotFoundException,
+  ConflictException,
+  ForbiddenException,
+} from '@nestjs/common';
 import * as argon2 from 'argon2';
 import { PrismaService } from '../../database/prisma.service';
 import { CreateUserDto } from './dto/create-user.dto';
@@ -12,10 +17,7 @@ export class UsersService {
 
   async create(dto: CreateUserDto, currentUser: AuthenticatedUser) {
     // Check if user can create users for this school
-    if (
-      currentUser.roles.includes(ROLES.SCHOOL_ADMIN) &&
-      dto.schoolId !== currentUser.schoolId
-    ) {
+    if (currentUser.roles.includes(ROLES.SCHOOL_ADMIN) && dto.schoolId !== currentUser.schoolId) {
       throw new ForbiddenException('Cannot create users for another school');
     }
 
@@ -140,10 +142,7 @@ export class UsersService {
     }
 
     // Check if user can access this user's data
-    if (
-      currentUser.roles.includes(ROLES.SCHOOL_ADMIN) &&
-      user.schoolId !== currentUser.schoolId
-    ) {
+    if (currentUser.roles.includes(ROLES.SCHOOL_ADMIN) && user.schoolId !== currentUser.schoolId) {
       throw new ForbiddenException('Cannot access users from another school');
     }
 
@@ -177,10 +176,7 @@ export class UsersService {
     }
 
     // Check if user can update this user
-    if (
-      currentUser.roles.includes(ROLES.SCHOOL_ADMIN) &&
-      user.schoolId !== currentUser.schoolId
-    ) {
+    if (currentUser.roles.includes(ROLES.SCHOOL_ADMIN) && user.schoolId !== currentUser.schoolId) {
       throw new ForbiddenException('Cannot update users from another school');
     }
 
@@ -265,10 +261,7 @@ export class UsersService {
     }
 
     // Check if user can delete this user
-    if (
-      currentUser.roles.includes(ROLES.SCHOOL_ADMIN) &&
-      user.schoolId !== currentUser.schoolId
-    ) {
+    if (currentUser.roles.includes(ROLES.SCHOOL_ADMIN) && user.schoolId !== currentUser.schoolId) {
       throw new ForbiddenException('Cannot delete users from another school');
     }
 

@@ -1,4 +1,10 @@
-import { Injectable, NotFoundException, ConflictException, BadRequestException, ForbiddenException } from '@nestjs/common';
+import {
+  Injectable,
+  NotFoundException,
+  ConflictException,
+  BadRequestException,
+  ForbiddenException,
+} from '@nestjs/common';
 import { PrismaService } from '../../database/prisma.service';
 import { CreateEnrollmentDto } from './dto/create-enrollment.dto';
 import { UpdateEnrollmentDto } from './dto/update-enrollment.dto';
@@ -27,7 +33,7 @@ export class EnrollmentsService {
 
     if (currentStudentCount >= subscription.plan.maxStudents) {
       throw new ForbiddenException(
-        `Student limit reached (${subscription.plan.maxStudents}). Upgrade your plan to add more students.`
+        `Student limit reached (${subscription.plan.maxStudents}). Upgrade your plan to add more students.`,
       );
     }
 
@@ -69,7 +75,9 @@ export class EnrollmentsService {
     });
 
     if (existingEnrollment) {
-      throw new ConflictException('Student is already enrolled in this class for the specified term');
+      throw new ConflictException(
+        'Student is already enrolled in this class for the specified term',
+      );
     }
 
     // Check class capacity
@@ -140,7 +148,7 @@ export class EnrollmentsService {
     // Check if adding these students would exceed the limit
     if (currentStudentCount + dto.studentIds.length > subscription.plan.maxStudents) {
       throw new ForbiddenException(
-        `Student limit would be exceeded. Current: ${currentStudentCount}, Adding: ${dto.studentIds.length}, Limit: ${subscription.plan.maxStudents}. Upgrade your plan to add more students.`
+        `Student limit would be exceeded. Current: ${currentStudentCount}, Adding: ${dto.studentIds.length}, Limit: ${subscription.plan.maxStudents}. Upgrade your plan to add more students.`,
       );
     }
 
@@ -230,7 +238,13 @@ export class EnrollmentsService {
     };
   }
 
-  async findAll(currentUser: AuthenticatedUser, page: number, limit: number, classId?: string, termId?: string) {
+  async findAll(
+    currentUser: AuthenticatedUser,
+    page: number,
+    limit: number,
+    classId?: string,
+    termId?: string,
+  ) {
     const skip = (page - 1) * limit;
 
     const where: any = {
@@ -456,12 +470,12 @@ export class EnrollmentsService {
     }
 
     const enrollments = await this.prisma.enrollment.findMany({
-      where: { 
-        classId, 
+      where: {
+        classId,
         termId,
         student: {
-          schoolId: currentUser.schoolId
-        }
+          schoolId: currentUser.schoolId,
+        },
       },
       include: {
         student: {

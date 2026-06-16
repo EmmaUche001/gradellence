@@ -1,7 +1,14 @@
+import { Transform } from 'class-transformer';
 import { IsString, IsEmail, IsDateString, IsOptional, MinLength, MaxLength } from 'class-validator';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 
 export class CreateStudentDto {
+  @ApiProperty({ example: 'LLA/26/0001' })
+  @IsString()
+  @MinLength(2)
+  @MaxLength(50)
+  admissionNumber!: string;
+
   @ApiProperty({ example: 'John' })
   @IsString()
   @MinLength(2)
@@ -22,6 +29,7 @@ export class CreateStudentDto {
   @ApiPropertyOptional({ example: 'MALE', enum: ['MALE', 'FEMALE'] })
   @IsString()
   @IsOptional()
+  @Transform(({ value }) => value?.toUpperCase())
   gender?: string;
 
   @ApiPropertyOptional({ example: '123 Main St' })

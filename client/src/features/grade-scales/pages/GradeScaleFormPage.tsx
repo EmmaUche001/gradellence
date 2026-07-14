@@ -10,6 +10,7 @@ const gradeScaleSchema = z.object({
   maxScore: z.coerce.number().min(0, 'Max must be 0 or greater').max(100, 'Max must be at most 100'),
   grade: z.string().min(1, 'Grade letter is required').max(5, 'Grade too long'),
   remark: z.string().min(1, 'Remark is required').max(100, 'Remark too long'),
+  points: z.coerce.number().min(0, 'Points must be 0 or greater').max(10, 'Points must be at most 10').default(0),
   isActive: z.boolean().optional(),
 }).refine(data => data.minScore < data.maxScore, {
   message: 'Min score must be less than max score',
@@ -34,7 +35,7 @@ export function GradeScaleFormPage() {
     formState: { errors },
   } = useForm<GradeScaleFormData>({
     resolver: zodResolver(gradeScaleSchema),
-    defaultValues: { minScore: 0, maxScore: 100, isActive: true },
+    defaultValues: { minScore: 0, maxScore: 100, points: 0, isActive: true },
   });
 
   const watchedGrade = watch('grade', '');
@@ -52,6 +53,7 @@ export function GradeScaleFormPage() {
             maxScore: s.maxScore,
             grade: s.grade,
             remark: s.remark,
+            points: s.points ?? 0,
             isActive: s.isActive,
           });
         })
@@ -118,18 +120,34 @@ export function GradeScaleFormPage() {
           </div>
         </div>
 
-        <div>
-          <label className="label">Grade Letter *</label>
-          <input {...register('grade')} className="input" placeholder="e.g. A, B+, C-" maxLength={5} />
-          {errors.grade && <p className="mt-1 text-sm text-red-600">{errors.grade.message}</p>}
-          {watchedGrade && (
-            <div className="mt-2 flex items-center space-x-2">
-              <span className="text-sm text-gray-600">Preview:</span>
-              <span className={`inline-flex w-10 h-10 items-center justify-center text-base font-bold rounded-full ${previewColor}`}>
-                {watchedGrade}
-              </span>
-            </div>
-          )}
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div>
+            <label className="label">Grade Letter *</label>
+            <input {...register('grade')} className="input" placeholder="e.g. A, B+, C-" maxLength={5} />
+            {errors.grade && <p className="mt-1 text-sm text-red-600">{errors.grade.message}</p>}
+            {watchedGrade && (
+              <div className="mt-2 flex items-center space-x-2">
+                <span className="text-sm text-gray-600">Preview:</span>
+                <span className={`inline-flex w-10 h-10 items-center justify-center text-base font-bold rounded-full ${previewColor}`}>
+                  {watchedGrade}
+                </span>
+              </div>
+            )}
+          </div>
+          <div>
+            <label className="label">Grade Points (for GPA)</label>
+            <input
+              {...register('points', { valueAsNumber: true })}
+              type="number"
+              min="0"
+              max="10"
+              step="0.1"
+              className="input"
+              placeholder="e.g. 5.0 for A, 4.0 for B"
+            />
+            <p className="mt-1 text-xs text-gray-500">Used for GPA calculation on transcripts</p>
+            {errors.points && <p className="mt-1 text-sm text-red-600">{errors.points.message}</p>}
+          </div>
         </div>
 
         <div>

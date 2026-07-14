@@ -1,4 +1,4 @@
-import { IsString, IsInt, Min, Max, IsOptional, IsBoolean } from 'class-validator';
+import { IsString, IsInt, IsNumber, Min, Max, IsOptional, IsBoolean } from 'class-validator';
 import { ApiProperty } from '@nestjs/swagger';
 
 export class CreateGradeScaleDto {
@@ -21,6 +21,17 @@ export class CreateGradeScaleDto {
   @ApiProperty({ example: 'Excellent' })
   @IsString()
   remark!: string;
+
+  @ApiProperty({
+    example: 5.0,
+    required: false,
+    description:
+      'Grade points used for GPA calculation on transcripts (e.g. A=5.0, B=4.0). Defaults to 0 if not set.',
+  })
+  @IsOptional()
+  @IsNumber()
+  @Min(0)
+  points?: number;
 
   @ApiProperty({ example: true, required: false })
   @IsOptional()

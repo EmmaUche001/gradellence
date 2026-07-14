@@ -1,5 +1,5 @@
 import apiClient, { ApiResponse } from './apiClient';
-import { Session, CreateSessionData, UpdateSessionData, CreateTermData, UpdateTermData, Term } from '../types/session';
+import { Session, CreateSessionData, UpdateSessionData, CreateTermData, UpdateTermData, Term, CreateSessionWithTermsData } from '../types/session';
 
 const BASE = '/v1/sessions';
 
@@ -47,6 +47,21 @@ export const sessionService = {
 
   async removeTerm(termId: string): Promise<ApiResponse<void>> {
     const { data } = await apiClient.delete(`${BASE}/terms/${termId}`);
+    return data;
+  },
+
+  async createWithTerms(dto: CreateSessionWithTermsData): Promise<ApiResponse<Session>> {
+    const { data } = await apiClient.post(`${BASE}/with-terms`, dto);
+    return data;
+  },
+
+  async setCurrentSession(id: string): Promise<ApiResponse<Session>> {
+    const { data } = await apiClient.patch(`${BASE}/${id}/set-current`);
+    return data;
+  },
+
+  async setCurrentTerm(id: string): Promise<ApiResponse<Term>> {
+    const { data } = await apiClient.patch(`${BASE}/terms/${id}/set-current`);
     return data;
   },
 };

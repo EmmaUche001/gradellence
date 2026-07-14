@@ -18,8 +18,9 @@ model School {
   address   String?   @map("address")
   phone     String?   @map("phone")
   email     String?   @map("email")
-  logo      String?   @map("logo")
-  isActive  Boolean   @default(true) @map("is_active")
+  logo          String?   @map("logo")
+  signatureUrl  String?   @map("signature_url")
+  isActive      Boolean   @default(true) @map("is_active")
   createdAt DateTime  @default(now()) @map("created_at")
   updatedAt DateTime  @updatedAt @map("updated_at")
   deletedAt DateTime? @map("deleted_at")
@@ -36,6 +37,8 @@ model School {
   roles        Role[]
   Assessment   Assessment[]
   Result       Result[]
+  parents      Parent[]
+  documentVerifications DocumentVerification[]
   subscriptions SchoolSubscription[]
   invoices     Invoice[]
 
@@ -70,7 +73,9 @@ model User {
   emailVerifications EmailVerification[]
   auditLogs     AuditLog[]
   teacher       Teacher?
- 
+  student       Student?
+  parent        Parent?
+
   @@index([schoolId])
   @@map("users")
 }
@@ -173,14 +178,62 @@ model Student {
   updatedBy       String?   @map("updated_by")
 
   // Relations
-  school      School       @relation(fields: [schoolId], references: [id])
+  school      School         @relation(fields: [schoolId], references: [id])
   enrollments Enrollment[]
   assessments Assessment[]
   results     Result[]
+  parents     StudentParent[]
+  user        User?          @relation(fields: [userId], references: [id])
+  userId      String?        @unique @map("user_id")
 
   @@unique([schoolId, admissionNumber])
   @@index([schoolId])
   @@map("students")
+}
+
+// ============================================
+// ACADEMIC - PARENTS
+// ============================================
+model Parent {
+  id            String    @id @default(uuid()) @map("id")
+  schoolId      String    @map("school_id")
+  email         String    @map("email")
+  passwordHash  String    @map("password_hash")
+  firstName     String    @map("first_name")
+  lastName      String    @map("last_name")
+  phone         String?   @map("phone")
+  address       String?   @map("address")
+  isActive      Boolean   @default(true) @map("is_active")
+  emailVerified Boolean   @default(false) @map("email_verified")
+  lastLoginAt   DateTime? @map("last_login_at")
+  userId        String?   @unique @map("user_id")
+  createdAt     DateTime  @default(now()) @map("created_at")
+  updatedAt     DateTime  @updatedAt @map("updated_at")
+  deletedAt     DateTime? @map("deleted_at")
+
+  // Relations
+  school   School          @relation(fields: [schoolId], references: [id])
+  user     User?           @relation(fields: [userId], references: [id])
+  students StudentParent[]
+
+  @@unique([schoolId, email])
+  @@index([schoolId])
+  @@map("parents")
+}
+
+// ============================================
+// STUDENT-PARENT JUNCTION
+// ============================================
+model StudentParent {
+  studentId String @map("student_id")
+  parentId  String @map("parent_id")
+
+  // Relations
+  student Student @relation(fields: [studentId], references: [id])
+  parent  Parent  @relation(fields: [parentId], references: [id])
+
+  @@id([studentId, parentId])
+  @@map("student_parents")
 }
 
 // ============================================
@@ -207,13 +260,13 @@ model Teacher {
   updatedBy     String?   @map("updated_by")
   userId        String?   @unique @map("user_id")
   user          User?     @relation(fields: [userId], references: [id])
- 
+
   // Relations
   school             School           @relation(fields: [schoolId], references: [id])
   classTeacher       Class[]
   subjectAssignments TeacherSubject[]
   assessments        Assessment[]
- 
+
   @@unique([schoolId, employeeId])
   @@index([schoolId])
   @@map("teachers")
@@ -371,6 +424,7 @@ model Enrollment {
   @@index([studentId])
   @@index([classId])
   @@index([termId])
+  @@index([classId, termId])
   @@map("enrollments")
 }
 
@@ -384,6 +438,7 @@ model GradeScale {
   minScore  Int      @map("min_score")
   maxScore  Int      @map("max_score")
   remark    String   @map("remark")
+  points    Float    @default(0) @map("points")
   isActive  Boolean  @default(true) @map("is_active")
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @updatedAt @map("updated_at")
@@ -425,6 +480,8 @@ model Assessment {
   @@index([studentId])
   @@index([subjectId])
   @@index([termId])
+  @@index([schoolId, termId])
+  @@index([schoolId, subjectId, termId])
   @@map("assessments")
 }
 
@@ -458,6 +515,8 @@ model Result {
   @@index([studentId])
   @@index([subjectId])
   @@index([termId])
+  @@index([schoolId, termId])
+  @@index([schoolId, subjectId])
   @@map("results")
 }
 
@@ -490,17 +549,18 @@ model SubscriptionPlan {
 // SAAS - SCHOOL SUBSCRIPTIONS
 // ============================================
 model SchoolSubscription {
-  id          String    @id @default(uuid()) @map("id")
-  schoolId    String    @map("school_id")
-  planId      String    @map("plan_id")
-  startDate   DateTime  @default(now()) @map("start_date")
-  endDate     DateTime  @map("end_date")
-  status      String    @default("ACTIVE") @map("status") // ACTIVE, EXPIRED, CANCELLED, PENDING, TRIAL
-  autoRenew   Boolean   @default(true) @map("auto_renew")
-  trialEndsAt DateTime? @map("trial_ends_at")
-  createdAt   DateTime  @default(now()) @map("created_at")
-  updatedAt   DateTime  @updatedAt @map("updated_at")
-  cancelledAt DateTime? @map("cancelled_at")
+  id            String    @id @default(uuid()) @map("id")
+  schoolId      String    @map("school_id")
+  planId        String    @map("plan_id")
+  startDate     DateTime  @default(now()) @map("start_date")
+  endDate       DateTime  @map("end_date")
+  status        String    @default("ACTIVE") @map("status") // ACTIVE, EXPIRED, CANCELLED, PENDING, TRIAL
+  autoRenew     Boolean   @default(true) @map("auto_renew")
+  trialEndsAt   DateTime? @map("trial_ends_at")
+  cancelledAt   DateTime? @map("cancelled_at")
+  proratedCredit Int? @default(0) @map("prorated_credit")
+  createdAt     DateTime  @default(now()) @map("created_at")
+  updatedAt     DateTime  @updatedAt @map("updated_at")
 
   // Relations
   school   School             @relation(fields: [schoolId], references: [id])
@@ -539,6 +599,30 @@ model Invoice {
   @@index([status])
   @@index([subscriptionId])
   @@map("invoices")
+}
+
+// ============================================
+// DOCUMENT VERIFICATION (QR)
+// ============================================
+model DocumentVerification {
+  id            String    @id @default(uuid()) @map("id")
+  hash          String    @unique @map("hash")
+  documentType  String    @map("document_type")
+  entityId      String    @map("entity_id")
+  schoolId      String    @map("school_id")
+  studentId     String?   @map("student_id")
+  studentName   String?   @map("student_name")
+  termId        String?   @map("term_id")
+  verifiedAt    DateTime? @map("verified_at")
+  verifiedCount Int       @default(0) @map("verified_count")
+  createdAt     DateTime  @default(now()) @map("created_at")
+
+  // Relations
+  school School @relation(fields: [schoolId], references: [id])
+
+  @@index([schoolId])
+  @@index([hash])
+  @@map("document_verifications")
 }
 
 // ============================================

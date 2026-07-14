@@ -1,16 +1,12 @@
-import {
-  Injectable,
-  NotFoundException,
-  ConflictException,
-  ForbiddenException,
-} from '@nestjs/common';
+import { Injectable, NotFoundException, ConflictException } from '@nestjs/common';
 import { PrismaService } from '../../database/prisma.service';
 import { CreateTeacherDto } from './dto/create-teacher.dto';
 import { UpdateTeacherDto } from './dto/update-teacher.dto';
 import { AssignTeacherDto } from './dto/assign-teacher.dto';
 import { AuthenticatedUser } from '../../common/types/express.types';
+import { enforceEntityLimit } from '../../common/helpers/trial-limits.helper';
 import * as crypto from 'crypto';
-import * as argon2 from 'argon2';
+import * as bcrypt from 'bcryptjs';
 import { InjectQueue } from '@nestjs/bullmq';
 import { Queue } from 'bullmq';
 
@@ -41,26 +37,7 @@ export class TeachersService {
   }
 
   async create(dto: CreateTeacherDto, currentUser: AuthenticatedUser) {
-    // Check subscription limit for users (teachers count as users)
-    const subscription = await this.prisma.schoolSubscription.findFirst({
-      where: { schoolId: currentUser.schoolId, status: 'ACTIVE' },
-      include: { plan: true },
-    });
-
-    if (!subscription) {
-      throw new ForbiddenException('No active subscription found');
-    }
-
-    // Check current teacher count (users)
-    const currentUserCount = await this.prisma.user.count({
-      where: { schoolId: currentUser.schoolId, deletedAt: null },
-    });
-
-    if (currentUserCount >= subscription.plan.maxUsers) {
-      throw new ForbiddenException(
-        `User limit reached (${subscription.plan.maxUsers}). Upgrade your plan to add more users.`,
-      );
-    }
+    await enforceEntityLimit(this.prisma, 'teachers', currentUser.schoolId);
 
     const employeeId = await this.generateEmployeeId(currentUser.schoolId);
 
@@ -94,7 +71,7 @@ export class TeachersService {
           // fallback to hex if base64 trimmed short
           tempPassword = crypto.randomBytes(6).toString('hex').slice(0, 12);
         }
-        const passwordHash = await argon2.hash(tempPassword);
+        const passwordHash = await bcrypt.hash(tempPassword, 12);
 
         // Find or create TEACHER role scoped to the school
         let teacherRole = await this.prisma.role.findFirst({
@@ -388,6 +365,57 @@ export class TeachersService {
     return {
       success: true,
       message: 'Teacher removed from subject successfully',
+    };
+  }
+
+  async assignAsClassTeacher(teacherId: string, classId: string, currentUser: AuthenticatedUser) {
+    const teacher = await this.prisma.teacher.findFirst({
+      where: { id: teacherId, schoolId: currentUser.schoolId, deletedAt: null },
+    });
+    if (!teacher) throw new NotFoundException('Teacher not found');
+
+    const cls = await this.prisma.class.findFirst({
+      where: { id: classId, schoolId: currentUser.schoolId, deletedAt: null },
+      include: {
+        subjects: { include: { subject: true } },
+      },
+    });
+    if (!cls) throw new NotFoundException('Class not found');
+
+    await this.prisma.class.update({
+      where: { id: classId },
+      data: { classTeacherId: teacherId },
+    });
+
+    const created: string[] = [];
+    const skipped: string[] = [];
+
+    for (const classSubject of cls.subjects) {
+      const existing = await this.prisma.teacherSubject.findUnique({
+        where: {
+          teacherId_subjectId_classId: {
+            teacherId,
+            subjectId: classSubject.subjectId,
+            classId,
+          },
+        },
+      });
+
+      if (existing) {
+        skipped.push(classSubject.subjectId);
+        continue;
+      }
+
+      await this.prisma.teacherSubject.create({
+        data: { teacherId, subjectId: classSubject.subjectId, classId },
+      });
+      created.push(classSubject.subjectId);
+    }
+
+    return {
+      success: true,
+      message: `Teacher assigned as class teacher. ${created.length} subject assignment(s) created automatically.`,
+      data: { teacherId, classId, subjectsAssigned: created },
     };
   }
 

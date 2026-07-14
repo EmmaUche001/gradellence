@@ -32,7 +32,7 @@ export const teacherService = {
   },
 
   async assignSubject(dto: AssignTeacherSubjectData): Promise<ApiResponse<void>> {
-    const { data } = await apiClient.post(`${BASE}/assign-subject`, dto);
+    const { data } = await apiClient.post(`${BASE}/assign`, dto);
     return data;
   },
 
@@ -43,6 +43,11 @@ export const teacherService = {
 
   async getAssignments(id: string): Promise<ApiResponse<any[]>> {
     const { data } = await apiClient.get(`${BASE}/${id}/assignments`);
+    return data;
+  },
+
+  async assignAsClassTeacher(teacherId: string, classId: string): Promise<ApiResponse<any>> {
+    const { data } = await apiClient.post(`${BASE}/assign-class-teacher`, { teacherId, classId });
     return data;
   },
 };

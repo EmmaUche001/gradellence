@@ -4,6 +4,8 @@ import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import { studentService } from '../../../services/studentService';
+import { classService } from '../../../services/classService';
+import { Class } from '../../../types/class';
 
 const studentSchema = z.object({
   admissionNumber: z.string().min(1, 'Admission number is required'),
@@ -17,6 +19,7 @@ const studentSchema = z.object({
   parentName: z.string().optional(),
   parentPhone: z.string().optional(),
   parentEmail: z.string().email('Invalid email').optional().or(z.literal('')),
+  classId: z.string().optional(),
 });
 
 type StudentFormData = z.infer<typeof studentSchema>;
@@ -28,6 +31,7 @@ export function StudentFormPage() {
   const [isLoading, setIsLoading] = useState(false);
   const [isFetching, setIsFetching] = useState(isEdit);
   const [error, setError] = useState<string | null>(null);
+  const [classes, setClasses] = useState<Class[]>([]);
 
   const {
     register,
@@ -39,12 +43,18 @@ export function StudentFormPage() {
   });
 
   useEffect(() => {
+    classService.getAll(1, 100).then((response) => {
+      setClasses(response.data.filter(c => c.isActive));
+    });
+  }, []);
+
+  useEffect(() => {
     if (id) {
       setIsFetching(true);
       studentService
         .getById(id)
         .then((response) => {
-          const student = response.data;
+          const student: any = response.data;
           reset({
             admissionNumber: student.admissionNumber,
             firstName: student.firstName,
@@ -57,6 +67,7 @@ export function StudentFormPage() {
             parentName: student.parentName || '',
             parentPhone: student.parentPhone || '',
             parentEmail: student.parentEmail || '',
+            classId: student.enrollments?.[0]?.classId || '',
           });
         })
         .catch((err) => setError(err.response?.data?.message || 'Failed to load student'))
@@ -140,6 +151,18 @@ export function StudentFormPage() {
             {errors.lastName && (
               <p className="mt-1 text-sm text-red-600">{errors.lastName.message}</p>
             )}
+          </div>
+
+          <div>
+            <label className="label">Assign to Class (optional)</label>
+            <select {...register('classId')} className="input">
+              <option value="">Select a class</option>
+              {classes.map((c) => (
+                <option key={c.id} value={c.id}>
+                  {c.name} (Level {c.level})
+                </option>
+              ))}
+            </select>
           </div>
 
           <div>

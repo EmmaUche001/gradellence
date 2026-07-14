@@ -96,7 +96,7 @@ export function EnrollmentFormPage() {
             <option value="">Select a class</option>
             {classes.map((c) => (
               <option key={c.id} value={c.id}>
-                {c.name} ({c.academicYear})
+                {c.name} (Level {c.level})
               </option>
             ))}
           </select>

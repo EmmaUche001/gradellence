@@ -1,15 +1,60 @@
-import { Injectable, NotFoundException, ConflictException } from '@nestjs/common';
+import {
+  Injectable,
+  NotFoundException,
+  ConflictException,
+  ForbiddenException,
+} from '@nestjs/common';
 import { PrismaService } from '../../database/prisma.service';
-import { CreateSubjectDto } from './dto/create-subject.dto';
+import { CreateSubjectDto, BulkCreateSubjectDto } from './dto/create-subject.dto';
 import { UpdateSubjectDto } from './dto/update-subject.dto';
 import { AssignSubjectDto } from './dto/assign-subject.dto';
 import { AuthenticatedUser } from '../../common/types/express.types';
+import { enforceEntityLimit } from '../../common/helpers/trial-limits.helper';
 
 @Injectable()
 export class SubjectsService {
   constructor(private readonly prisma: PrismaService) {}
 
+  async bulkCreate(dto: BulkCreateSubjectDto, currentUser: AuthenticatedUser) {
+    const created = [];
+    const skipped = [];
+
+    for (const subjectDto of dto.subjects) {
+      const existing = await this.prisma.subject.findFirst({
+        where: {
+          schoolId: currentUser.schoolId,
+          code: subjectDto.code,
+          deletedAt: null,
+        },
+      });
+
+      if (existing) {
+        skipped.push(subjectDto.code);
+        continue;
+      }
+
+      const subject = await this.prisma.subject.create({
+        data: {
+          schoolId: currentUser.schoolId,
+          name: subjectDto.name,
+          code: subjectDto.code,
+          description: subjectDto.description,
+          createdBy: currentUser.id,
+        },
+      });
+      created.push(subject);
+    }
+
+    return {
+      success: true,
+      message: `${created.length} subject(s) created${skipped.length > 0 ? `, ${skipped.length} skipped (code exists): ${skipped.join(', ')}` : ''}`,
+      data: created,
+    };
+  }
+
   async create(dto: CreateSubjectDto, currentUser: AuthenticatedUser) {
+    await enforceEntityLimit(this.prisma, 'subjects', currentUser.schoolId);
+
     // Check if subject code already exists in the school
     const existingSubject = await this.prisma.subject.findFirst({
       where: {

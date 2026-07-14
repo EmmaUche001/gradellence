@@ -100,7 +100,7 @@ export function BulkEnrollmentPage() {
             <select className="input" value={selectedClassId} onChange={(e) => setSelectedClassId(e.target.value)}>
               <option value="">Select a class</option>
               {classes.map((c) => (
-                <option key={c.id} value={c.id}>{c.name} ({c.academicYear})</option>
+                <option key={c.id} value={c.id}>{c.name} (Level {c.level})</option>
               ))}
             </select>
           </div>

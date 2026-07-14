@@ -115,7 +115,7 @@ export function BroadsheetPage() {
             <label className="label">Class *</label>
             <select className="input" value={selectedClassId} onChange={(e) => setSelectedClassId(e.target.value)}>
               <option value="">Select class</option>
-              {classes.map(c => <option key={c.id} value={c.id}>{c.name} ({c.academicYear})</option>)}
+              {classes.map(c => <option key={c.id} value={c.id}>{c.name} (Level {c.level})</option>)}
             </select>
           </div>
           <div>

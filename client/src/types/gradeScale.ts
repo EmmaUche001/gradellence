@@ -5,6 +5,7 @@ export interface GradeScale {
   maxScore: number;
   grade: string;
   remark: string;
+  points: number;
   isActive: boolean;
   createdAt: string;
   updatedAt: string;
@@ -15,6 +16,7 @@ export interface CreateGradeScaleData {
   maxScore: number;
   grade: string;
   remark: string;
+  points?: number;
   isActive?: boolean;
 }
 

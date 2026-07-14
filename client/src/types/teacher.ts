@@ -17,7 +17,7 @@ export interface Teacher {
   classTeacher?: Array<{
     id: string;
     name: string;
-    academicYear: string;
+    level: number;
   }>;
   subjectAssignments?: Array<{
     id: string;

@@ -30,6 +30,7 @@ export interface CreateStudentData {
   parentName?: string;
   parentPhone?: string;
   parentEmail?: string;
+  classId?: string;
 }
 
 export interface UpdateStudentData extends Partial<CreateStudentData> {}

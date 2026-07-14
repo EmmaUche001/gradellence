@@ -11,27 +11,43 @@ import {
   Request,
   DefaultValuePipe,
   ParseIntPipe,
+  HttpCode,
+  HttpStatus,
 } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiResponse, ApiBearerAuth } from '@nestjs/swagger';
 import { SubjectsService } from './subjects.service';
-import { CreateSubjectDto } from './dto/create-subject.dto';
+import { CreateSubjectDto, BulkCreateSubjectDto } from './dto/create-subject.dto';
 import { UpdateSubjectDto } from './dto/update-subject.dto';
 import { AssignSubjectDto } from './dto/assign-subject.dto';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
 import { RolesGuard } from '../../common/guards/roles.guard';
+import { TenantGuard } from '../../common/guards/tenant.guard';
 import { Roles } from '../../common/decorators/roles.decorator';
 import { ROLES } from '../../common/constants/roles.constants';
 import { AuthenticatedRequest } from '../../common/types/express.types';
+import { RateLimit } from '../../common/decorators/rate-limit.decorator';
+import { RATE_LIMIT_PRESETS } from '../../common/constants/rate-limit.constants';
 
 @ApiTags('Subjects')
 @Controller('subjects')
-@UseGuards(JwtAuthGuard, RolesGuard)
+@UseGuards(JwtAuthGuard, RolesGuard, TenantGuard)
 @ApiBearerAuth()
 export class SubjectsController {
   constructor(private readonly subjectsService: SubjectsService) {}
 
+  @Post('bulk')
+  @Roles(ROLES.SUPER_ADMIN, ROLES.SCHOOL_ADMIN)
+  @RateLimit(RATE_LIMIT_PRESETS.BULK)
+  @HttpCode(HttpStatus.CREATED)
+  @ApiOperation({ summary: 'Bulk create subjects' })
+  @ApiResponse({ status: 201, description: 'Subjects created' })
+  async bulkCreate(@Body() dto: BulkCreateSubjectDto, @Request() req: AuthenticatedRequest) {
+    return this.subjectsService.bulkCreate(dto, req.user);
+  }
+
   @Post()
   @Roles(ROLES.SUPER_ADMIN, ROLES.SCHOOL_ADMIN)
+  @RateLimit(RATE_LIMIT_PRESETS.WRITE)
   @ApiOperation({ summary: 'Create a new subject' })
   @ApiResponse({ status: 201, description: 'Subject created successfully' })
   @ApiResponse({ status: 400, description: 'Bad request' })
@@ -61,6 +77,7 @@ export class SubjectsController {
 
   @Patch(':id')
   @Roles(ROLES.SUPER_ADMIN, ROLES.SCHOOL_ADMIN)
+  @RateLimit(RATE_LIMIT_PRESETS.WRITE)
   @ApiOperation({ summary: 'Update subject' })
   @ApiResponse({ status: 200, description: 'Subject updated successfully' })
   @ApiResponse({ status: 404, description: 'Subject not found' })
@@ -74,6 +91,7 @@ export class SubjectsController {
 
   @Delete(':id')
   @Roles(ROLES.SUPER_ADMIN, ROLES.SCHOOL_ADMIN)
+  @RateLimit(RATE_LIMIT_PRESETS.DELETE)
   @ApiOperation({ summary: 'Delete subject (soft delete)' })
   @ApiResponse({ status: 200, description: 'Subject deleted successfully' })
   @ApiResponse({ status: 404, description: 'Subject not found' })
@@ -84,6 +102,7 @@ export class SubjectsController {
   // Subject-Class Assignment
   @Post('assign')
   @Roles(ROLES.SUPER_ADMIN, ROLES.SCHOOL_ADMIN)
+  @RateLimit(RATE_LIMIT_PRESETS.WRITE)
   @ApiOperation({ summary: 'Assign subject to class' })
   @ApiResponse({ status: 201, description: 'Subject assigned successfully' })
   @ApiResponse({ status: 404, description: 'Subject or class not found' })
@@ -94,6 +113,7 @@ export class SubjectsController {
 
   @Delete(':subjectId/classes/:classId')
   @Roles(ROLES.SUPER_ADMIN, ROLES.SCHOOL_ADMIN)
+  @RateLimit(RATE_LIMIT_PRESETS.DELETE)
   @ApiOperation({ summary: 'Remove subject from class' })
   @ApiResponse({ status: 200, description: 'Subject removed successfully' })
   @ApiResponse({ status: 404, description: 'Assignment not found' })

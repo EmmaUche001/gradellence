@@ -1,7 +1,8 @@
 import { Processor, WorkerHost } from '@nestjs/bullmq';
 import { Job } from 'bullmq';
 import { Logger } from '@nestjs/common';
-import { PrismaService } from '../../../database/prisma.service';
+import { ResultsService } from '../../../modules/results/results.service';
+import { AuthenticatedUser } from '../../../common/types/express.types';
 
 export interface ResultComputationJob {
   classId: string;
@@ -15,7 +16,7 @@ export interface ResultComputationJob {
 export class ResultComputationProcessor extends WorkerHost {
   private readonly logger = new Logger(ResultComputationProcessor.name);
 
-  constructor(private readonly prisma: PrismaService) {
+  constructor(private readonly resultsService: ResultsService) {
     super();
   }
 
@@ -27,73 +28,25 @@ export class ResultComputationProcessor extends WorkerHost {
     );
 
     try {
-      // Get all enrollments for this class and term (through student's school)
-      const enrollments = await this.prisma.enrollment.findMany({
-        where: {
-          classId,
-          termId,
-          student: { schoolId },
-        },
-        include: { student: true },
-      });
+      const currentUser: AuthenticatedUser = {
+        id: userId,
+        schoolId,
+        email: '',
+        firstName: '',
+        lastName: '',
+        roles: [],
+        permissions: [],
+      };
 
-      // Get assessments for this class and term
-      const assessments = await this.prisma.assessment.findMany({
-        where: {
-          schoolId,
-          termId,
-          ...(subjectIds?.length ? { subjectId: { in: subjectIds } } : {}),
-        },
-      });
+      const result = await this.resultsService.computeResults(
+        classId,
+        termId,
+        currentUser,
+        subjectIds,
+      );
+      this.logger.log(`Result computation completed successfully`);
 
-      // Compute results for each student
-      const results = [];
-      for (const enrollment of enrollments) {
-        const studentAssessments = assessments.filter((a) => a.studentId === enrollment.studentId);
-
-        // Group by subject
-        const subjectGroups = new Map<string, typeof studentAssessments>();
-        for (const assessment of studentAssessments) {
-          const group = subjectGroups.get(assessment.subjectId) || [];
-          group.push(assessment);
-          subjectGroups.set(assessment.subjectId, group);
-        }
-
-        for (const [subjectId, subjectAssessments] of subjectGroups) {
-          const totalScore = subjectAssessments.reduce((sum, a) => sum + (a.score || 0), 0);
-
-          results.push({
-            studentId: enrollment.studentId,
-            subjectId,
-            termId,
-            schoolId,
-            totalScore,
-            createdBy: userId,
-          });
-        }
-      }
-
-      // Upsert results using the correct unique constraint
-      for (const result of results) {
-        await this.prisma.result.upsert({
-          where: {
-            studentId_subjectId_termId: {
-              studentId: result.studentId,
-              subjectId: result.subjectId,
-              termId: result.termId,
-            },
-          },
-          update: {
-            totalScore: result.totalScore,
-            updatedBy: result.createdBy,
-          },
-          create: result,
-        });
-      }
-
-      this.logger.log(`Result computation completed: ${results.length} results computed`);
-
-      return { success: true, count: results.length };
+      return result;
     } catch (error) {
       const err = error as Error;
       this.logger.error(`Result computation failed: ${err.message}`, err.stack);

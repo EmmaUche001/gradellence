@@ -1,8 +1,13 @@
 {
   "dependencies": {
     "@nestjs/cache-manager": "^3.1.2",
+    "@types/bcryptjs": "^2.4.6",
     "@types/ioredis": "^4.28.10",
+    "bcryptjs": "^3.0.3",
     "cache-manager-redis-store": "^3.0.1",
     "ioredis": "^5.11.1"
+  },
+  "devDependencies": {
+    "ts-node": "^10.9.2"
   }
 }

@@ -157,7 +157,7 @@ export function AssessmentFormPage() {
             <select {...register('classId')} className="input">
               <option value="">Select class</option>
               {classes.map((c) => (
-                <option key={c.id} value={c.id}>{c.name} ({c.academicYear})</option>
+                <option key={c.id} value={c.id}>{c.name} (Level {c.level})</option>
               ))}
             </select>
             {errors.classId && <p className="mt-1 text-sm text-red-600">{errors.classId.message}</p>}

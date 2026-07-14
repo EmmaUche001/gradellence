@@ -4,16 +4,20 @@ import {
   ConflictException,
   ForbiddenException,
 } from '@nestjs/common';
-import * as argon2 from 'argon2';
+import * as bcrypt from 'bcryptjs';
 import { PrismaService } from '../../database/prisma.service';
 import { CreateUserDto } from './dto/create-user.dto';
 import { UpdateUserDto } from './dto/update-user.dto';
 import { AuthenticatedUser } from '../../common/types/express.types';
 import { ROLES } from '../../common/constants/roles.constants';
+import { AuditLogsService } from '../audit-logs/audit-logs.service';
 
 @Injectable()
 export class UsersService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly auditLogsService: AuditLogsService,
+  ) {}
 
   async create(dto: CreateUserDto, currentUser: AuthenticatedUser) {
     // Check if user can create users for this school
@@ -31,7 +35,7 @@ export class UsersService {
     }
 
     // Hash password
-    const passwordHash = await argon2.hash(dto.password);
+    const passwordHash = await bcrypt.hash(dto.password, 12);
 
     const user = await this.prisma.user.create({
       data: {
@@ -166,7 +170,13 @@ export class UsersService {
     };
   }
 
-  async update(id: string, dto: UpdateUserDto, currentUser: AuthenticatedUser) {
+  async update(
+    id: string,
+    dto: UpdateUserDto,
+    currentUser: AuthenticatedUser,
+    ipAddress?: string,
+    userAgent?: string,
+  ) {
     const user = await this.prisma.user.findFirst({
       where: { id, deletedAt: null },
     });
@@ -203,7 +213,7 @@ export class UsersService {
 
     // Hash password if provided
     if (dto.password) {
-      updateData.passwordHash = await argon2.hash(dto.password);
+      updateData.passwordHash = await bcrypt.hash(dto.password, 12);
     }
 
     const updatedUser = await this.prisma.user.update({
@@ -220,6 +230,18 @@ export class UsersService {
 
     // Update roles if provided
     if (dto.roleIds) {
+      // Fetch old role ids before mutation
+      const oldRoles = await this.prisma.userRole.findMany({
+        where: { userId: id },
+        select: { roleId: true },
+      });
+      const oldRoleIds = oldRoles.map((r) => r.roleId);
+
+      // Only log if roles actually changed
+      const changed =
+        oldRoleIds.length !== dto.roleIds.length ||
+        !oldRoleIds.every((r) => dto.roleIds!.includes(r));
+
       // Remove existing roles
       await this.prisma.userRole.deleteMany({
         where: { userId: id },
@@ -233,6 +255,21 @@ export class UsersService {
             roleId,
           })),
         });
+      }
+
+      if (changed) {
+        await this.auditLogsService
+          .logAction(
+            currentUser.id,
+            'ROLE_CHANGED',
+            'User',
+            id,
+            oldRoleIds,
+            dto.roleIds,
+            ipAddress,
+            userAgent,
+          )
+          .catch(() => {});
       }
     }
 

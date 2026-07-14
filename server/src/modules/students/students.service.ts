@@ -1,13 +1,11 @@
-import {
-  Injectable,
-  NotFoundException,
-  ConflictException,
-  ForbiddenException,
-} from '@nestjs/common';
+import { Injectable, NotFoundException, ConflictException } from '@nestjs/common';
 import { PrismaService } from '../../database/prisma.service';
 import { CreateStudentDto } from './dto/create-student.dto';
 import { UpdateStudentDto } from './dto/update-student.dto';
 import { AuthenticatedUser } from '../../common/types/express.types';
+import { enforceEntityLimit } from '../../common/helpers/trial-limits.helper';
+import { BulkStudentsService } from './bulk-students.service';
+import { ImportResult } from '../../common/import/import-result.interface';
 
 @Injectable()
 export class StudentsService {
@@ -34,26 +32,7 @@ export class StudentsService {
   }
 
   async create(dto: CreateStudentDto, currentUser: AuthenticatedUser) {
-    // Check subscription limit for students
-    const subscription = await this.prisma.schoolSubscription.findFirst({
-      where: { schoolId: currentUser.schoolId, status: 'ACTIVE' },
-      include: { plan: true },
-    });
-
-    if (!subscription) {
-      throw new ForbiddenException('No active subscription found');
-    }
-
-    // Check current student count
-    const currentStudentCount = await this.prisma.student.count({
-      where: { schoolId: currentUser.schoolId, deletedAt: null },
-    });
-
-    if (currentStudentCount >= subscription.plan.maxStudents) {
-      throw new ForbiddenException(
-        `Student limit reached (${subscription.plan.maxStudents}). Upgrade your plan to add more students.`,
-      );
-    }
+    await enforceEntityLimit(this.prisma, 'students', currentUser.schoolId);
 
     // Generate admission number
     const admissionNumber = await this.generateAdmissionNumber(currentUser.schoolId);
@@ -75,6 +54,30 @@ export class StudentsService {
         createdBy: currentUser.id,
       },
     });
+
+    // Auto-enroll in class if classId provided and current term exists
+    if (dto.classId) {
+      const currentTerm = await this.prisma.term.findFirst({
+        where: { schoolId: currentUser.schoolId, isCurrent: true },
+      });
+
+      if (currentTerm) {
+        // Check for existing enrollment in this term
+        const existingEnrollment = await this.prisma.enrollment.findFirst({
+          where: { studentId: student.id, termId: currentTerm.id },
+        });
+
+        if (!existingEnrollment) {
+          await this.prisma.enrollment.create({
+            data: {
+              studentId: student.id,
+              classId: dto.classId,
+              termId: currentTerm.id,
+            },
+          });
+        }
+      }
+    }
 
     return {
       success: true,
@@ -241,5 +244,115 @@ export class StudentsService {
       message: 'Student enrollments retrieved successfully',
       data: enrollments,
     };
+  }
+
+  async promoteStudents(dto: {
+    fromClassId: string;
+    toClassId: string;
+    termId: string;
+    nextTermId: string;
+    studentIds?: string[];
+  }, currentUser: AuthenticatedUser) {
+    const { fromClassId, toClassId, termId, nextTermId, studentIds } = dto;
+
+    const fromClass = await this.prisma.class.findFirst({
+      where: { id: fromClassId, schoolId: currentUser.schoolId, deletedAt: null },
+    });
+    if (!fromClass) {
+      throw new NotFoundException('Source class not found');
+    }
+
+    const toClass = await this.prisma.class.findFirst({
+      where: { id: toClassId, schoolId: currentUser.schoolId, deletedAt: null },
+    });
+    if (!toClass) {
+      throw new NotFoundException('Target class not found');
+    }
+
+    const term = await this.prisma.term.findFirst({
+      where: { id: termId, schoolId: currentUser.schoolId, deletedAt: null },
+    });
+    if (!term) {
+      throw new NotFoundException('Source term not found');
+    }
+
+    const nextTerm = await this.prisma.term.findFirst({
+      where: { id: nextTermId, schoolId: currentUser.schoolId, deletedAt: null },
+    });
+    if (!nextTerm) {
+      throw new NotFoundException('Target term not found');
+    }
+
+    const enrollmentWhere: any = {
+      classId: fromClassId,
+      termId,
+      student: { schoolId: currentUser.schoolId },
+    };
+    if (studentIds && studentIds.length > 0) {
+      enrollmentWhere.studentId = { in: studentIds };
+    }
+
+    const sourceEnrollments = await this.prisma.enrollment.findMany({
+      where: enrollmentWhere,
+      select: { studentId: true },
+    });
+
+    const studentIdsToPromote = sourceEnrollments.map((e) => e.studentId);
+
+    if (studentIdsToPromote.length === 0) {
+      return { promotedCount: 0, skippedCount: 0 };
+    }
+
+    const result = await this.prisma.$transaction(async (tx) => {
+      const createManyResult = await tx.enrollment.createMany({
+        data: studentIdsToPromote.map((studentId) => ({
+          studentId,
+          classId: toClassId,
+          termId: nextTermId,
+        })),
+        skipDuplicates: true,
+      });
+
+      const promotedCount = createManyResult.count;
+      const skippedCount = studentIdsToPromote.length - promotedCount;
+
+      return { promotedCount, skippedCount };
+    });
+
+    return result;
+  }
+
+  async importCsv(schoolId: string, csvContent: string): Promise<ImportResult> {
+    const bulkService = new BulkStudentsService(this.prisma);
+    return bulkService.importStudents(schoolId, csvContent);
+  }
+
+  async export(schoolId: string, classId?: string, termId?: string) {
+    const where: any = { schoolId, deletedAt: null };
+    if (classId) {
+      const enrollmentStudents = await this.prisma.enrollment
+        .findMany({
+          where: { classId, termId: termId || undefined },
+          select: { studentId: true },
+        })
+        .then((enrollments) => enrollments.map((e) => e.studentId));
+      where.id = { in: enrollmentStudents };
+    }
+
+    return this.prisma.student.findMany({
+      where,
+      select: {
+        admissionNumber: true,
+        firstName: true,
+        lastName: true,
+        dateOfBirth: true,
+        gender: true,
+        parentName: true,
+        parentEmail: true,
+        parentPhone: true,
+        isActive: true,
+        createdAt: true,
+      },
+    });
   }
 }

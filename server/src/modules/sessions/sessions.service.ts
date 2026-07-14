@@ -6,6 +6,7 @@ import {
 } from '@nestjs/common';
 import { PrismaService } from '../../database/prisma.service';
 import { CreateSessionDto } from './dto/create-session.dto';
+import { CreateSessionWithTermsDto } from './dto/create-session-with-terms.dto';
 import { UpdateSessionDto } from './dto/update-session.dto';
 import { CreateTermDto } from './dto/create-term.dto';
 import { UpdateTermDto } from './dto/update-term.dto';
@@ -16,6 +17,46 @@ export class SessionsService {
   constructor(private readonly prisma: PrismaService) {}
 
   // ==================== SESSIONS ====================
+
+  async createWithTerms(dto: CreateSessionWithTermsDto, currentUser: AuthenticatedUser) {
+    const session = await this.prisma.session.create({
+      data: {
+        schoolId: currentUser.schoolId,
+        name: dto.name,
+        startDate: new Date(dto.startDate),
+        endDate: new Date(dto.endDate),
+        terms: {
+          create: [
+            {
+              schoolId: currentUser.schoolId,
+              name: '1st Term',
+              startDate: new Date(dto.firstTermStart),
+              endDate: new Date(dto.firstTermEnd),
+            },
+            {
+              schoolId: currentUser.schoolId,
+              name: '2nd Term',
+              startDate: new Date(dto.secondTermStart),
+              endDate: new Date(dto.secondTermEnd),
+            },
+            {
+              schoolId: currentUser.schoolId,
+              name: '3rd Term',
+              startDate: new Date(dto.thirdTermStart),
+              endDate: new Date(dto.thirdTermEnd),
+            },
+          ],
+        },
+      },
+      include: { terms: { orderBy: { startDate: 'asc' } } },
+    });
+
+    return {
+      success: true,
+      message: 'Session created with 3 terms',
+      data: session,
+    };
+  }
 
   async createSession(dto: CreateSessionDto, currentUser: AuthenticatedUser) {
     // Validate dates
@@ -148,6 +189,32 @@ export class SessionsService {
       success: true,
       message: 'Session updated successfully',
       data: updatedSession,
+    };
+  }
+
+  async setCurrentSession(id: string, currentUser: AuthenticatedUser) {
+    const session = await this.prisma.session.findFirst({
+      where: { id, schoolId: currentUser.schoolId, deletedAt: null },
+    });
+    if (!session) throw new NotFoundException('Session not found');
+
+    // Unset all other current sessions for this school
+    await this.prisma.session.updateMany({
+      where: { schoolId: currentUser.schoolId, isCurrent: true },
+      data: { isCurrent: false },
+    });
+
+    // Set this one as current
+    const updated = await this.prisma.session.update({
+      where: { id },
+      data: { isCurrent: true },
+      include: { terms: { orderBy: { startDate: 'asc' } } },
+    });
+
+    return {
+      success: true,
+      message: 'Current session updated',
+      data: updated,
     };
   }
 
@@ -326,6 +393,31 @@ export class SessionsService {
     };
   }
 
+  async setCurrentTerm(id: string, currentUser: AuthenticatedUser) {
+    const term = await this.prisma.term.findFirst({
+      where: { id, schoolId: currentUser.schoolId, deletedAt: null },
+    });
+    if (!term) throw new NotFoundException('Term not found');
+
+    // Unset all other current terms for this school
+    await this.prisma.term.updateMany({
+      where: { schoolId: currentUser.schoolId, isCurrent: true },
+      data: { isCurrent: false },
+    });
+
+    const updated = await this.prisma.term.update({
+      where: { id },
+      data: { isCurrent: true },
+      include: { session: true },
+    });
+
+    return {
+      success: true,
+      message: 'Current term updated',
+      data: updated,
+    };
+  }
+
   async removeTerm(id: string, currentUser: AuthenticatedUser) {
     const term = await this.prisma.term.findFirst({
       where: { id, schoolId: currentUser.schoolId, deletedAt: null },
@@ -344,6 +436,23 @@ export class SessionsService {
     return {
       success: true,
       message: 'Term deleted successfully',
+    };
+  }
+
+  async getCurrent(currentUser: AuthenticatedUser) {
+    const session = await this.prisma.session.findFirst({
+      where: { schoolId: currentUser.schoolId, isCurrent: true },
+      include: {
+        terms: {
+          orderBy: { startDate: 'asc' },
+        },
+      },
+    });
+
+    return {
+      success: true,
+      message: session ? 'Current session retrieved' : 'No active session set',
+      data: session,
     };
   }
 

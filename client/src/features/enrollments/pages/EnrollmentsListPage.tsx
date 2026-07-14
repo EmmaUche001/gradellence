@@ -76,7 +76,7 @@ export function EnrollmentsListPage() {
                   <tr key={e.id} className="hover:bg-gray-50">
                     <td className="table-cell font-medium text-gray-900">{label}</td>
                     <td className="table-cell">{e.student?.admissionNumber || '—'}</td>
-                    <td className="table-cell">{e.class ? `${e.class.name} (${e.class.academicYear})` : '—'}</td>
+                    <td className="table-cell">{e.class ? `${e.class.name} (Level ${e.class.level})` : '—'}</td>
                     <td className="table-cell">{e.term?.name || '—'}</td>
                     <td className="table-cell">{new Date(e.enrollmentDate).toLocaleDateString()}</td>
                     <td className="table-cell">

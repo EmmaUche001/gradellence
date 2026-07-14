@@ -2,7 +2,16 @@ import { Routes as RouterRoutes, Route, Navigate } from 'react-router-dom';
 import { useAuthStore } from '../store/authStore';
 import { LoginPage } from '../features/auth/pages/LoginPage';
 import { RegisterPage } from '../features/auth/pages/RegisterPage';
+import ForgotPasswordPage from '../features/auth/pages/ForgotPasswordPage';
+import ResetPasswordPage from '../features/auth/pages/ResetPasswordPage';
 import { DashboardLayout } from '../layouts/DashboardLayout';
+import SuperAdminLayout from '../layouts/SuperAdminLayout';
+import SuperAdminGuard from '../components/guards/SuperAdminGuard';
+import SuperAdminDashboard from '../features/super-admin/pages/SuperAdminDashboard';
+import SchoolsPage from '../features/super-admin/pages/SchoolsPage';
+import SuperAdminSubscriptionsPage from '../features/super-admin/pages/SubscriptionsPage';
+import PlatformAnalyticsPage from '../features/super-admin/pages/PlatformAnalyticsPage';
+import { SuperAdminLoginPage } from '../features/super-admin/pages/SuperAdminLoginPage';
 import { DashboardPage } from '../features/dashboard/pages/DashboardPage';
 import { StudentsListPage } from '../features/students/pages/StudentsListPage';
 import { StudentFormPage } from '../features/students/pages/StudentFormPage';
@@ -23,6 +32,64 @@ import { ResultsListPage } from '../features/results/pages/ResultsListPage';
 import { BroadsheetPage } from '../features/results/pages/BroadsheetPage';
 import { GradeScalesListPage } from '../features/grade-scales/pages/GradeScalesListPage';
 import { GradeScaleFormPage } from '../features/grade-scales/pages/GradeScaleFormPage';
+import { SubscriptionsPage } from '../features/subscriptions/pages/SubscriptionsPage';
+import { UsersListPage } from '../features/users/pages/UsersListPage';
+import { RolesListPage } from '../features/roles/pages/RolesListPage';
+import { RoleFormPage } from '../features/roles/pages/RoleFormPage';
+import { AuditLogsListPage } from '../features/audit-logs/pages/AuditLogsListPage';
+import { BillingPage } from '../features/billing/pages/BillingPage';
+import { SchoolSettingsPage } from '../features/schools/pages/SchoolSettingsPage';
+import { AnalyticsDashboardPage } from '../features/analytics/pages/AnalyticsDashboardPage';
+import ParentLoginPage from '../features/parents/pages/ParentLoginPage';
+import ParentRegisterPage from '../features/parents/pages/ParentRegisterPage';
+import ParentDashboard from '../features/parents/pages/ParentDashboard';
+import StudentResultsPage from '../features/parents/pages/StudentResultsPage';
+import StudentAnalyticsPage from '../features/parents/pages/StudentAnalyticsPage';
+import { StudentImportPage } from '../features/students/pages/StudentImportPage';
+import { ScoreImportPage } from '../features/assessments/pages/ScoreImportPage';
+
+function RedirectToDashboard({ to }: { to: string }) {
+  return <Navigate to={to} replace />;
+}
+
+const routes = [
+  { path: 'dashboard', element: <DashboardPage />, index: true },
+  { path: 'students', element: <StudentsListPage /> },
+  { path: 'students/new', element: <StudentFormPage /> },
+  { path: 'students/:id/edit', element: <StudentFormPage /> },
+  { path: 'teachers', element: <TeachersListPage /> },
+  { path: 'teachers/new', element: <TeacherFormPage /> },
+  { path: 'teachers/:id/edit', element: <TeacherFormPage /> },
+  { path: 'classes', element: <ClassesListPage /> },
+  { path: 'classes/new', element: <ClassFormPage /> },
+  { path: 'classes/:id/edit', element: <ClassFormPage /> },
+  { path: 'subjects', element: <SubjectsListPage /> },
+  { path: 'subjects/new', element: <SubjectFormPage /> },
+  { path: 'subjects/:id/edit', element: <SubjectFormPage /> },
+  { path: 'sessions', element: <SessionsListPage /> },
+  { path: 'sessions/new', element: <SessionFormPage /> },
+  { path: 'sessions/:id/edit', element: <SessionFormPage /> },
+  { path: 'enrollments', element: <EnrollmentsListPage /> },
+  { path: 'enrollments/new', element: <EnrollmentFormPage /> },
+  { path: 'enrollments/bulk', element: <BulkEnrollmentPage /> },
+  { path: 'assessments', element: <AssessmentsListPage /> },
+  { path: 'assessments/new', element: <AssessmentFormPage /> },
+  { path: 'assessments/:id/edit', element: <AssessmentFormPage /> },
+  { path: 'results', element: <ResultsListPage /> },
+  { path: 'results/broadsheet', element: <BroadsheetPage /> },
+  { path: 'grade-scales', element: <GradeScalesListPage /> },
+  { path: 'grade-scales/new', element: <GradeScaleFormPage /> },
+  { path: 'grade-scales/:id/edit', element: <GradeScaleFormPage /> },
+  { path: 'subscriptions', element: <SubscriptionsPage /> },
+  { path: 'users', element: <UsersListPage /> },
+  { path: 'roles', element: <RolesListPage /> },
+  { path: 'roles/new', element: <RoleFormPage /> },
+  { path: 'roles/:id/edit', element: <RoleFormPage /> },
+  { path: 'audit-logs', element: <AuditLogsListPage /> },
+  { path: 'billing', element: <BillingPage /> },
+  { path: 'settings', element: <SchoolSettingsPage /> },
+  { path: 'analytics', element: <AnalyticsDashboardPage /> },
+];
 
 export function Routes() {
   const { isAuthenticated } = useAuthStore();
@@ -38,71 +105,51 @@ export function Routes() {
         path="/register"
         element={!isAuthenticated ? <RegisterPage /> : <Navigate to="/dashboard" />}
       />
+      <Route path="/forgot-password" element={<ForgotPasswordPage />} />
+      <Route path="/reset-password" element={<ResetPasswordPage />} />
 
-      {/* Protected Routes */}
+      {/* Hidden Super Admin Login */}
+      <Route path="/super-admin-login" element={<SuperAdminLoginPage />} />
+
+      {/* Protected Routes — nested under /dashboard */}
       <Route
         path="/dashboard"
         element={isAuthenticated ? <DashboardLayout /> : <Navigate to="/login" />}
       >
         <Route index element={<DashboardPage />} />
-        <Route path="students" element={<StudentsListPage />} />
-        <Route path="students/new" element={<StudentFormPage />} />
-        <Route path="students/:id/edit" element={<StudentFormPage />} />
-        <Route path="teachers" element={<TeachersListPage />} />
-        <Route path="teachers/new" element={<TeacherFormPage />} />
-        <Route path="teachers/:id/edit" element={<TeacherFormPage />} />
-        <Route path="classes" element={<ClassesListPage />} />
-        <Route path="classes/new" element={<ClassFormPage />} />
-        <Route path="classes/:id/edit" element={<ClassFormPage />} />
-        <Route path="subjects" element={<SubjectsListPage />} />
-        <Route path="subjects/new" element={<SubjectFormPage />} />
-        <Route path="subjects/:id/edit" element={<SubjectFormPage />} />
-        <Route path="sessions" element={<SessionsListPage />} />
-        <Route path="sessions/new" element={<SessionFormPage />} />
-        <Route path="sessions/:id/edit" element={<SessionFormPage />} />
-        <Route path="enrollments" element={<EnrollmentsListPage />} />
-        <Route path="enrollments/new" element={<EnrollmentFormPage />} />
-        <Route path="enrollments/bulk" element={<BulkEnrollmentPage />} />
-        <Route path="assessments" element={<AssessmentsListPage />} />
-        <Route path="assessments/new" element={<AssessmentFormPage />} />
-        <Route path="assessments/:id/edit" element={<AssessmentFormPage />} />
-        <Route path="results" element={<ResultsListPage />} />
-        <Route path="results/broadsheet" element={<BroadsheetPage />} />
-        <Route path="grade-scales" element={<GradeScalesListPage />} />
-        <Route path="grade-scales/new" element={<GradeScaleFormPage />} />
-        <Route path="grade-scales/:id/edit" element={<GradeScaleFormPage />} />
+        {routes.map((r) => (
+          <Route key={r.path} path={r.path} element={r.element} />
+        ))}
       </Route>
 
-      {/* Also accessible without /dashboard prefix */}
+      {/* Root-level aliases for direct access without /dashboard prefix */}
       <Route
         element={isAuthenticated ? <DashboardLayout /> : <Navigate to="/login" />}
       >
-        <Route path="students" element={<StudentsListPage />} />
-        <Route path="students/new" element={<StudentFormPage />} />
-        <Route path="students/:id/edit" element={<StudentFormPage />} />
-        <Route path="teachers" element={<TeachersListPage />} />
-        <Route path="teachers/new" element={<TeacherFormPage />} />
-        <Route path="teachers/:id/edit" element={<TeacherFormPage />} />
-        <Route path="classes" element={<ClassesListPage />} />
-        <Route path="classes/new" element={<ClassFormPage />} />
-        <Route path="classes/:id/edit" element={<ClassFormPage />} />
-        <Route path="subjects" element={<SubjectsListPage />} />
-        <Route path="subjects/new" element={<SubjectFormPage />} />
-        <Route path="subjects/:id/edit" element={<SubjectFormPage />} />
-        <Route path="sessions" element={<SessionsListPage />} />
-        <Route path="sessions/new" element={<SessionFormPage />} />
-        <Route path="sessions/:id/edit" element={<SessionFormPage />} />
-        <Route path="enrollments" element={<EnrollmentsListPage />} />
-        <Route path="enrollments/new" element={<EnrollmentFormPage />} />
-        <Route path="enrollments/bulk" element={<BulkEnrollmentPage />} />
-        <Route path="assessments" element={<AssessmentsListPage />} />
-        <Route path="assessments/new" element={<AssessmentFormPage />} />
-        <Route path="assessments/:id/edit" element={<AssessmentFormPage />} />
-        <Route path="results" element={<ResultsListPage />} />
-        <Route path="results/broadsheet" element={<BroadsheetPage />} />
-        <Route path="grade-scales" element={<GradeScalesListPage />} />
-        <Route path="grade-scales/new" element={<GradeScaleFormPage />} />
-        <Route path="grade-scales/:id/edit" element={<GradeScaleFormPage />} />
+        {routes.map((r) => (
+          <Route key={r.path} path={r.path} element={<RedirectToDashboard to={`/dashboard/${r.path}`} />} />
+        ))}
+      </Route>
+
+      {/* Parent Portal Routes */}
+      <Route path="/parent/login" element={<ParentLoginPage />} />
+      <Route path="/parent/register" element={<ParentRegisterPage />} />
+      <Route path="/parent/dashboard" element={<ParentDashboard />} />
+      <Route path="/parent/students/:studentId/results" element={<StudentResultsPage />} />
+      <Route path="/parent/students/:studentId/analytics" element={<StudentAnalyticsPage />} />
+
+      {/* Import Routes */}
+      <Route path="/students/import" element={<StudentImportPage />} />
+      <Route path="/assessments/import" element={<ScoreImportPage />} />
+
+      {/* Super Admin Routes */}
+      <Route element={<SuperAdminGuard />}>
+        <Route path="/super-admin" element={<SuperAdminLayout />}>
+          <Route index element={<SuperAdminDashboard />} />
+          <Route path="schools" element={<SchoolsPage />} />
+          <Route path="subscriptions" element={<SuperAdminSubscriptionsPage />} />
+          <Route path="analytics" element={<PlatformAnalyticsPage />} />
+        </Route>
       </Route>
 
       {/* Default redirect */}

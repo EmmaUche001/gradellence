@@ -1,13 +1,22 @@
 import { Transform } from 'class-transformer';
-import { IsString, IsEmail, IsDateString, IsOptional, MinLength, MaxLength } from 'class-validator';
+import {
+  IsString,
+  IsEmail,
+  IsDateString,
+  IsOptional,
+  IsUUID,
+  MinLength,
+  MaxLength,
+} from 'class-validator';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 
 export class CreateStudentDto {
-  @ApiProperty({ example: 'LLA/26/0001' })
+  @ApiPropertyOptional({ example: 'LLA/26/0001' })
   @IsString()
   @MinLength(2)
   @MaxLength(50)
-  admissionNumber!: string;
+  @IsOptional()
+  admissionNumber?: string;
 
   @ApiProperty({ example: 'John' })
   @IsString()
@@ -61,4 +70,9 @@ export class CreateStudentDto {
   @IsEmail()
   @IsOptional()
   parentEmail?: string;
+
+  @ApiPropertyOptional({ example: 'class-uuid' })
+  @IsUUID()
+  @IsOptional()
+  classId?: string;
 }

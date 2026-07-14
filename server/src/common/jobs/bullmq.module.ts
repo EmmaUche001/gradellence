@@ -4,6 +4,8 @@ import { ConfigService } from '@nestjs/config';
 import { ResultComputationProcessor } from './processors/result-computation.processor';
 import { BulkEnrollmentProcessor } from './processors/bulk-enrollment.processor';
 import { EmailProcessor } from './processors/email.processor';
+import { ResultsModule } from '../../modules/results/results.module';
+import { EnrollmentsModule } from '../../modules/enrollments/enrollments.module';
 
 @Global()
 @Module({
@@ -32,6 +34,8 @@ import { EmailProcessor } from './processors/email.processor';
       { name: 'bulk-enrollment' },
       { name: 'email' },
     ),
+    ResultsModule,
+    EnrollmentsModule,
   ],
   providers: [ResultComputationProcessor, BulkEnrollmentProcessor, EmailProcessor],
   exports: [BullModule],

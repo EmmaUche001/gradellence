@@ -9,12 +9,23 @@ import { CreateAssessmentDto } from './dto/create-assessment.dto';
 import { UpdateAssessmentDto } from './dto/update-assessment.dto';
 import { BulkAssessmentDto } from './dto/bulk-assessment.dto';
 import { AuthenticatedUser } from '../../common/types/express.types';
+import { AuditLogsService } from '../audit-logs/audit-logs.service';
+import { BulkAssessmentsService } from './bulk-assessments.service';
+import { ImportResult } from '../../common/import/import-result.interface';
 
 @Injectable()
 export class AssessmentsService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly auditLogsService: AuditLogsService,
+  ) {}
 
-  async create(dto: CreateAssessmentDto, currentUser: AuthenticatedUser) {
+  async create(
+    dto: CreateAssessmentDto,
+    currentUser: AuthenticatedUser,
+    ipAddress?: string,
+    userAgent?: string,
+  ) {
     // Check subscription limit for students
     const subscription = await this.prisma.schoolSubscription.findFirst({
       where: { schoolId: currentUser.schoolId, status: 'ACTIVE' },
@@ -116,6 +127,19 @@ export class AssessmentsService {
         },
       },
     });
+
+    await this.auditLogsService
+      .logAction(
+        currentUser.id,
+        'SCORE_CREATED',
+        'Assessment',
+        assessment.id,
+        undefined,
+        { score: dto.score, maxScore: dto.maxScore, weight: dto.weight ?? 1.0 },
+        ipAddress,
+        userAgent,
+      )
+      .catch(() => {});
 
     return {
       success: true,
@@ -368,7 +392,13 @@ export class AssessmentsService {
     };
   }
 
-  async update(id: string, dto: UpdateAssessmentDto, currentUser: AuthenticatedUser) {
+  async update(
+    id: string,
+    dto: UpdateAssessmentDto,
+    currentUser: AuthenticatedUser,
+    ipAddress?: string,
+    userAgent?: string,
+  ) {
     const assessment = await this.prisma.assessment.findFirst({
       where: {
         id,
@@ -433,6 +463,23 @@ export class AssessmentsService {
       },
     });
 
+    await this.auditLogsService
+      .logAction(
+        currentUser.id,
+        'SCORE_UPDATED',
+        'Assessment',
+        id,
+        { score: assessment.score, maxScore: assessment.maxScore, weight: assessment.weight },
+        {
+          score: updatedAssessment.score,
+          maxScore: updatedAssessment.maxScore,
+          weight: updatedAssessment.weight,
+        },
+        ipAddress,
+        userAgent,
+      )
+      .catch(() => {});
+
     return {
       success: true,
       message: 'Assessment updated successfully',
@@ -440,7 +487,7 @@ export class AssessmentsService {
     };
   }
 
-  async remove(id: string, currentUser: AuthenticatedUser) {
+  async remove(id: string, currentUser: AuthenticatedUser, ipAddress?: string, userAgent?: string) {
     const assessment = await this.prisma.assessment.findFirst({
       where: {
         id,
@@ -455,6 +502,19 @@ export class AssessmentsService {
     await this.prisma.assessment.delete({
       where: { id },
     });
+
+    await this.auditLogsService
+      .logAction(
+        currentUser.id,
+        'SCORE_DELETED',
+        'Assessment',
+        id,
+        { score: assessment.score, maxScore: assessment.maxScore, weight: assessment.weight },
+        undefined,
+        ipAddress,
+        userAgent,
+      )
+      .catch(() => {});
 
     return {
       success: true,
@@ -578,5 +638,31 @@ export class AssessmentsService {
         assessments,
       },
     };
+  }
+
+  async importCsv(schoolId: string, csvContent: string): Promise<ImportResult> {
+    const bulkService = new BulkAssessmentsService(this.prisma);
+    return bulkService.importAssessments(schoolId, csvContent);
+  }
+
+  async export(schoolId: string, classId?: string, termId?: string) {
+    const where: any = { schoolId };
+    if (classId) {
+      const enrollments = await this.prisma.enrollment.findMany({
+        where: { classId, termId: termId || undefined },
+        select: { studentId: true },
+      });
+      where.studentId = { in: enrollments.map((e) => e.studentId) };
+    }
+    if (termId) where.termId = termId;
+
+    return this.prisma.assessment.findMany({
+      where,
+      include: {
+        student: { select: { id: true, firstName: true, lastName: true, admissionNumber: true } },
+        subject: { select: { id: true, name: true, code: true } },
+        term: { select: { id: true, name: true } },
+      },
+    });
   }
 }

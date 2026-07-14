@@ -19,6 +19,7 @@ export interface Term {
   startDate: string;
   endDate: string;
   isActive: boolean;
+  isCurrent: boolean;
 }
 
 export interface CreateSessionData {
@@ -40,3 +41,15 @@ export interface CreateTermData {
 }
 
 export interface UpdateTermData extends Partial<Omit<CreateTermData, 'sessionId'>> {}
+
+export interface CreateSessionWithTermsData {
+  name: string;
+  startDate: string;
+  endDate: string;
+  firstTermStart: string;
+  firstTermEnd: string;
+  secondTermStart: string;
+  secondTermEnd: string;
+  thirdTermStart: string;
+  thirdTermEnd: string;
+}

@@ -23,7 +23,6 @@ export function GradeScalesListPage() {
     setError(null);
     try {
       const response = await gradeScaleService.getAll(page, 50);
-      // Sort by minScore descending (highest grade first)
       const sorted = [...response.data].sort((a, b) => b.minScore - a.minScore);
       setScales(sorted);
       if (response.meta) setTotalPages(response.meta.totalPages);
@@ -65,6 +64,7 @@ export function GradeScalesListPage() {
               <tr>
                 <th className="table-header">Score Range</th>
                 <th className="table-header">Grade</th>
+                <th className="table-header">Points</th>
                 <th className="table-header">Visual</th>
                 <th className="table-header">Remark</th>
                 <th className="table-header">Status</th>
@@ -73,9 +73,9 @@ export function GradeScalesListPage() {
             </thead>
             <tbody className="bg-white divide-y divide-gray-200">
               {isLoading ? (
-                <tr><td colSpan={6} className="px-6 py-12 text-center text-gray-500">Loading grade scales...</td></tr>
+                <tr><td colSpan={7} className="px-6 py-12 text-center text-gray-500">Loading grade scales...</td></tr>
               ) : scales.length === 0 ? (
-                <tr><td colSpan={6} className="px-6 py-12 text-center text-gray-500">
+                <tr><td colSpan={7} className="px-6 py-12 text-center text-gray-500">
                   No grade scales found. Click "+ Add Grade Scale" to create one.
                 </td></tr>
               ) : scales.map((s) => (
@@ -86,6 +86,11 @@ export function GradeScalesListPage() {
                   <td className="table-cell">
                     <span className={`inline-flex w-10 h-10 items-center justify-center text-base font-bold rounded-full ${getGradeColor(s.grade)}`}>
                       {s.grade}
+                    </span>
+                  </td>
+                  <td className="table-cell text-center">
+                    <span className="inline-flex px-2 py-1 text-xs font-semibold rounded-full bg-blue-50 text-blue-700">
+                      {(s.points ?? 0).toFixed(1)} pts
                     </span>
                   </td>
                   <td className="table-cell">

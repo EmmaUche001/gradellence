@@ -1,5 +1,8 @@
 import apiClient, { ApiResponse } from './apiClient';
 import { Subject, CreateSubjectData, UpdateSubjectData } from '../types/subject';
+export interface BulkCreateSubjectsDto {
+  subjects: Array<{ name: string; code: string }>;
+}
 
 const BASE = '/v1/subjects';
 
@@ -28,6 +31,11 @@ export const subjectService = {
 
   async remove(id: string): Promise<ApiResponse<void>> {
     const { data } = await apiClient.delete(`${BASE}/${id}`);
+    return data;
+  },
+
+  async bulkCreate(dto: BulkCreateSubjectsDto): Promise<ApiResponse<any>> {
+    const { data } = await apiClient.post(`${BASE}/bulk`, dto);
     return data;
   },
 };

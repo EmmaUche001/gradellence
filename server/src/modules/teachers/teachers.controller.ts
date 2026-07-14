@@ -19,19 +19,23 @@ import { UpdateTeacherDto } from './dto/update-teacher.dto';
 import { AssignTeacherDto } from './dto/assign-teacher.dto';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
 import { RolesGuard } from '../../common/guards/roles.guard';
+import { TenantGuard } from '../../common/guards/tenant.guard';
 import { Roles } from '../../common/decorators/roles.decorator';
 import { ROLES } from '../../common/constants/roles.constants';
 import { AuthenticatedRequest } from '../../common/types/express.types';
+import { RateLimit } from '../../common/decorators/rate-limit.decorator';
+import { RATE_LIMIT_PRESETS } from '../../common/constants/rate-limit.constants';
 
 @ApiTags('Teachers')
 @Controller('teachers')
-@UseGuards(JwtAuthGuard, RolesGuard)
+@UseGuards(JwtAuthGuard, RolesGuard, TenantGuard)
 @ApiBearerAuth()
 export class TeachersController {
   constructor(private readonly teachersService: TeachersService) {}
 
   @Post()
   @Roles(ROLES.SUPER_ADMIN, ROLES.SCHOOL_ADMIN)
+  @RateLimit(RATE_LIMIT_PRESETS.WRITE)
   @ApiOperation({ summary: 'Create a new teacher' })
   @ApiResponse({ status: 201, description: 'Teacher created successfully' })
   @ApiResponse({ status: 400, description: 'Bad request' })
@@ -61,6 +65,7 @@ export class TeachersController {
 
   @Patch(':id')
   @Roles(ROLES.SUPER_ADMIN, ROLES.SCHOOL_ADMIN)
+  @RateLimit(RATE_LIMIT_PRESETS.WRITE)
   @ApiOperation({ summary: 'Update teacher' })
   @ApiResponse({ status: 200, description: 'Teacher updated successfully' })
   @ApiResponse({ status: 404, description: 'Teacher not found' })
@@ -74,6 +79,7 @@ export class TeachersController {
 
   @Delete(':id')
   @Roles(ROLES.SUPER_ADMIN, ROLES.SCHOOL_ADMIN)
+  @RateLimit(RATE_LIMIT_PRESETS.DELETE)
   @ApiOperation({ summary: 'Delete teacher (soft delete)' })
   @ApiResponse({ status: 200, description: 'Teacher deleted successfully' })
   @ApiResponse({ status: 404, description: 'Teacher not found' })
@@ -84,6 +90,7 @@ export class TeachersController {
   // Teacher-Subject Assignment
   @Post('assign')
   @Roles(ROLES.SUPER_ADMIN, ROLES.SCHOOL_ADMIN)
+  @RateLimit(RATE_LIMIT_PRESETS.WRITE)
   @ApiOperation({ summary: 'Assign teacher to subject and class' })
   @ApiResponse({ status: 201, description: 'Teacher assigned successfully' })
   @ApiResponse({ status: 404, description: 'Teacher, subject, or class not found' })
@@ -94,6 +101,7 @@ export class TeachersController {
 
   @Delete(':teacherId/subjects/:subjectId/classes/:classId')
   @Roles(ROLES.SUPER_ADMIN, ROLES.SCHOOL_ADMIN)
+  @RateLimit(RATE_LIMIT_PRESETS.DELETE)
   @ApiOperation({ summary: 'Remove teacher from subject and class' })
   @ApiResponse({ status: 200, description: 'Teacher removed successfully' })
   @ApiResponse({ status: 404, description: 'Assignment not found' })

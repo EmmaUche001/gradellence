@@ -1,7 +1,14 @@
-import { Injectable, NotFoundException, ConflictException } from '@nestjs/common';
+import {
+  Injectable,
+  NotFoundException,
+  ConflictException,
+  ForbiddenException,
+} from '@nestjs/common';
 import { PrismaService } from '../../database/prisma.service';
 import { CreateSchoolDto } from './dto/create-school.dto';
 import { UpdateSchoolDto } from './dto/update-school.dto';
+import { AuthenticatedUser } from '../../common/types/express.types';
+import { ROLES } from '../../common/constants/roles.constants';
 
 @Injectable()
 export class SchoolsService {
@@ -63,7 +70,15 @@ export class SchoolsService {
     };
   }
 
-  async findOne(id: string) {
+  async findOne(id: string, currentUser: AuthenticatedUser) {
+    // Platform-level SUPER_ADMIN may look up any school. Every other role
+    // may only look up their own school — otherwise any authenticated user
+    // could read another tenant's school profile (address, phone, email,
+    // logo) just by knowing/guessing an id.
+    if (!currentUser.roles.includes(ROLES.SUPER_ADMIN) && id !== currentUser.schoolId) {
+      throw new NotFoundException('School not found');
+    }
+
     const school = await this.prisma.school.findFirst({
       where: { id, deletedAt: null },
     });
@@ -79,7 +94,24 @@ export class SchoolsService {
     };
   }
 
-  async update(id: string, dto: UpdateSchoolDto) {
+  async update(id: string, dto: UpdateSchoolDto, currentUser: AuthenticatedUser) {
+    const isSuperAdmin = currentUser.roles.includes(ROLES.SUPER_ADMIN);
+
+    // Same isolation rule as findOne: a SCHOOL_ADMIN may only update their
+    // own school, never another tenant's.
+    if (!isSuperAdmin && id !== currentUser.schoolId) {
+      throw new NotFoundException('School not found');
+    }
+
+    // Suspending/reactivating a school is an explicit Super Admin capability
+    // per spec ("suspend/reactivate schools") — a SCHOOL_ADMIN must not be
+    // able to flip their own tenant's isActive flag.
+    if (!isSuperAdmin && dto.isActive !== undefined) {
+      throw new ForbiddenException(
+        'Only a platform administrator can suspend or reactivate a school',
+      );
+    }
+
     const school = await this.prisma.school.findFirst({
       where: { id, deletedAt: null },
     });

@@ -11,30 +11,49 @@ import {
   Request,
   DefaultValuePipe,
   ParseIntPipe,
+  HttpCode,
+  HttpStatus,
 } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiResponse, ApiBearerAuth } from '@nestjs/swagger';
 import { SessionsService } from './sessions.service';
 import { CreateSessionDto } from './dto/create-session.dto';
+import { CreateSessionWithTermsDto } from './dto/create-session-with-terms.dto';
 import { UpdateSessionDto } from './dto/update-session.dto';
 import { CreateTermDto } from './dto/create-term.dto';
 import { UpdateTermDto } from './dto/update-term.dto';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
 import { RolesGuard } from '../../common/guards/roles.guard';
+import { TenantGuard } from '../../common/guards/tenant.guard';
 import { Roles } from '../../common/decorators/roles.decorator';
 import { ROLES } from '../../common/constants/roles.constants';
 import { AuthenticatedRequest } from '../../common/types/express.types';
+import { RateLimit } from '../../common/decorators/rate-limit.decorator';
+import { RATE_LIMIT_PRESETS } from '../../common/constants/rate-limit.constants';
 
 @ApiTags('Sessions & Terms')
 @Controller('sessions')
-@UseGuards(JwtAuthGuard, RolesGuard)
+@UseGuards(JwtAuthGuard, RolesGuard, TenantGuard)
 @ApiBearerAuth()
 export class SessionsController {
   constructor(private readonly sessionsService: SessionsService) {}
 
   // ==================== SESSIONS ====================
 
+  @Post('with-terms')
+  @Roles(ROLES.SUPER_ADMIN, ROLES.SCHOOL_ADMIN)
+  @RateLimit(RATE_LIMIT_PRESETS.BULK)
+  @HttpCode(HttpStatus.CREATED)
+  @ApiOperation({ summary: 'Create academic session with 3 terms' })
+  async createWithTerms(
+    @Body() dto: CreateSessionWithTermsDto,
+    @Request() req: AuthenticatedRequest,
+  ) {
+    return this.sessionsService.createWithTerms(dto, req.user);
+  }
+
   @Post()
   @Roles(ROLES.SUPER_ADMIN, ROLES.SCHOOL_ADMIN)
+  @RateLimit(RATE_LIMIT_PRESETS.WRITE)
   @ApiOperation({ summary: 'Create a new academic session' })
   @ApiResponse({ status: 201, description: 'Session created successfully' })
   @ApiResponse({ status: 400, description: 'Bad request' })
@@ -60,6 +79,14 @@ export class SessionsController {
     return this.sessionsService.getCurrentSession(req.user);
   }
 
+  @Patch(':id/set-current')
+  @Roles(ROLES.SUPER_ADMIN, ROLES.SCHOOL_ADMIN)
+  @RateLimit(RATE_LIMIT_PRESETS.WRITE)
+  @ApiOperation({ summary: 'Set session as current' })
+  async setCurrentSession(@Param('id') id: string, @Request() req: AuthenticatedRequest) {
+    return this.sessionsService.setCurrentSession(id, req.user);
+  }
+
   @Get(':id')
   @ApiOperation({ summary: 'Get session by ID' })
   @ApiResponse({ status: 200, description: 'Session retrieved successfully' })
@@ -70,6 +97,7 @@ export class SessionsController {
 
   @Patch(':id')
   @Roles(ROLES.SUPER_ADMIN, ROLES.SCHOOL_ADMIN)
+  @RateLimit(RATE_LIMIT_PRESETS.WRITE)
   @ApiOperation({ summary: 'Update session' })
   @ApiResponse({ status: 200, description: 'Session updated successfully' })
   @ApiResponse({ status: 404, description: 'Session not found' })
@@ -83,6 +111,7 @@ export class SessionsController {
 
   @Delete(':id')
   @Roles(ROLES.SUPER_ADMIN, ROLES.SCHOOL_ADMIN)
+  @RateLimit(RATE_LIMIT_PRESETS.DELETE)
   @ApiOperation({ summary: 'Delete session (soft delete)' })
   @ApiResponse({ status: 200, description: 'Session deleted successfully' })
   @ApiResponse({ status: 404, description: 'Session not found' })
@@ -94,6 +123,7 @@ export class SessionsController {
 
   @Post(':sessionId/terms')
   @Roles(ROLES.SUPER_ADMIN, ROLES.SCHOOL_ADMIN)
+  @RateLimit(RATE_LIMIT_PRESETS.WRITE)
   @ApiOperation({ summary: 'Create a new term' })
   @ApiResponse({ status: 201, description: 'Term created successfully' })
   @ApiResponse({ status: 400, description: 'Bad request' })
@@ -128,8 +158,17 @@ export class SessionsController {
     return this.sessionsService.findOneTerm(id, req.user);
   }
 
+  @Patch('terms/:id/set-current')
+  @Roles(ROLES.SUPER_ADMIN, ROLES.SCHOOL_ADMIN)
+  @RateLimit(RATE_LIMIT_PRESETS.WRITE)
+  @ApiOperation({ summary: 'Set term as current' })
+  async setCurrentTerm(@Param('id') id: string, @Request() req: AuthenticatedRequest) {
+    return this.sessionsService.setCurrentTerm(id, req.user);
+  }
+
   @Patch('terms/:id')
   @Roles(ROLES.SUPER_ADMIN, ROLES.SCHOOL_ADMIN)
+  @RateLimit(RATE_LIMIT_PRESETS.WRITE)
   @ApiOperation({ summary: 'Update term' })
   @ApiResponse({ status: 200, description: 'Term updated successfully' })
   @ApiResponse({ status: 404, description: 'Term not found' })
@@ -143,6 +182,7 @@ export class SessionsController {
 
   @Delete('terms/:id')
   @Roles(ROLES.SUPER_ADMIN, ROLES.SCHOOL_ADMIN)
+  @RateLimit(RATE_LIMIT_PRESETS.DELETE)
   @ApiOperation({ summary: 'Delete term (soft delete)' })
   @ApiResponse({ status: 200, description: 'Term deleted successfully' })
   @ApiResponse({ status: 404, description: 'Term not found' })

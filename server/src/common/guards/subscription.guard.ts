@@ -33,7 +33,14 @@ export class SubscriptionGuard implements CanActivate {
     }
 
     const request = context.switchToHttp().getRequest();
-    const schoolId = request.user?.schoolId;
+    const user = request.user;
+    
+    // Super admins bypass subscription checks
+    if (user?.roles?.includes('SUPER_ADMIN')) {
+      return true;
+    }
+
+    const schoolId = user?.schoolId;
 
     if (!schoolId) {
       throw new ForbiddenException('School not identified');

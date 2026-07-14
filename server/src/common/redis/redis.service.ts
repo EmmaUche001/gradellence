@@ -113,6 +113,26 @@ export class RedisService implements OnModuleInit, OnModuleDestroy {
     return result === '1';
   }
 
+  // ==================== Password Reset ====================
+
+  async storePasswordResetToken(token: string, userId: string): Promise<void> {
+    if (!this.isReady()) return;
+    const key = REDIS_KEYS.PASSWORD_RESET(token);
+    await this.client.set(key, userId, 'EX', REDIS_TTL.PASSWORD_RESET);
+  }
+
+  async getPasswordResetToken(token: string): Promise<string | null> {
+    if (!this.isReady()) return null;
+    const key = REDIS_KEYS.PASSWORD_RESET(token);
+    return this.client.get(key);
+  }
+
+  async deletePasswordResetToken(token: string): Promise<void> {
+    if (!this.isReady()) return;
+    const key = REDIS_KEYS.PASSWORD_RESET(token);
+    await this.client.del(key);
+  }
+
   // ==================== Rate Limiting ====================
 
   async incrementRateLimit(

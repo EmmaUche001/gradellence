@@ -36,6 +36,7 @@ export class GradeScalesService {
         minScore: dto.minScore,
         maxScore: dto.maxScore,
         remark: dto.remark,
+        points: dto.points ?? 0,
         isActive: dto.isActive ?? true,
       },
     });

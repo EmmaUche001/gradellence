@@ -22,6 +22,8 @@ import { CurrentUser } from '../../common/decorators/current-user.decorator';
 import { Roles } from '../../common/decorators/roles.decorator';
 import { AuthenticatedUser } from '../../common/types/express.types';
 import { Cache } from '../../common/decorators/cache.decorator';
+import { RateLimit } from '../../common/decorators/rate-limit.decorator';
+import { RATE_LIMIT_PRESETS } from '../../common/constants/rate-limit.constants';
 
 @ApiTags('Grade Scales')
 @ApiBearerAuth()
@@ -32,6 +34,7 @@ export class GradeScalesController {
 
   @Post()
   @Roles('SCHOOL_ADMIN')
+  @RateLimit(RATE_LIMIT_PRESETS.WRITE)
   @ApiOperation({ summary: 'Create a new grade scale' })
   create(@Body() dto: CreateGradeScaleDto, @CurrentUser() user: AuthenticatedUser) {
     return this.gradeScalesService.create(dto, user);
@@ -61,6 +64,7 @@ export class GradeScalesController {
 
   @Put(':id')
   @Roles('SCHOOL_ADMIN')
+  @RateLimit(RATE_LIMIT_PRESETS.WRITE)
   @ApiOperation({ summary: 'Update a grade scale' })
   update(
     @Param('id') id: string,
@@ -72,6 +76,7 @@ export class GradeScalesController {
 
   @Delete(':id')
   @Roles('SCHOOL_ADMIN')
+  @RateLimit(RATE_LIMIT_PRESETS.DELETE)
   @ApiOperation({ summary: 'Soft delete a grade scale' })
   remove(@Param('id') id: string, @CurrentUser() user: AuthenticatedUser) {
     return this.gradeScalesService.remove(id, user);
@@ -79,6 +84,7 @@ export class GradeScalesController {
 
   @Patch(':id/activate')
   @Roles('SCHOOL_ADMIN')
+  @RateLimit(RATE_LIMIT_PRESETS.WRITE)
   @ApiOperation({ summary: 'Toggle grade scale active status' })
   toggleActive(@Param('id') id: string, @CurrentUser() user: AuthenticatedUser) {
     return this.gradeScalesService.toggleActive(id, user);

@@ -19,6 +19,10 @@ import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
 import { RolesGuard } from '../../common/guards/roles.guard';
 import { Roles } from '../../common/decorators/roles.decorator';
 import { ROLES } from '../../common/constants/roles.constants';
+import { CurrentUser } from '../../common/decorators/current-user.decorator';
+import { AuthenticatedUser } from '../../common/types/express.types';
+import { RateLimit } from '../../common/decorators/rate-limit.decorator';
+import { RATE_LIMIT_PRESETS } from '../../common/constants/rate-limit.constants';
 
 @ApiTags('Schools')
 @Controller('schools')
@@ -29,6 +33,7 @@ export class SchoolsController {
 
   @Post()
   @Roles(ROLES.SUPER_ADMIN)
+  @RateLimit(RATE_LIMIT_PRESETS.WRITE)
   @ApiOperation({ summary: 'Create a new school' })
   @ApiResponse({ status: 201, description: 'School created successfully' })
   @ApiResponse({ status: 400, description: 'Bad request' })
@@ -49,24 +54,31 @@ export class SchoolsController {
   }
 
   @Get(':id')
+  @Roles(ROLES.SUPER_ADMIN, ROLES.SCHOOL_ADMIN, ROLES.TEACHER, ROLES.STUDENT, ROLES.PARENT)
   @ApiOperation({ summary: 'Get school by ID' })
   @ApiResponse({ status: 200, description: 'School retrieved successfully' })
   @ApiResponse({ status: 404, description: 'School not found' })
-  async findOne(@Param('id') id: string) {
-    return this.schoolsService.findOne(id);
+  async findOne(@Param('id') id: string, @CurrentUser() user: AuthenticatedUser) {
+    return this.schoolsService.findOne(id, user);
   }
 
   @Patch(':id')
   @Roles(ROLES.SUPER_ADMIN, ROLES.SCHOOL_ADMIN)
+  @RateLimit(RATE_LIMIT_PRESETS.WRITE)
   @ApiOperation({ summary: 'Update school' })
   @ApiResponse({ status: 200, description: 'School updated successfully' })
   @ApiResponse({ status: 404, description: 'School not found' })
-  async update(@Param('id') id: string, @Body() updateSchoolDto: UpdateSchoolDto) {
-    return this.schoolsService.update(id, updateSchoolDto);
+  async update(
+    @Param('id') id: string,
+    @Body() updateSchoolDto: UpdateSchoolDto,
+    @CurrentUser() user: AuthenticatedUser,
+  ) {
+    return this.schoolsService.update(id, updateSchoolDto, user);
   }
 
   @Delete(':id')
   @Roles(ROLES.SUPER_ADMIN)
+  @RateLimit(RATE_LIMIT_PRESETS.DELETE)
   @ApiOperation({ summary: 'Delete school (soft delete)' })
   @ApiResponse({ status: 200, description: 'School deleted successfully' })
   @ApiResponse({ status: 404, description: 'School not found' })

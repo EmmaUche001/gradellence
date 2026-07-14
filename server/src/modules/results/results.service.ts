@@ -3,28 +3,34 @@ import {
   NotFoundException,
   BadRequestException,
   ForbiddenException,
+  Optional,
 } from '@nestjs/common';
 import { PrismaService } from '../../database/prisma.service';
 import { PublishResultDto } from './dto/publish-result.dto';
 import { AuthenticatedUser } from '../../common/types/express.types';
 import { PdfService } from '../../common/pdf/pdf.service';
+import { AuditLogsService } from '../audit-logs/audit-logs.service';
+import { resolveGrade, assignPositions } from './grading.util';
+import { DomainEventsService, DOMAIN_EVENTS } from '../../common/events/domain-events.service';
 
 @Injectable()
 export class ResultsService {
   constructor(
     private readonly prisma: PrismaService,
-    private readonly pdfService: PdfService,
+    private readonly auditLogsService: AuditLogsService,
+    private readonly domainEvents: DomainEventsService,
+    @Optional() private readonly pdfService?: PdfService,
   ) {}
 
-  async computeResults(
-    classId: string,
-    termId: string,
-    currentUser: AuthenticatedUser,
-    subjectIds?: string[],
-  ) {
-    // Check subscription limit for students
+  /**
+   * Shared subscription/student-limit check used by both computeResults()
+   * and publishResults(). Previously copy-pasted verbatim into both methods;
+   * centralised here so a future change to limit logic only needs to happen
+   * once.
+   */
+  private async assertWithinStudentLimit(schoolId: string) {
     const subscription = await this.prisma.schoolSubscription.findFirst({
-      where: { schoolId: currentUser.schoolId, status: 'ACTIVE' },
+      where: { schoolId, status: 'ACTIVE' },
       include: { plan: true },
     });
 
@@ -32,9 +38,8 @@ export class ResultsService {
       throw new ForbiddenException('No active subscription found');
     }
 
-    // Check current student count
     const currentStudentCount = await this.prisma.student.count({
-      where: { schoolId: currentUser.schoolId, deletedAt: null },
+      where: { schoolId, deletedAt: null },
     });
 
     if (currentStudentCount >= subscription.plan.maxStudents) {
@@ -42,6 +47,15 @@ export class ResultsService {
         `Student limit reached (${subscription.plan.maxStudents}). Upgrade your plan to add more students.`,
       );
     }
+  }
+
+  async computeResults(
+    classId: string,
+    termId: string,
+    currentUser: AuthenticatedUser,
+    subjectIds?: string[],
+  ) {
+    await this.assertWithinStudentLimit(currentUser.schoolId);
 
     const classEntity = await this.prisma.class.findFirst({
       where: { id: classId, schoolId: currentUser.schoolId, deletedAt: null },
@@ -111,83 +125,91 @@ export class ResultsService {
       orderBy: { minScore: 'desc' },
     });
 
-    const results: any[] = [];
+    // Wrap all writes in a single transaction so a failure partway through
+    // (e.g. on student 40 of 60) rolls back everything rather than leaving
+    // a half-computed result set with no indication anything went wrong.
+    const results = await this.prisma.$transaction(async (tx) => {
+      const written: any[] = [];
 
-    for (const enrollment of enrollments) {
-      for (const classSubject of targetSubjects) {
-        const assessments = await this.prisma.assessment.findMany({
-          where: {
-            studentId: enrollment.studentId,
-            subjectId: classSubject.subjectId,
-            termId,
-            schoolId: currentUser.schoolId,
-          },
-        });
+      for (const enrollment of enrollments) {
+        for (const classSubject of targetSubjects) {
+          const assessments = await tx.assessment.findMany({
+            where: {
+              studentId: enrollment.studentId,
+              subjectId: classSubject.subjectId,
+              termId,
+              schoolId: currentUser.schoolId,
+            },
+          });
 
-        if (assessments.length === 0) {
-          continue;
-        }
+          if (assessments.length === 0) {
+            continue;
+          }
 
-        let totalWeightedScore = 0;
-        let totalWeight = 0;
+          let totalWeightedScore = 0;
+          let totalWeight = 0;
 
-        for (const assessment of assessments) {
-          const normalizedScore = (assessment.score / assessment.maxScore) * 100;
-          totalWeightedScore += normalizedScore * assessment.weight;
-          totalWeight += assessment.weight;
-        }
+          for (const assessment of assessments) {
+            const normalizedScore = (assessment.score / assessment.maxScore) * 100;
+            totalWeightedScore += normalizedScore * assessment.weight;
+            totalWeight += assessment.weight;
+          }
 
-        const finalScore = totalWeight > 0 ? totalWeightedScore / totalWeight : 0;
+          const finalScore = totalWeight > 0 ? totalWeightedScore / totalWeight : 0;
 
-        let grade: string | null = null;
-        let remark: string | null = null;
+          // Use the shared grading util against the school's real, configurable
+          // GradeScale — not a hardcoded scale baked into this method.
+          const { grade, remark } = resolveGrade(finalScore, gradeScales);
 
-        for (const gs of gradeScales) {
-          if (finalScore >= gs.minScore && finalScore <= gs.maxScore) {
-            grade = gs.grade;
-            remark = gs.remark;
-            break;
+          const existingResult = await tx.result.findUnique({
+            where: {
+              studentId_subjectId_termId: {
+                studentId: enrollment.studentId,
+                subjectId: classSubject.subjectId,
+                termId,
+              },
+            },
+          });
+
+          if (existingResult) {
+            const updated = await tx.result.update({
+              where: { id: existingResult.id },
+              data: {
+                totalScore: finalScore,
+                grade,
+                remark,
+                updatedBy: currentUser.id,
+              },
+            });
+            written.push(updated);
+          } else {
+            const created = await tx.result.create({
+              data: {
+                schoolId: currentUser.schoolId,
+                studentId: enrollment.studentId,
+                subjectId: classSubject.subjectId,
+                termId,
+                totalScore: finalScore,
+                grade,
+                remark,
+                createdBy: currentUser.id,
+              },
+            });
+            written.push(created);
           }
         }
-
-        const existingResult = await this.prisma.result.findUnique({
-          where: {
-            studentId_subjectId_termId: {
-              studentId: enrollment.studentId,
-              subjectId: classSubject.subjectId,
-              termId,
-            },
-          },
-        });
-
-        if (existingResult) {
-          const updated = await this.prisma.result.update({
-            where: { id: existingResult.id },
-            data: {
-              totalScore: finalScore,
-              grade,
-              remark,
-              updatedBy: currentUser.id,
-            },
-          });
-          results.push(updated);
-        } else {
-          const created = await this.prisma.result.create({
-            data: {
-              schoolId: currentUser.schoolId,
-              studentId: enrollment.studentId,
-              subjectId: classSubject.subjectId,
-              termId,
-              totalScore: finalScore,
-              grade,
-              remark,
-              createdBy: currentUser.id,
-            },
-          });
-          results.push(created);
-        }
       }
-    }
+
+      return written;
+    });
+
+    this.domainEvents.emit(DOMAIN_EVENTS.RESULTS_COMPUTED, {
+      schoolId: currentUser.schoolId,
+      classId,
+      termId,
+      computedCount: results.length,
+      computedBy: currentUser.id,
+    });
 
     return {
       success: true,
@@ -200,27 +222,13 @@ export class ResultsService {
     };
   }
 
-  async publishResults(dto: PublishResultDto, currentUser: AuthenticatedUser) {
-    // Check subscription limit for students
-    const subscription = await this.prisma.schoolSubscription.findFirst({
-      where: { schoolId: currentUser.schoolId, status: 'ACTIVE' },
-      include: { plan: true },
-    });
-
-    if (!subscription) {
-      throw new ForbiddenException('No active subscription found');
-    }
-
-    // Check current student count
-    const currentStudentCount = await this.prisma.student.count({
-      where: { schoolId: currentUser.schoolId, deletedAt: null },
-    });
-
-    if (currentStudentCount >= subscription.plan.maxStudents) {
-      throw new ForbiddenException(
-        `Student limit reached (${subscription.plan.maxStudents}). Upgrade your plan to add more students.`,
-      );
-    }
+  async publishResults(
+    dto: PublishResultDto,
+    currentUser: AuthenticatedUser,
+    ipAddress?: string,
+    userAgent?: string,
+  ) {
+    await this.assertWithinStudentLimit(currentUser.schoolId);
 
     const classEntity = await this.prisma.class.findFirst({
       where: { id: dto.classId, schoolId: currentUser.schoolId, deletedAt: null },
@@ -248,13 +256,40 @@ export class ResultsService {
       where.subjectId = { in: dto.subjectIds };
     }
 
-    const updateResult = await this.prisma.result.updateMany({
-      where,
-      data: {
-        isPublished: true,
-        publishedAt: new Date(),
-        updatedBy: currentUser.id,
-      },
+    // Publication is all-or-nothing for this batch — wrapped in a transaction
+    // per the architecture spec, and leaves room for future steps (e.g. a
+    // publication audit record) to join the same atomic unit.
+    const updateResult = await this.prisma.$transaction(async (tx) => {
+      return tx.result.updateMany({
+        where,
+        data: {
+          isPublished: true,
+          publishedAt: new Date(),
+          updatedBy: currentUser.id,
+        },
+      });
+    });
+
+    // Audit log wiring (Cline — Phase 1 Task 2)
+    await this.auditLogsService
+      .logAction(
+        currentUser.id,
+        'RESULTS_PUBLISHED',
+        'Result',
+        dto.classId,
+        undefined,
+        { publishedCount: updateResult.count, termId: dto.termId },
+        ipAddress,
+        userAgent,
+      )
+      .catch(() => {});
+
+    this.domainEvents.emit(DOMAIN_EVENTS.RESULTS_PUBLISHED, {
+      schoolId: currentUser.schoolId,
+      termId: dto.termId,
+      subjectIds: dto.subjectIds,
+      publishedCount: updateResult.count,
+      publishedBy: currentUser.id,
     });
 
     return {
@@ -266,7 +301,12 @@ export class ResultsService {
     };
   }
 
-  async unpublishResults(dto: PublishResultDto, currentUser: AuthenticatedUser) {
+  async unpublishResults(
+    dto: PublishResultDto,
+    currentUser: AuthenticatedUser,
+    ipAddress?: string,
+    userAgent?: string,
+  ) {
     const where: any = {
       schoolId: currentUser.schoolId,
       termId: dto.termId,
@@ -284,6 +324,28 @@ export class ResultsService {
         publishedAt: null,
         updatedBy: currentUser.id,
       },
+    });
+
+    // Audit log wiring (Cline — Phase 1 Task 2)
+    await this.auditLogsService
+      .logAction(
+        currentUser.id,
+        'RESULTS_UNPUBLISHED',
+        'Result',
+        dto.classId,
+        undefined,
+        { unpublishedCount: updateResult.count, termId: dto.termId },
+        ipAddress,
+        userAgent,
+      )
+      .catch(() => {});
+
+    this.domainEvents.emit(DOMAIN_EVENTS.RESULTS_UNPUBLISHED, {
+      schoolId: currentUser.schoolId,
+      termId: dto.termId,
+      subjectIds: dto.subjectIds,
+      unpublishedCount: updateResult.count,
+      unpublishedBy: currentUser.id,
     });
 
     return {
@@ -415,7 +477,7 @@ export class ResultsService {
     };
   }
 
-  async getStudentResults(studentId: string, termId: string, currentUser: AuthenticatedUser) {
+  async getStudentResults(studentId: string, termId: string, currentUser: AuthenticatedUser, publishedOnly = false) {
     const student = await this.prisma.student.findFirst({
       where: { id: studentId, schoolId: currentUser.schoolId, deletedAt: null },
     });
@@ -424,12 +486,17 @@ export class ResultsService {
       throw new NotFoundException('Student not found');
     }
 
+    const where: any = {
+      studentId,
+      termId,
+      schoolId: currentUser.schoolId,
+    };
+    if (publishedOnly) {
+      where.isPublished = true;
+    }
+
     const results = await this.prisma.result.findMany({
-      where: {
-        studentId,
-        termId,
-        schoolId: currentUser.schoolId,
-      },
+      where,
       include: {
         subject: {
           select: {
@@ -656,10 +723,10 @@ export class ResultsService {
       };
     });
 
-    broadsheetData.sort((a, b) => b.totalScore - a.totalScore);
-    broadsheetData.forEach((entry, index) => {
-      (entry as any).position = index + 1;
-    });
+    // Use the shared assignPositions util so JSON and PDF broadsheets
+    // produce identical ranking — previously this was a hand-rolled
+    // sort+forEach that the PDF broadsheet didn't replicate at all.
+    const rankedBroadsheetData = assignPositions(broadsheetData);
 
     return {
       success: true,
@@ -671,7 +738,7 @@ export class ResultsService {
           level: classEntity.level,
         },
         subjects,
-        students: broadsheetData,
+        students: rankedBroadsheetData,
       },
     };
   }
@@ -683,6 +750,10 @@ export class ResultsService {
 
     if (!student) {
       throw new NotFoundException('Student not found');
+    }
+
+    if (!this.pdfService) {
+      throw new NotFoundException('PDF service unavailable');
     }
 
     return this.pdfService.generateTranscript(studentId, currentUser.schoolId);

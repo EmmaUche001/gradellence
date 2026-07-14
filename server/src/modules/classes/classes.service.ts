@@ -8,61 +8,73 @@ import { PrismaService } from '../../database/prisma.service';
 import { CreateClassDto } from './dto/create-class.dto';
 import { UpdateClassDto } from './dto/update-class.dto';
 import { AuthenticatedUser } from '../../common/types/express.types';
+import { enforceEntityLimit } from '../../common/helpers/trial-limits.helper';
 
 @Injectable()
 export class ClassesService {
   constructor(private readonly prisma: PrismaService) {}
 
+  private deriveLevel(name: string): number {
+    const n = name.trim().toLowerCase();
+
+    // Nursery
+    const nurseryMatch = n.match(/nursery\s*(\d+)/);
+    if (nurseryMatch) return parseInt(nurseryMatch[1]);
+
+    // Primary / Basic
+    const primaryMatch = n.match(/(?:primary|basic)\s*(\d+)/);
+    if (primaryMatch) return parseInt(primaryMatch[1]);
+
+    // JSS / JS / Junior
+    const jssMatch = n.match(/(?:jss|js|junior)\s*(\d+)/);
+    if (jssMatch) return 6 + parseInt(jssMatch[1]);
+
+    // SS / SSS / Senior
+    const ssMatch = n.match(/(?:sss|ss|senior)\s*(\d+)/);
+    if (ssMatch) return 9 + parseInt(ssMatch[1]);
+
+    return 99;
+  }
+
   async create(dto: CreateClassDto, currentUser: AuthenticatedUser) {
-    // Check if class name already exists in the school
-    const existingClass = await this.prisma.class.findFirst({
-      where: {
-        schoolId: currentUser.schoolId,
-        name: dto.name,
-        level: dto.level,
-        deletedAt: null,
-      },
-    });
+    await enforceEntityLimit(this.prisma, 'classes', currentUser.schoolId);
 
-    if (existingClass) {
-      throw new ConflictException('Class with this name and level already exists');
-    }
+    const names = dto.names
+      .split(',')
+      .map((n) => n.trim())
+      .filter(Boolean);
 
-    // Validate class teacher if provided
-    if (dto.classTeacherId) {
-      const teacher = await this.prisma.teacher.findFirst({
-        where: { id: dto.classTeacherId, schoolId: currentUser.schoolId, deletedAt: null },
+    const created = [];
+    const skipped = [];
+
+    for (const name of names) {
+      const level = this.deriveLevel(name);
+
+      // Check for duplicate within school
+      const existing = await this.prisma.class.findFirst({
+        where: { schoolId: currentUser.schoolId, name, deletedAt: null },
       });
 
-      if (!teacher) {
-        throw new NotFoundException('Class teacher not found');
+      if (existing) {
+        skipped.push(name);
+        continue;
       }
-    }
 
-    const classEntity = await this.prisma.class.create({
-      data: {
-        schoolId: currentUser.schoolId,
-        name: dto.name,
-        level: dto.level,
-        stream: dto.stream,
-        capacity: dto.capacity,
-        classTeacherId: dto.classTeacherId,
-      },
-      include: {
-        classTeacher: {
-          select: {
-            id: true,
-            firstName: true,
-            lastName: true,
-          },
+      const cls = await this.prisma.class.create({
+        data: {
+          schoolId: currentUser.schoolId,
+          name,
+          level,
+          createdBy: currentUser.id,
         },
-      },
-    });
+      });
+      created.push(cls);
+    }
 
     return {
       success: true,
-      message: 'Class created successfully',
-      data: classEntity,
+      message: `${created.length} class(es) created${skipped.length > 0 ? `, ${skipped.length} skipped (already exist): ${skipped.join(', ')}` : ''}`,
+      data: created,
     };
   }
 
@@ -234,6 +246,88 @@ export class ClassesService {
     return {
       success: true,
       message: 'Class deleted successfully',
+    };
+  }
+
+  async assignSubjects(classId: string, subjectIds: string[], currentUser: AuthenticatedUser) {
+    const cls = await this.prisma.class.findFirst({
+      where: { id: classId, schoolId: currentUser.schoolId, deletedAt: null },
+    });
+    if (!cls) throw new NotFoundException('Class not found');
+
+    const created = [];
+    const skipped = [];
+
+    for (const subjectId of subjectIds) {
+      const existing = await this.prisma.classSubject.findUnique({
+        where: { classId_subjectId: { classId, subjectId } },
+      });
+      if (existing) {
+        skipped.push(subjectId);
+        continue;
+      }
+
+      await this.prisma.classSubject.create({
+        data: { classId, subjectId },
+      });
+      created.push(subjectId);
+
+      // If class has a class teacher, auto-create TeacherSubject for the new subject
+      if (cls.classTeacherId) {
+        const existingTeacherSubject = await this.prisma.teacherSubject.findUnique({
+          where: {
+            teacherId_subjectId_classId: {
+              teacherId: cls.classTeacherId,
+              subjectId,
+              classId,
+            },
+          },
+        });
+        if (!existingTeacherSubject) {
+          await this.prisma.teacherSubject.create({
+            data: {
+              teacherId: cls.classTeacherId,
+              subjectId,
+              classId,
+            },
+          });
+        }
+      }
+    }
+
+    return {
+      success: true,
+      message: `${created.length} subject(s) assigned, ${skipped.length} already existed`,
+      data: { classId, assigned: created, skipped },
+    };
+  }
+
+  async removeSubject(classId: string, subjectId: string, currentUser: AuthenticatedUser) {
+    const cls = await this.prisma.class.findFirst({
+      where: { id: classId, schoolId: currentUser.schoolId, deletedAt: null },
+    });
+    if (!cls) throw new NotFoundException('Class not found');
+
+    await this.prisma.classSubject.delete({
+      where: { classId_subjectId: { classId, subjectId } },
+    });
+
+    return { success: true, message: 'Subject removed from class' };
+  }
+
+  async getClassSubjects(classId: string, currentUser: AuthenticatedUser) {
+    const cls = await this.prisma.class.findFirst({
+      where: { id: classId, schoolId: currentUser.schoolId, deletedAt: null },
+      include: {
+        subjects: { include: { subject: true } },
+      },
+    });
+    if (!cls) throw new NotFoundException('Class not found');
+
+    return {
+      success: true,
+      message: 'Class subjects retrieved',
+      data: cls.subjects.map((cs) => cs.subject),
     };
   }
 

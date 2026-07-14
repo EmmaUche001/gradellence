@@ -1,6 +1,5 @@
 import { Module } from '@nestjs/common';
 import { ConfigModule, ConfigService } from '@nestjs/config';
-import { ThrottlerModule } from '@nestjs/throttler';
 import { APP_GUARD, APP_INTERCEPTOR } from '@nestjs/core';
 import { PrismaModule } from './database/prisma.module';
 import { RedisModule } from './common/redis/redis.module';
@@ -20,10 +19,17 @@ import { HealthModule } from './modules/health/health.module';
 import { AuditLogsModule } from './modules/audit-logs/audit-logs.module';
 import { SubscriptionsModule } from './modules/subscriptions/subscriptions.module';
 import { BillingModule } from './modules/billing/billing.module';
+import { ParentsModule } from './modules/parents/parents.module';
+import { AnalyticsModule } from './modules/analytics/analytics.module';
+import { NotificationsModule } from './modules/notifications/notifications.module';
+import { SuperAdminModule } from './modules/super-admin/super-admin.module';
+import { VerifyModule } from './common/verify/verify.module';
 import { configValidationSchema } from './config/config.validation';
 import { RateLimitGuard } from './common/guards/rate-limit.guard';
+import { PermissionsGuard } from './common/guards/permissions.guard';
 import { CacheInterceptor } from './common/interceptors/cache.interceptor';
 import { BullMQModule } from './common/jobs/bullmq.module';
+import { DomainEventsModule } from './common/events/domain-events.module';
 
 @Module({
   imports: [
@@ -34,16 +40,11 @@ import { BullMQModule } from './common/jobs/bullmq.module';
       validationSchema: configValidationSchema,
     }),
 
-    // Rate limiting
-    ThrottlerModule.forRoot([
-      {
-        ttl: 60000,
-        limit: 100,
-      },
-    ]),
-
     // Database
     PrismaModule,
+
+    // Domain events (decouples side effects from core services)
+    DomainEventsModule,
 
     // Redis (global)
     RedisModule.forRootAsync({
@@ -74,11 +75,22 @@ import { BullMQModule } from './common/jobs/bullmq.module';
     GradeScalesModule,
     HealthModule,
     AuditLogsModule,
+    SubscriptionsModule,
+    BillingModule,
+    ParentsModule,
+    AnalyticsModule,
+    NotificationsModule,
+    SuperAdminModule,
+    VerifyModule,
   ],
   providers: [
     {
       provide: APP_GUARD,
       useClass: RateLimitGuard,
+    },
+    {
+      provide: APP_GUARD,
+      useClass: PermissionsGuard,
     },
     {
       provide: APP_INTERCEPTOR,

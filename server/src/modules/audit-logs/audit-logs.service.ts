@@ -1,6 +1,7 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { Injectable, NotFoundException, ForbiddenException } from '@nestjs/common';
 import { PrismaService } from '../../database/prisma.service';
 import { AuthenticatedUser } from '../../common/types/express.types';
+import { ROLES } from '../../common/constants/roles.constants';
 
 @Injectable()
 export class AuditLogsService {
@@ -21,8 +22,15 @@ export class AuditLogsService {
 
     const where: any = {};
 
-    // Only SUPER_ADMIN can see all logs; school admins see logs from their school's users
-    // For now, filter by schoolId via the users associated with the school
+    // SUPER_ADMIN sees logs across every school. Every other role is scoped
+    // to logs whose actor belongs to their own school — this MUST stay a
+    // structural filter on the query, not an afterthought, or one school's
+    // admin can read another school's entire audit trail (login activity,
+    // score changes, role changes, etc).
+    if (!currentUser.roles.includes(ROLES.SUPER_ADMIN)) {
+      where.actor = { schoolId: currentUser.schoolId };
+    }
+
     if (actorId) where.actorId = actorId;
     if (action) where.action = action;
     if (entityType) where.entityType = entityType;
@@ -67,6 +75,8 @@ export class AuditLogsService {
   }
 
   async findOne(id: string, currentUser: AuthenticatedUser) {
+    const isSuperAdmin = currentUser.roles.includes(ROLES.SUPER_ADMIN);
+
     const log = await this.prisma.auditLog.findUnique({
       where: { id },
       include: {
@@ -76,6 +86,7 @@ export class AuditLogsService {
             email: true,
             firstName: true,
             lastName: true,
+            schoolId: true,
           },
         },
       },
@@ -83,6 +94,15 @@ export class AuditLogsService {
 
     if (!log) {
       throw new NotFoundException('Audit log not found');
+    }
+
+    // Same isolation rule as findAll: a non-SUPER_ADMIN can only fetch a log
+    // entry whose actor belongs to their own school. Use Forbidden rather
+    // than NotFound here since the id was already confirmed to exist —
+    // NotFound would have been indistinguishable from a typo'd id, which is
+    // fine for findAll's filtered list but unnecessary to fake here.
+    if (!isSuperAdmin && log.actor.schoolId !== currentUser.schoolId) {
+      throw new ForbiddenException('You do not have access to this audit log');
     }
 
     return {

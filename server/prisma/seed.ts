@@ -1,4 +1,6 @@
 import { PrismaClient } from '@prisma/client';
+import * as bcrypt from 'bcryptjs';
+import { seedPermissions } from '../src/database/seeds/permissions.seed';
 
 const prisma = new PrismaClient();
 
@@ -125,6 +127,65 @@ async function main() {
   }
 
   console.log('Subscription plans seeding complete!');
+
+  // Seed permissions and role-permission mappings
+  await seedPermissions(prisma);
+
+  // ── Create SUPER ADMIN user ──────────────────────
+  const superAdminEmail = 'irismonde.black@gmail.com';
+  let superAdmin = await prisma.user.findUnique({
+    where: { email: superAdminEmail },
+  });
+
+  if (!superAdmin) {
+    // Find the first school to use as a reference (SUPER_ADMIN bypasses tenant isolation via TenantGuard)
+    const firstSchool = await prisma.school.findFirst({ where: { deletedAt: null } });
+    if (!firstSchool) {
+      console.warn('No schools found, skipping SUPER_ADMIN user creation');
+      return;
+    }
+
+    const passwordHash = await bcrypt.hash('Laptop-me-llence', 12);
+
+    superAdmin = await prisma.user.create({
+      data: {
+        email: superAdminEmail,
+        passwordHash,
+        firstName: 'Iris',
+        lastName: 'Monde',
+        schoolId: firstSchool.id,
+        isActive: true,
+        emailVerified: true,
+      },
+    });
+    console.log(`Created SUPER ADMIN user: ${superAdminEmail}`);
+  } else {
+    console.log(`SUPER ADMIN user already exists: ${superAdminEmail}`);
+  }
+
+  // Assign SUPER_ADMIN role to the user
+  const superAdminRole = await prisma.role.findFirst({
+    where: { schoolId: null, name: 'SUPER_ADMIN' },
+  });
+
+  if (superAdminRole && superAdmin) {
+    const existingAssignment = await prisma.userRole.findUnique({
+      where: { userId_roleId: { userId: superAdmin.id, roleId: superAdminRole.id } },
+    });
+
+    if (!existingAssignment) {
+      await prisma.userRole.create({
+        data: {
+          userId: superAdmin.id,
+          roleId: superAdminRole.id,
+        },
+      });
+      console.log(`Assigned SUPER_ADMIN role to user ${superAdminEmail}`);
+    } else {
+      console.log(`SUPER_ADMIN role already assigned to ${superAdminEmail}`);
+    }
+  }
+
 }
 
 main()

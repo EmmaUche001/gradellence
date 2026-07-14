@@ -19,18 +19,24 @@ import { UpdateEnrollmentDto } from './dto/update-enrollment.dto';
 import { BulkEnrollmentDto } from './dto/bulk-enrollment.dto';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
 import { RolesGuard } from '../../common/guards/roles.guard';
+import { TenantGuard } from '../../common/guards/tenant.guard';
 import { Roles } from '../../common/decorators/roles.decorator';
 import { ROLES } from '../../common/constants/roles.constants';
 import { AuthenticatedRequest } from '../../common/types/express.types';
 import { RateLimit } from '../../common/decorators/rate-limit.decorator';
 import { RATE_LIMIT_PRESETS } from '../../common/constants/rate-limit.constants';
+import { InjectQueue } from '@nestjs/bullmq';
+import { Queue } from 'bullmq';
 
 @ApiTags('Enrollments')
 @Controller('enrollments')
-@UseGuards(JwtAuthGuard, RolesGuard)
+@UseGuards(JwtAuthGuard, RolesGuard, TenantGuard)
 @ApiBearerAuth()
 export class EnrollmentsController {
-  constructor(private readonly enrollmentsService: EnrollmentsService) {}
+  constructor(
+    private readonly enrollmentsService: EnrollmentsService,
+    @InjectQueue('bulk-enrollment') private readonly bulkEnrollmentQueue: Queue,
+  ) {}
 
   @Post()
   @Roles(ROLES.SUPER_ADMIN, ROLES.SCHOOL_ADMIN)
@@ -52,7 +58,33 @@ export class EnrollmentsController {
   @ApiResponse({ status: 400, description: 'Bad request' })
   @ApiResponse({ status: 404, description: 'Class or term not found' })
   async bulkCreate(@Body() dto: BulkEnrollmentDto, @Request() req: AuthenticatedRequest) {
-    return this.enrollmentsService.bulkCreate(dto, req.user);
+    const job = await this.bulkEnrollmentQueue.add('bulk-create', {
+      classId: dto.classId,
+      termId: dto.termId,
+      schoolId: req.user.schoolId,
+      studentIds: dto.studentIds,
+      userId: req.user.id,
+    });
+    return { jobId: job.id };
+  }
+
+  @Get('bulk-status/:jobId')
+  @Roles(ROLES.SUPER_ADMIN, ROLES.SCHOOL_ADMIN)
+  @ApiOperation({ summary: 'Get bulk enrollment job status' })
+  async getBulkEnrollmentStatus(
+    @Param('jobId') jobId: string,
+    @Request() req: AuthenticatedRequest,
+  ) {
+    const job = await this.bulkEnrollmentQueue.getJob(jobId);
+    if (!job || job.data.schoolId !== req.user.schoolId) {
+      return { state: 'not_found' };
+    }
+    const state = await job.getState();
+    return {
+      state,
+      result: state === 'completed' ? job.returnvalue : undefined,
+      failedReason: state === 'failed' ? job.failedReason : undefined,
+    };
   }
 
   @Get()
@@ -90,6 +122,7 @@ export class EnrollmentsController {
 
   @Patch(':id')
   @Roles(ROLES.SUPER_ADMIN, ROLES.SCHOOL_ADMIN)
+  @RateLimit(RATE_LIMIT_PRESETS.WRITE)
   @ApiOperation({ summary: 'Update enrollment' })
   @ApiResponse({ status: 200, description: 'Enrollment updated successfully' })
   @ApiResponse({ status: 404, description: 'Enrollment not found' })
@@ -103,6 +136,7 @@ export class EnrollmentsController {
 
   @Delete(':id')
   @Roles(ROLES.SUPER_ADMIN, ROLES.SCHOOL_ADMIN)
+  @RateLimit(RATE_LIMIT_PRESETS.DELETE)
   @ApiOperation({ summary: 'Remove enrollment' })
   @ApiResponse({ status: 200, description: 'Enrollment removed successfully' })
   @ApiResponse({ status: 404, description: 'Enrollment not found' })

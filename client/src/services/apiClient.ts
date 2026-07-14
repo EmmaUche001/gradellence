@@ -1,5 +1,6 @@
 import axios, { AxiosError, InternalAxiosRequestConfig } from 'axios';
 import { useAuthStore } from '../store/authStore';
+import { useToastStore } from '../store/toastStore';
 
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3000/api';
 
@@ -53,8 +54,22 @@ const processQueue = (error: unknown, token: string | null = null) => {
 };
 
 apiClient.interceptors.response.use(
-  (response) => response,
+  (response) => {
+    // Show success toast for mutation methods
+    const method = response.config?.method?.toUpperCase();
+    if (method && ['POST', 'PUT', 'PATCH', 'DELETE'].includes(method)) {
+      const message = response.data?.message || 'Operation successful';
+      useToastStore.getState().addToast('success', message);
+    }
+    return response;
+  },
   async (error: AxiosError) => {
+    // Show error toast (skip 401 as those are handled by refresh flow)
+    if (error.response?.status !== 401) {
+      const errData = error.response?.data as any;
+      const message = errData?.error?.message || errData?.message || 'Something went wrong';
+      useToastStore.getState().addToast('error', message);
+    }
     const originalRequest = error.config as InternalAxiosRequestConfig & { _retry?: boolean };
 
     if (error.response?.status === 401 && !originalRequest._retry) {

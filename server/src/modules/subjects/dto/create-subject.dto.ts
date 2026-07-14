@@ -1,4 +1,12 @@
-import { IsString, IsOptional, MinLength, MaxLength } from 'class-validator';
+import {
+  IsString,
+  IsOptional,
+  IsArray,
+  ValidateNested,
+  MinLength,
+  MaxLength,
+} from 'class-validator';
+import { Type } from 'class-transformer';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 
 export class CreateSubjectDto {
@@ -18,4 +26,17 @@ export class CreateSubjectDto {
   @IsString()
   @IsOptional()
   description?: string;
+}
+
+export class BulkCreateSubjectDto {
+  @ApiProperty({
+    example: [
+      { name: 'Mathematics', code: 'MAT1' },
+      { name: 'English Language', code: 'ENG1' },
+    ],
+  })
+  @IsArray()
+  @ValidateNested({ each: true })
+  @Type(() => CreateSubjectDto)
+  subjects!: CreateSubjectDto[];
 }

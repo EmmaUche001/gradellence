@@ -17,7 +17,7 @@ export interface Enrollment {
   class?: {
     id: string;
     name: string;
-    academicYear: string;
+    level: number;
   };
   term?: {
     id: string;

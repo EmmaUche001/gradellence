@@ -21,6 +21,8 @@ import { RolesGuard } from '../../common/guards/roles.guard';
 import { Roles } from '../../common/decorators/roles.decorator';
 import { ROLES } from '../../common/constants/roles.constants';
 import { AuthenticatedRequest } from '../../common/types/express.types';
+import { RateLimit } from '../../common/decorators/rate-limit.decorator';
+import { RATE_LIMIT_PRESETS } from '../../common/constants/rate-limit.constants';
 
 @ApiTags('Classes')
 @Controller('classes')
@@ -31,6 +33,7 @@ export class ClassesController {
 
   @Post()
   @Roles(ROLES.SUPER_ADMIN, ROLES.SCHOOL_ADMIN)
+  @RateLimit(RATE_LIMIT_PRESETS.WRITE)
   @ApiOperation({ summary: 'Create a new class' })
   @ApiResponse({ status: 201, description: 'Class created successfully' })
   @ApiResponse({ status: 400, description: 'Bad request' })
@@ -68,6 +71,7 @@ export class ClassesController {
 
   @Patch(':id')
   @Roles(ROLES.SUPER_ADMIN, ROLES.SCHOOL_ADMIN)
+  @RateLimit(RATE_LIMIT_PRESETS.WRITE)
   @ApiOperation({ summary: 'Update class' })
   @ApiResponse({ status: 200, description: 'Class updated successfully' })
   @ApiResponse({ status: 404, description: 'Class not found' })
@@ -81,6 +85,7 @@ export class ClassesController {
 
   @Delete(':id')
   @Roles(ROLES.SUPER_ADMIN, ROLES.SCHOOL_ADMIN)
+  @RateLimit(RATE_LIMIT_PRESETS.DELETE)
   @ApiOperation({ summary: 'Delete class (soft delete)' })
   @ApiResponse({ status: 200, description: 'Class deleted successfully' })
   @ApiResponse({ status: 404, description: 'Class not found' })

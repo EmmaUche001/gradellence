@@ -8,6 +8,8 @@ export interface AuthenticatedUser {
   lastName: string;
   roles: string[];
   permissions: string[];
+  studentId?: string;
+  parentId?: string;
 }
 
 export interface AuthenticatedRequest extends Request {

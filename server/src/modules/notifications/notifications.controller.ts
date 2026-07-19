@@ -22,10 +22,7 @@ export class NotificationsController {
 
   @Patch('preferences')
   @ApiOperation({ summary: 'Update current user notification preferences' })
-  updatePreferences(
-    @CurrentUser() user: AuthenticatedUser,
-    @Body() dto: Record<string, boolean>,
-  ) {
+  updatePreferences(@CurrentUser() user: AuthenticatedUser, @Body() dto: Record<string, boolean>) {
     return this.notificationsService.updatePreferences(user.id, dto);
   }
 }

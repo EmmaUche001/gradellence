@@ -1,110 +1,102 @@
 import React, { useState } from 'react';
-import { useNavigate, Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
+import { Eye, EyeOff, AlertCircle } from 'lucide-react';
 import { parentAuth } from '../services/parentApi';
+import { ParentAuthLayout } from '../components/ParentAuthLayout';
+import { Input } from '../../../components/ui/Input';
+import { Button } from '../../../components/ui/Button';
+
+interface FormState {
+  firstName: string; lastName: string;
+  email: string; password: string; phone: string;
+  schoolSlug: string; admissionNumber: string;
+}
 
 const ParentRegisterPage: React.FC = () => {
   const navigate = useNavigate();
-  const [form, setForm] = useState({
-    firstName: '',
-    lastName: '',
-    email: '',
-    password: '',
-    phone: '',
-    schoolSlug: '',
-    admissionNumber: '',
+  const [form, setForm]       = useState<FormState>({
+    firstName: '', lastName: '', email: '', password: '',
+    phone: '', schoolSlug: '', admissionNumber: '',
   });
-  const [error, setError] = useState('');
+  const [showPwd, setShowPwd] = useState(false);
+  const [error, setError]     = useState('');
   const [loading, setLoading] = useState(false);
 
-  const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    setForm({ ...form, [e.target.name]: e.target.value });
-  };
+  const set = (key: keyof FormState) =>
+    (e: React.ChangeEvent<HTMLInputElement>) => setForm(f => ({ ...f, [key]: e.target.value }));
 
   const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setError('');
-    setLoading(true);
-
+    e.preventDefault(); setError(''); setLoading(true);
     try {
       await parentAuth.register(form);
-      navigate('/parent/login', { state: { message: 'Registration successful. Please log in.' } });
+      navigate('/parent/login', { state: { message: 'Registration successful. Please sign in.' } });
     } catch (err: any) {
-      setError(err?.response?.data?.message || 'Registration failed');
-    } finally {
-      setLoading(false);
-    }
+      setError(err?.response?.data?.message || 'Registration failed. Please check your details.');
+    } finally { setLoading(false); }
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gray-50">
-      <div className="max-w-md w-full space-y-8 p-8 bg-white rounded-lg shadow-md">
-        <div className="text-center">
-          <h2 className="text-3xl font-bold text-gray-900">Parent Registration</h2>
-          <p className="mt-2 text-gray-600">Link your account to your child's records</p>
+    <ParentAuthLayout>
+      <div className="mb-8">
+        <h1 className="text-2xl font-bold text-gray-900">Create Parent Account</h1>
+        <p className="mt-1.5 text-sm text-gray-500">Link your account to your child's school records</p>
+      </div>
+
+      {error && (
+        <div className="flex items-start gap-3 px-4 py-3 mb-5 rounded-xl bg-danger-50 border border-danger-100">
+          <AlertCircle size={16} className="text-danger-600 shrink-0 mt-0.5" />
+          <p className="text-sm text-danger-700">{error}</p>
+        </div>
+      )}
+
+      <form onSubmit={handleSubmit} className="space-y-4" noValidate>
+        {/* Personal info */}
+        <p className="text-xs font-semibold text-gray-400 uppercase tracking-wider">Your Details</p>
+        <div className="grid grid-cols-2 gap-3">
+          <Input id="firstName" label="First name" placeholder="Jane"
+            value={form.firstName} onChange={set('firstName')} required />
+          <Input id="lastName" label="Last name" placeholder="Doe"
+            value={form.lastName} onChange={set('lastName')} required />
+        </div>
+        <Input id="email" type="email" label="Email address" placeholder="you@example.com"
+          value={form.email} onChange={set('email')} autoComplete="email" required />
+        <Input id="phone" label="Phone (optional)" placeholder="+234-800-000-0000"
+          value={form.phone} onChange={set('phone')} />
+        <div>
+          <Input id="password" type={showPwd ? 'text' : 'password'} label="Password"
+            placeholder="Min. 8 characters" value={form.password} onChange={set('password')}
+            autoComplete="new-password" required
+            endIcon={
+              <button type="button" onClick={() => setShowPwd(v => !v)}
+                className="text-gray-400 hover:text-gray-600 transition-colors pointer-events-auto"
+                aria-label={showPwd ? 'Hide' : 'Show'}>
+                {showPwd ? <EyeOff size={16} /> : <Eye size={16} />}
+              </button>
+            } />
         </div>
 
-        <form onSubmit={handleSubmit} className="mt-8 space-y-4">
-          {error && (
-            <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded">
-              {error}
-            </div>
-          )}
+        {/* School link */}
+        <p className="text-xs font-semibold text-gray-400 uppercase tracking-wider pt-1">Link to School</p>
+        <Input id="schoolSlug" label="School identifier (slug)" placeholder="kings-international-school"
+          value={form.schoolSlug} onChange={set('schoolSlug')} required
+          helperText="Ask your school admin for the school slug" />
+        <Input id="admissionNumber" label="Child's admission number" placeholder="GDL/2025/001"
+          value={form.admissionNumber} onChange={set('admissionNumber')} required
+          helperText="Found on the student's report card" />
 
-          <div className="grid grid-cols-2 gap-4">
-            <div>
-              <label className="block text-sm font-medium text-gray-700">First Name</label>
-              <input name="firstName" required value={form.firstName} onChange={handleChange}
-                className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500" />
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-gray-700">Last Name</label>
-              <input name="lastName" required value={form.lastName} onChange={handleChange}
-                className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500" />
-            </div>
-          </div>
+        <Button type="submit" variant="primary" fullWidth loading={loading}
+          className="!bg-success-600 hover:!bg-success-700 focus:ring-success-500 mt-2">
+          Create Account
+        </Button>
+      </form>
 
-          <div>
-            <label className="block text-sm font-medium text-gray-700">Email</label>
-            <input name="email" type="email" required value={form.email} onChange={handleChange}
-              className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500" />
-          </div>
-
-          <div>
-            <label className="block text-sm font-medium text-gray-700">Password</label>
-            <input name="password" type="password" required minLength={8} value={form.password} onChange={handleChange}
-              className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500" />
-          </div>
-
-          <div>
-            <label className="block text-sm font-medium text-gray-700">Phone (optional)</label>
-            <input name="phone" value={form.phone} onChange={handleChange}
-              className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500" />
-          </div>
-
-          <div>
-            <label className="block text-sm font-medium text-gray-700">School Slug</label>
-            <input name="schoolSlug" required value={form.schoolSlug} onChange={handleChange} placeholder="e.g. my-school"
-              className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500" />
-          </div>
-
-          <div>
-            <label className="block text-sm font-medium text-gray-700">Child's Admission Number</label>
-            <input name="admissionNumber" required value={form.admissionNumber} onChange={handleChange}
-              className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500" />
-          </div>
-
-          <button type="submit" disabled={loading}
-            className="w-full flex justify-center py-2 px-4 border border-transparent rounded-md shadow-sm text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 disabled:opacity-50">
-            {loading ? 'Registering...' : 'Register'}
-          </button>
-
-          <p className="text-center text-sm text-gray-600">
-            Already have an account?{' '}
-            <Link to="/parent/login" className="text-blue-600 hover:text-blue-500">Sign in</Link>
-          </p>
-        </form>
-      </div>
-    </div>
+      <p className="mt-6 text-center text-sm text-gray-500">
+        Already have an account?{' '}
+        <Link to="/parent/login" className="font-semibold text-success-600 hover:text-success-700">
+          Sign in
+        </Link>
+      </p>
+    </ParentAuthLayout>
   );
 };
 

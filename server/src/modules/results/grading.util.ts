@@ -21,11 +21,21 @@ export interface GradeScaleEntry {
   minScore: number;
   maxScore: number;
   remark: string;
+  points: number;
+  isPass: boolean;
 }
 
 export interface ResolvedGrade {
   grade: string | null;
   remark: string | null;
+  points: number | null;
+  isPass: boolean;
+}
+
+export enum RankingStrategy {
+  STANDARD = 'standard', // 1,2,3,4 for ties
+  COMPETITION = 'competition', // 1,1,3 for two tied students
+  DENSE = 'dense', // 1,1,2 for two tied students
 }
 
 /**
@@ -36,34 +46,74 @@ export interface ResolvedGrade {
  * safely shareable between modules without creating a circular dependency
  * between ResultsService and PdfService.
  *
- * Returns { grade: null, remark: null } if no band matches the score —
+ * Returns { grade: null, remark: null, points: null, isPass: false } if no band matches the score —
  * callers should decide how to display that (e.g. "Not graded").
  */
 export function resolveGrade(score: number, gradeScales: GradeScaleEntry[]): ResolvedGrade {
   for (const gs of gradeScales) {
     if (score >= gs.minScore && score <= gs.maxScore) {
-      return { grade: gs.grade, remark: gs.remark };
+      return { grade: gs.grade, remark: gs.remark, points: gs.points, isPass: gs.isPass };
     }
   }
-  return { grade: null, remark: null };
+  return { grade: null, remark: null, points: null, isPass: false };
 }
 
 /**
- * Rank a set of entries by totalScore, descending, assigning a 1-based
- * position to each. This preserves the exact ranking behaviour that
- * existed inline in results.service.getBroadsheet() (sequential position,
- * no shared rank for ties) — it has just been extracted so pdf.service.ts
- * can produce an identical position column instead of having none at all.
- *
- * Tie-handling note: two students with the same totalScore currently get
- * consecutive positions (e.g. 3 and 4), not a shared rank. That matches
- * existing behaviour and isn't changed here — sharing ranks on ties would
- * be a deliberate product decision, not a bug fix, so it's left as-is.
+ * Calculate GPA from a list of results with points
+ */
+export function calculateGPA(results: { points: number | null }[]): number {
+  const validResults = results.filter((r) => r.points !== null);
+  if (validResults.length === 0) return 0;
+  const totalPoints = validResults.reduce((sum, r) => sum + (r.points || 0), 0);
+  return totalPoints / validResults.length;
+}
+
+/**
+ * Calculate cumulative GPA from results across multiple terms
+ */
+export function calculateCumulativeGPA(
+  resultsByTerm: { results: { points: number | null }[] }[],
+): number {
+  const allResults = resultsByTerm.flatMap((term) => term.results);
+  return calculateGPA(allResults);
+}
+
+/**
+ * Rank a set of entries by totalScore, descending, with configurable ranking strategy
  */
 export function assignPositions<T extends { totalScore: number }>(
   entries: T[],
+  strategy: RankingStrategy = RankingStrategy.STANDARD,
 ): (T & { position: number })[] {
-  return [...entries]
-    .sort((a, b) => b.totalScore - a.totalScore)
-    .map((entry, index) => ({ ...entry, position: index + 1 }));
+  const sorted = [...entries].sort((a, b) => b.totalScore - a.totalScore);
+
+  if (strategy === RankingStrategy.STANDARD) {
+    return sorted.map((entry, index) => ({ ...entry, position: index + 1 }));
+  }
+
+  if (strategy === RankingStrategy.COMPETITION) {
+    let position = 1;
+    const result: (T & { position: number })[] = [];
+    for (let i = 0; i < sorted.length; i++) {
+      if (i > 0 && sorted[i].totalScore < sorted[i - 1].totalScore) {
+        position = i + 1;
+      }
+      result.push({ ...sorted[i], position });
+    }
+    return result;
+  }
+
+  if (strategy === RankingStrategy.DENSE) {
+    let position = 1;
+    const result: (T & { position: number })[] = [];
+    for (let i = 0; i < sorted.length; i++) {
+      if (i > 0 && sorted[i].totalScore < sorted[i - 1].totalScore) {
+        position += 1;
+      }
+      result.push({ ...sorted[i], position });
+    }
+    return result;
+  }
+
+  return sorted.map((entry, index) => ({ ...entry, position: index + 1 }));
 }

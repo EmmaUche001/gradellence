@@ -55,6 +55,13 @@ export class TeachersController {
     return this.teachersService.findAll(req.user, page, limit, search);
   }
 
+  @Get('me')
+  @Roles(ROLES.TEACHER)
+  @ApiOperation({ summary: 'Get own teacher profile with assignments (TEACHER only)' })
+  async getMyProfile(@Request() req: AuthenticatedRequest) {
+    return this.teachersService.findMyProfile(req.user);
+  }
+
   @Get(':id')
   @ApiOperation({ summary: 'Get teacher by ID' })
   @ApiResponse({ status: 200, description: 'Teacher retrieved successfully' })

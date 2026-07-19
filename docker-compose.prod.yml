@@ -1,0 +1,29 @@
+version: '3.8'
+
+# Production compose override — use with:
+# docker-compose -f docker-compose.yml -f docker-compose.prod.yml up -d --build
+
+services:
+  backend:
+    environment:
+      NODE_ENV: production
+    restart: always
+
+  nginx:
+    image: nginx:alpine
+    container_name: srms-nginx
+    restart: always
+    ports:
+      - '80:80'
+      - '443:443'
+    volumes:
+      - ./docker/nginx/nginx.prod.conf:/etc/nginx/nginx.conf:ro
+      - /etc/letsencrypt:/etc/letsencrypt:ro
+    depends_on:
+      - backend
+
+  postgres:
+    restart: always
+
+  redis:
+    restart: always

@@ -14,9 +14,9 @@ export async function seedAssessmentConfigs(prisma: PrismaClient) {
     { type: 'EXAM', label: 'Exam', maxScore: 60, weight: 0.6, order: 3 },
   ];
 
-  let createdCount = 0;
+  const createdCount = 0;
 
- /* for (const school of schools) {
+  /* for (const school of schools) {
     for (const config of defaults) {
       await prisma.assessmentConfig.upsert({
         where: { schoolId_type: { schoolId: school.id, type: config.type } },

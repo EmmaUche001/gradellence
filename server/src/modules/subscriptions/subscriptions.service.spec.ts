@@ -42,10 +42,7 @@ describe('SubscriptionsService', () => {
     prisma = createPrismaMock();
 
     const module: TestingModule = await Test.createTestingModule({
-      providers: [
-        SubscriptionsService,
-        { provide: PrismaService, useValue: prisma },
-      ],
+      providers: [SubscriptionsService, { provide: PrismaService, useValue: prisma }],
     }).compile();
 
     service = module.get<SubscriptionsService>(SubscriptionsService);
@@ -121,17 +118,13 @@ describe('SubscriptionsService', () => {
 
       await service.subscribe(schoolId, planId);
 
-      expect(callOrder.indexOf('updateMany')).toBeLessThan(
-        callOrder.indexOf('create'),
-      );
+      expect(callOrder.indexOf('updateMany')).toBeLessThan(callOrder.indexOf('create'));
     });
 
     it('throws NotFoundException when the plan does not exist', async () => {
       prisma.subscriptionPlan.findUnique.mockResolvedValue(null);
 
-      await expect(service.subscribe(schoolId, planId)).rejects.toThrow(
-        NotFoundException,
-      );
+      await expect(service.subscribe(schoolId, planId)).rejects.toThrow(NotFoundException);
 
       // Neither updateMany nor create should have been called
       expect(prisma.schoolSubscription.updateMany).not.toHaveBeenCalled();
@@ -160,9 +153,7 @@ describe('SubscriptionsService', () => {
       // Simulate Prisma returning null — no ACTIVE subscription row found
       prisma.schoolSubscription.findFirst.mockResolvedValue(null);
 
-      await expect(service.getCurrentSubscription(schoolId)).rejects.toThrow(
-        NotFoundException,
-      );
+      await expect(service.getCurrentSubscription(schoolId)).rejects.toThrow(NotFoundException);
     });
 
     it('throws NotFoundException with the correct message when no active subscription exists', async () => {
@@ -190,9 +181,7 @@ describe('SubscriptionsService', () => {
     it('queries for ACTIVE subscriptions scoped to the given schoolId', async () => {
       prisma.schoolSubscription.findFirst.mockResolvedValue(null);
 
-      await expect(service.getCurrentSubscription(schoolId)).rejects.toThrow(
-        NotFoundException,
-      );
+      await expect(service.getCurrentSubscription(schoolId)).rejects.toThrow(NotFoundException);
 
       expect(prisma.schoolSubscription.findFirst).toHaveBeenCalledWith(
         expect.objectContaining({

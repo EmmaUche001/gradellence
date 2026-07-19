@@ -44,4 +44,24 @@ export class AnalyticsController {
   ) {
     return this.analyticsService.getClassRankings(user.schoolId, classId, termId);
   }
+
+  @Get('enrollment-history')
+  @Roles(ROLES.SCHOOL_ADMIN, ROLES.TEACHER)
+  @ApiOperation({ summary: 'Get enrollment counts grouped by time period for the trend chart' })
+  getEnrollmentHistory(
+    @CurrentUser() user: AuthenticatedUser,
+    @Query('period') period: '7d' | '30d' | '90d' | '1y' = '30d',
+  ) {
+    return this.analyticsService.getEnrollmentHistory(user.schoolId, period);
+  }
+
+  @Get('grade-distribution')
+  @Roles(ROLES.SCHOOL_ADMIN, ROLES.TEACHER)
+  @ApiOperation({
+    summary:
+      'Get grade band distribution (Excellent/Good/Average/Needs Support) for the donut chart',
+  })
+  getGradeDistribution(@CurrentUser() user: AuthenticatedUser, @Query('termId') termId?: string) {
+    return this.analyticsService.getGradeDistribution(user.schoolId, termId);
+  }
 }

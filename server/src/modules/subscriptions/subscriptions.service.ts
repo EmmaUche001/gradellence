@@ -35,7 +35,10 @@ export class SubscriptionsService {
   async seedDefaultPlans() {
     const existingCount = await this.prisma.subscriptionPlan.count();
     if (existingCount > 0) {
-      return { message: `${existingCount} plan(s) already exist. No action taken.`, count: existingCount };
+      return {
+        message: `${existingCount} plan(s) already exist. No action taken.`,
+        count: existingCount,
+      };
     }
 
     const defaults = [
@@ -218,7 +221,9 @@ export class SubscriptionsService {
           amount: amountDue,
           currency: 'NGN',
           dueDate: endDate,
-          description: `${plan.name} plan subscription` + (proratedCredit > 0 ? ` (prorated credit: ₦${proratedCredit.toLocaleString()})` : ''),
+          description:
+            `${plan.name} plan subscription` +
+            (proratedCredit > 0 ? ` (prorated credit: ₦${proratedCredit.toLocaleString()})` : ''),
         },
       });
     }

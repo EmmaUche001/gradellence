@@ -82,17 +82,17 @@ describe('SessionsService', () => {
       // different-school session will not match, so the service gets null.
       prisma.session.findFirst.mockResolvedValue(null);
 
-      await expect(
-        service.findOneSession('other-school-session-id', currentUser),
-      ).rejects.toThrow(NotFoundException);
+      await expect(service.findOneSession('other-school-session-id', currentUser)).rejects.toThrow(
+        NotFoundException,
+      );
     });
 
     it('queries with the correct schoolId and id combination', async () => {
       prisma.session.findFirst.mockResolvedValue(null);
 
-      await expect(
-        service.findOneSession('sess-99', currentUser),
-      ).rejects.toThrow(NotFoundException);
+      await expect(service.findOneSession('sess-99', currentUser)).rejects.toThrow(
+        NotFoundException,
+      );
 
       const calledWith = prisma.session.findFirst.mock.calls[0][0];
       expect(calledWith.where).toMatchObject({
@@ -129,9 +129,7 @@ describe('SessionsService', () => {
         endDate: '2024-09-01', // same as startDate
       };
 
-      await expect(service.createSession(dto, currentUser)).rejects.toThrow(
-        BadRequestException,
-      );
+      await expect(service.createSession(dto, currentUser)).rejects.toThrow(BadRequestException);
     });
 
     it('throws BadRequestException when startDate is after endDate', async () => {
@@ -141,9 +139,7 @@ describe('SessionsService', () => {
         endDate: '2024-09-01', // endDate before startDate
       };
 
-      await expect(service.createSession(dto, currentUser)).rejects.toThrow(
-        BadRequestException,
-      );
+      await expect(service.createSession(dto, currentUser)).rejects.toThrow(BadRequestException);
     });
 
     it('creates the session when startDate is strictly before endDate', async () => {
@@ -184,9 +180,7 @@ describe('SessionsService', () => {
         endDate: '2024-09-01',
       };
 
-      await expect(service.createSession(dto, currentUser)).rejects.toThrow(
-        BadRequestException,
-      );
+      await expect(service.createSession(dto, currentUser)).rejects.toThrow(BadRequestException);
 
       expect(prisma.session.create).not.toHaveBeenCalled();
     });

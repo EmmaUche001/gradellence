@@ -14,15 +14,7 @@ interface AssessmentImportRow {
   [key: string]: string | undefined;
 }
 
-const EXPECTED_HEADERS = [
-  'admissionNumber',
-  'subjectCode',
-  'termId',
-  'ca1',
-  'ca2',
-  'ca3',
-  'exam',
-];
+const EXPECTED_HEADERS = ['admissionNumber', 'subjectCode', 'termId', 'ca1', 'ca2', 'ca3', 'exam'];
 
 @Injectable()
 export class BulkAssessmentsService extends BaseImportService {
@@ -46,36 +38,37 @@ export class BulkAssessmentsService extends BaseImportService {
     const admissionNumbers = Array.from(
       new Set(data.map((r) => r.admissionNumber.trim()).filter((x) => !!x)),
     );
-    const students = admissionNumbers.length > 0
-      ? await this.prisma.student.findMany({
-          where: { schoolId, admissionNumber: { in: admissionNumbers } },
-          select: { id: true, admissionNumber: true },
-        })
-      : [];
+    const students =
+      admissionNumbers.length > 0
+        ? await this.prisma.student.findMany({
+            where: { schoolId, admissionNumber: { in: admissionNumbers } },
+            select: { id: true, admissionNumber: true },
+          })
+        : [];
     const studentMap = new Map(students.map((s) => [s.admissionNumber, s.id]));
 
     // Pre-fetch subjects
     const subjectCodes = Array.from(
       new Set(data.map((r) => r.subjectCode.trim()).filter((x) => !!x)),
     );
-    const subjects = subjectCodes.length > 0
-      ? await this.prisma.subject.findMany({
-          where: { schoolId, code: { in: subjectCodes } },
-          select: { id: true, code: true },
-        })
-      : [];
+    const subjects =
+      subjectCodes.length > 0
+        ? await this.prisma.subject.findMany({
+            where: { schoolId, code: { in: subjectCodes } },
+            select: { id: true, code: true },
+          })
+        : [];
     const subjectMap = new Map(subjects.map((s) => [s.code, s.id]));
 
     // Collect term IDs for validation
-    const termIds = Array.from(
-      new Set(data.map((r) => r.termId.trim()).filter((x) => !!x)),
-    );
-    const terms = termIds.length > 0
-      ? await this.prisma.term.findMany({
-          where: { id: { in: termIds }, schoolId },
-          select: { id: true },
-        })
-      : [];
+    const termIds = Array.from(new Set(data.map((r) => r.termId.trim()).filter((x) => !!x)));
+    const terms =
+      termIds.length > 0
+        ? await this.prisma.term.findMany({
+            where: { id: { in: termIds }, schoolId },
+            select: { id: true },
+          })
+        : [];
     const termSet = new Set(terms.map((t) => t.id));
 
     const batchSize = 50;

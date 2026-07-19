@@ -1,328 +1,207 @@
 import { useState, useEffect, useCallback } from 'react';
-import { Link } from 'react-router-dom';
+import { useNavigate } from 'react-router-dom';
+import { School, Plus, Search, AlertCircle } from 'lucide-react';
 import { classService } from '../../../services/classService';
 import { subjectService } from '../../../services/subjectService';
 import { Class } from '../../../types/class';
 import { Subject } from '../../../types/subject';
+import { PageHeader } from '../../../components/ui/PageHeader';
+import { Button } from '../../../components/ui/Button';
+import { Badge } from '../../../components/ui/Badge';
+import { EmptyState } from '../../../components/ui/EmptyState';
+import { SkeletonTable } from '../../../components/ui/SkeletonLoader';
+import { ConfirmDialog } from '../../../components/ui/ConfirmDialog';
+import { Modal } from '../../../components/ui/Modal';
 
 export function ClassesListPage() {
-  const [classes, setClasses] = useState<Class[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-  const [page, setPage] = useState(1);
-  const [totalPages, setTotalPages] = useState(1);
-  const [search, setSearch] = useState('');
-
-  // Subject modal state
-  const [modalClass, setModalClass] = useState<Class | null>(null);
-  const [allSubjects, setAllSubjects] = useState<Subject[]>([]);
-  const [_assignedIds, setAssignedIds] = useState<Set<string>>(new Set());
-  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
-  const [modalLoading, setModalLoading] = useState(false);
-  const [modalSaving, setModalSaving] = useState(false);
-
-  // Subject chips per class
+  const navigate = useNavigate();
+  const [classes, setClasses]           = useState<Class[]>([]);
+  const [isLoading, setIsLoading]       = useState(true);
+  const [error, setError]               = useState<string | null>(null);
+  const [page, setPage]                 = useState(1);
+  const [totalPages, setTotalPages]     = useState(1);
+  const [total, setTotal]               = useState(0);
+  const [search, setSearch]             = useState('');
   const [classSubjects, setClassSubjects] = useState<Record<string, Subject[]>>({});
+  const [deleteTarget, setDeleteTarget] = useState<Class | null>(null);
+  const [deleting, setDeleting]         = useState(false);
+
+  // Subject modal
+  const [modalClass, setModalClass]         = useState<Class | null>(null);
+  const [allSubjects, setAllSubjects]       = useState<Subject[]>([]);
+  const [selectedIds, setSelectedIds]       = useState<Set<string>>(new Set());
+  const [modalLoading, setModalLoading]     = useState(false);
+  const [modalSaving, setModalSaving]       = useState(false);
 
   const fetchClasses = useCallback(async () => {
-    setIsLoading(true);
-    setError(null);
+    setIsLoading(true); setError(null);
     try {
-      const response = await classService.getAll(page, 20, search || undefined);
-      setClasses(response.data);
-
-      if (response.meta) {
-        setTotalPages(response.meta.totalPages);
-      }
-
-      // Fetch subjects for each class in parallel
-      const classesData = response.data;
-      const subjectMap: Record<string, Subject[]> = {};
-      await Promise.all(
-        classesData.map(async (cls) => {
-          try {
-            const res = await classService.getClassSubjects(cls.id);
-            subjectMap[cls.id] = res.data;
-          } catch {
-            subjectMap[cls.id] = [];
-          }
-        })
-      );
-      setClassSubjects(subjectMap);
+      const res = await classService.getAll(page, 20, search || undefined);
+      setClasses(res.data);
+      if (res.meta) { setTotalPages(res.meta.totalPages); setTotal(res.meta.total ?? res.data.length); }
+      const subMap: Record<string, Subject[]> = {};
+      await Promise.all(res.data.map(async c => {
+        try { subMap[c.id] = (await classService.getClassSubjects(c.id)).data; }
+        catch { subMap[c.id] = []; }
+      }));
+      setClassSubjects(subMap);
     } catch (err: any) {
       setError(err.response?.data?.message || 'Failed to load classes');
-    } finally {
-      setIsLoading(false);
-    }
+    } finally { setIsLoading(false); }
   }, [page, search]);
 
-  useEffect(() => {
-    fetchClasses();
-  }, [fetchClasses]);
+  useEffect(() => { fetchClasses(); }, [fetchClasses]);
 
-  const handleDelete = async (id: string, name: string) => {
-    if (!window.confirm(`Delete class "${name}"? This action cannot be undone.`)) return;
-    try {
-      await classService.remove(id);
-      fetchClasses();
-    } catch (err: any) {
-      setError(err.response?.data?.message || 'Failed to delete class');
-    }
+  const confirmDelete = async () => {
+    if (!deleteTarget) return;
+    setDeleting(true);
+    try { await classService.remove(deleteTarget.id); setDeleteTarget(null); fetchClasses(); }
+    catch (err: any) { setError(err.response?.data?.message || 'Failed to delete'); setDeleteTarget(null); }
+    finally { setDeleting(false); }
   };
 
   const openSubjectModal = async (cls: Class) => {
-    setModalClass(cls);
-    setModalLoading(true);
-    setError(null);
+    setModalClass(cls); setModalLoading(true); setError(null);
     try {
-      const [subjectsRes, assignedRes] = await Promise.all([
-        subjectService.getAll(1, 100),
-        classService.getClassSubjects(cls.id),
-      ]);
-      setAllSubjects(subjectsRes.data.filter(s => s.isActive));
-      const assigned = new Set(assignedRes.data.map(s => s.id));
-      setAssignedIds(assigned);
-      setSelectedIds(new Set(assigned));
-    } catch (err: any) {
-      setError('Failed to load subjects');
-    } finally {
-      setModalLoading(false);
-    }
+      const [sr, ar] = await Promise.all([subjectService.getAll(1, 100), classService.getClassSubjects(cls.id)]);
+      setAllSubjects(sr.data.filter(s => s.isActive));
+      setSelectedIds(new Set(ar.data.map(s => s.id)));
+    } catch { setError('Failed to load subjects'); }
+    finally { setModalLoading(false); }
   };
 
-  const closeSubjectModal = () => {
-    setModalClass(null);
-    setAllSubjects([]);
-    setAssignedIds(new Set());
-    setSelectedIds(new Set());
-  };
-
-  const toggleSubject = (id: string) => {
-    setSelectedIds(prev => {
-      const next = new Set(prev);
-      if (next.has(id)) next.delete(id);
-      else next.add(id);
-      return next;
-    });
-  };
-
-  const saveSubjectAssignment = async () => {
+  const saveSubjects = async () => {
     if (!modalClass) return;
     setModalSaving(true);
-    setError(null);
     try {
       await classService.assignSubjects(modalClass.id, Array.from(selectedIds));
-      closeSubjectModal();
-      fetchClasses();
-      // Refresh subjects for this class
-      const res = await classService.getClassSubjects(modalClass.id);
-      setClassSubjects(prev => ({ ...prev, [modalClass.id]: res.data }));
-    } catch (err: any) {
-      setError(err.response?.data?.message || 'Failed to assign subjects');
-    } finally {
-      setModalSaving(false);
-    }
+      setClassSubjects(prev => ({ ...prev, [modalClass.id]: allSubjects.filter(s => selectedIds.has(s.id)) }));
+      setModalClass(null);
+    } catch (err: any) { setError(err.response?.data?.message || 'Failed to save subjects'); }
+    finally { setModalSaving(false); }
   };
+
+  const start = (page - 1) * 20 + 1;
+  const end   = Math.min(page * 20, total);
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl font-bold text-gray-900">Classes</h1>
-          <p className="mt-1 text-sm text-gray-500">Manage all classes in your school</p>
-        </div>
-        <Link to="/classes/new" className="btn-primary">
-          + Add Class
-        </Link>
-      </div>
+      <PageHeader title="Classes" description="Manage classes and their subject assignments"
+        actions={<Button variant="primary" size="sm" onClick={() => navigate('/classes/new')}><Plus size={15} /> Add Class</Button>} />
 
       {error && (
-        <div className="rounded-md bg-red-50 p-4">
-          <p className="text-sm text-red-700">{error}</p>
+        <div className="flex items-start gap-3 px-4 py-3 rounded-xl bg-danger-50 border border-danger-100">
+          <AlertCircle size={16} className="text-danger-600 shrink-0 mt-0.5" />
+          <p className="text-sm text-danger-700">{error}</p>
         </div>
       )}
 
-      <div className="card">
-        <div className="p-4 border-b border-gray-200">
-          <input
-            type="text"
-            placeholder="Search by name or level..."
-            value={search}
-            onChange={(e) => { setSearch(e.target.value); setPage(1); }}
-            className="input max-w-md"
-          />
+      <div className="bg-surface rounded-card shadow-sm border border-border overflow-hidden">
+        <div className="flex items-center gap-3 px-5 py-4 border-b border-border">
+          <div className="relative flex-1 max-w-sm">
+            <Search size={15} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-gray-400" />
+            <input type="text" placeholder="Search classes…" value={search}
+              onChange={e => { setSearch(e.target.value); setPage(1); }}
+              className="w-full h-10 pl-10 pr-4 text-sm bg-gray-50 border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 focus:bg-surface placeholder-gray-400" />
+          </div>
+          {!isLoading && total > 0 && <span className="text-sm text-gray-500 ml-auto">{total} class{total !== 1 ? 'es' : ''}</span>}
         </div>
 
-        <div className="overflow-x-auto">
-          <table className="min-w-full divide-y divide-gray-200">
-            <thead className="bg-gray-50">
-              <tr>
-                <th className="table-header">Name</th>
-                <th className="table-header">Level</th>
-                <th className="table-header">Class Teacher</th>
-                <th className="table-header">Capacity</th>
-                <th className="table-header">Students</th>
-                <th className="table-header">Subjects</th>
-                <th className="table-header">Status</th>
-                <th className="table-header text-right">Actions</th>
-              </tr>
-            </thead>
-            <tbody className="bg-white divide-y divide-gray-200">
-              {isLoading ? (
-                <tr>
-                  <td colSpan={8} className="px-6 py-12 text-center text-gray-500">
-                    Loading classes...
-                  </td>
+        {isLoading ? (
+          <div className="p-5"><SkeletonTable rows={5} cols={7} /></div>
+        ) : classes.length === 0 ? (
+          <EmptyState icon={<School size={40} />} title="No classes yet"
+            description={search ? `No classes match "${search}".` : 'Create your first class to begin organising students.'}
+            actionLabel={search ? undefined : 'Add Class'} onAction={search ? undefined : () => navigate('/classes/new')} />
+        ) : (
+          <div className="overflow-x-auto">
+            <table className="w-full">
+              <thead>
+                <tr className="bg-gray-50 border-b border-border">
+                  {['Name', 'Class Teacher', 'Students', 'Subjects', 'Status', ''].map(h => (
+                    <th key={h} className="px-5 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider last:text-right">{h}</th>
+                  ))}
                 </tr>
-              ) : classes.length === 0 ? (
-                <tr>
-                  <td colSpan={8} className="px-6 py-12 text-center text-gray-500">
-                    No classes found. Click "+ Add Class" to create one.
-                  </td>
-                </tr>
-              ) : (
-                classes.map((cls) => (
-                  <tr key={cls.id} className="hover:bg-gray-50">
-                    <td className="table-cell font-medium text-gray-900">{cls.name}</td>
-                    <td className="table-cell">Level {cls.level}</td>
-                    <td className="table-cell">
-                      {cls.classTeacher
-                        ? `${cls.classTeacher.firstName} ${cls.classTeacher.lastName}`
-                        : '—'}
-                    </td>
-                    <td className="table-cell">{cls.capacity ?? '—'}</td>
-                    <td className="table-cell">{cls._count?.enrollments ?? 0}</td>
-                    <td className="table-cell">
-                      <button
-                        onClick={() => openSubjectModal(cls)}
-                        className="text-sm text-primary-600 hover:text-primary-800 underline"
-                      >
-                        Manage Subjects
-                      </button>
-                      {(() => {
-                        const subjects = classSubjects[cls.id];
-                        if (!subjects || subjects.length === 0) {
-                          return <span className="ml-2 text-xs text-gray-400">No subjects assigned</span>;
-                        }
-                        const visible = subjects.slice(0, 4);
-                        const remaining = subjects.length - 4;
-                        return (
-                          <span className="ml-2 inline-flex flex-wrap gap-1">
-                            {visible.map((s) => (
-                              <span
-                                key={s.id}
-                                className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800"
-                              >
-                                {s.name}
-                              </span>
-                            ))}
-                            {remaining > 0 && (
-                              <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-600">
-                                +{remaining} more
-                              </span>
-                            )}
-                          </span>
-                        );
-                      })()}
-                    </td>
-                    <td className="table-cell">
-                      <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${
-                        cls.isActive
-                          ? 'bg-green-100 text-green-800'
-                          : 'bg-red-100 text-red-800'
-                      }`}>
-                        {cls.isActive ? 'Active' : 'Inactive'}
-                      </span>
-                    </td>
-                    <td className="table-cell text-right space-x-2">
-                      <Link
-                        to={`/classes/${cls.id}/edit`}
-                        className="text-sm text-primary-600 hover:text-primary-800"
-                      >
-                        Edit
-                      </Link>
-                      <button
-                        onClick={() => handleDelete(cls.id, cls.name)}
-                        className="text-sm text-red-600 hover:text-red-800"
-                      >
-                        Delete
-                      </button>
-                    </td>
-                  </tr>
-                ))
-              )}
-            </tbody>
-          </table>
-        </div>
+              </thead>
+              <tbody className="divide-y divide-border">
+                {classes.map(cls => {
+                  const subs = classSubjects[cls.id] ?? [];
+                  return (
+                    <tr key={cls.id} className="hover:bg-gray-50 transition-colors">
+                      <td className="px-5 py-3.5 text-sm font-semibold text-gray-900">{cls.name}</td>
+                      <td className="px-5 py-3.5 text-sm text-gray-600">
+                        {cls.classTeacher ? `${cls.classTeacher.firstName} ${cls.classTeacher.lastName}` : '—'}
+                      </td>
+                      <td className="px-5 py-3.5 text-sm text-gray-700">{cls._count?.enrollments ?? 0}</td>
+                      <td className="px-5 py-3.5">
+                        <div className="flex flex-wrap gap-1 items-center">
+                          {subs.length === 0 ? (
+                            <button onClick={() => openSubjectModal(cls)} className="text-xs text-primary-600 hover:underline">Assign subjects</button>
+                          ) : (
+                            <>
+                              {subs.slice(0, 3).map(s => (
+                                <Badge key={s.id} variant="primary">{s.name}</Badge>
+                              ))}
+                              {subs.length > 3 && <Badge variant="gray">+{subs.length - 3}</Badge>}
+                              <button onClick={() => openSubjectModal(cls)} className="text-xs text-primary-600 hover:underline ml-1">Edit</button>
+                            </>
+                          )}
+                        </div>
+                      </td>
+                      <td className="px-5 py-3.5">
+                        <Badge variant={cls.isActive ? 'success' : 'danger'}>{cls.isActive ? 'Active' : 'Inactive'}</Badge>
+                      </td>
+                      <td className="px-5 py-3.5 text-right">
+                        <div className="flex items-center justify-end gap-3">
+                          <button onClick={() => navigate(`/classes/${cls.id}/edit`)} className="text-sm font-medium text-primary-600 hover:text-primary-700">Edit</button>
+                          <button onClick={() => setDeleteTarget(cls)} className="text-sm font-medium text-danger-600 hover:text-danger-700">Delete</button>
+                        </div>
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+        )}
 
         {totalPages > 1 && (
-          <div className="flex items-center justify-between px-6 py-4 border-t border-gray-200">
-            <button
-              onClick={() => setPage((p) => Math.max(1, p - 1))}
-              disabled={page === 1}
-              className="btn-secondary disabled:opacity-50"
-            >
-              Previous
-            </button>
-            <span className="text-sm text-gray-600">
-              Page {page} of {totalPages}
-            </span>
-            <button
-              onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
-              disabled={page === totalPages}
-              className="btn-secondary disabled:opacity-50"
-            >
-              Next
-            </button>
+          <div className="flex items-center justify-between px-5 py-3.5 border-t border-border">
+            <p className="text-sm text-gray-500">Showing {start}–{end} of {total}</p>
+            <div className="flex items-center gap-2">
+              <Button variant="secondary" size="sm" onClick={() => setPage(p => p - 1)} disabled={page === 1}>Previous</Button>
+              <span className="text-sm text-gray-600 px-1">{page} / {totalPages}</span>
+              <Button variant="secondary" size="sm" onClick={() => setPage(p => p + 1)} disabled={page >= totalPages}>Next</Button>
+            </div>
           </div>
         )}
       </div>
 
-      {/* Subject Assignment Modal */}
-      {modalClass && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
-          <div className="bg-white rounded-lg shadow-xl max-w-lg w-full mx-4 max-h-[80vh] flex flex-col">
-            <div className="flex items-center justify-between p-4 border-b border-gray-200">
-              <h3 className="text-lg font-semibold text-gray-900">
-                Subjects — {modalClass.name}
-              </h3>
-              <button onClick={closeSubjectModal} className="text-gray-400 hover:text-gray-600 text-xl">&times;</button>
-            </div>
-            <div className="p-4 overflow-y-auto flex-1">
-              {modalLoading ? (
-                <p className="text-gray-500 text-center py-8">Loading subjects...</p>
-              ) : allSubjects.length === 0 ? (
-                <p className="text-gray-500 text-center py-8">No subjects available. Create subjects first.</p>
-              ) : (
-                <div className="space-y-2">
-                  {allSubjects.map((s) => (
-                    <label key={s.id} className="flex items-center space-x-3 p-2 rounded hover:bg-gray-50 cursor-pointer">
-                      <input
-                        type="checkbox"
-                        checked={selectedIds.has(s.id)}
-                        onChange={() => toggleSubject(s.id)}
-                        className="h-4 w-4 text-primary-600 rounded"
-                      />
-                      <span className="text-sm font-medium text-gray-700">{s.name}</span>
-                      <span className="text-xs text-gray-400">({s.code})</span>
-                    </label>
-                  ))}
-                </div>
-              )}
-            </div>
-            <div className="flex items-center justify-end space-x-3 p-4 border-t border-gray-200">
-              <button onClick={closeSubjectModal} className="btn-secondary">Cancel</button>
-              <button
-                onClick={saveSubjectAssignment}
-                disabled={modalSaving}
-                className="btn-primary disabled:opacity-50"
-              >
-                {modalSaving ? 'Saving...' : 'Save'}
-              </button>
-            </div>
+      <ConfirmDialog isOpen={!!deleteTarget} onClose={() => setDeleteTarget(null)} onConfirm={confirmDelete}
+        title="Delete class?" loading={deleting}
+        message={`"${deleteTarget?.name}" and all related data will be permanently removed.`} confirmLabel="Delete" />
+
+      <Modal isOpen={!!modalClass} onClose={() => setModalClass(null)} size="md"
+        title={`Subjects — ${modalClass?.name}`}
+        footer={<><Button variant="ghost" onClick={() => setModalClass(null)}>Cancel</Button><Button variant="primary" onClick={saveSubjects} loading={modalSaving}>Save</Button></>}>
+        {modalLoading ? (
+          <div className="py-8 text-center text-sm text-gray-400">Loading subjects…</div>
+        ) : allSubjects.length === 0 ? (
+          <p className="text-sm text-gray-500 py-4">No active subjects found. Create subjects first.</p>
+        ) : (
+          <div className="space-y-1 max-h-80 overflow-y-auto">
+            {allSubjects.map(s => (
+              <label key={s.id} className="flex items-center gap-3 p-2.5 rounded-xl hover:bg-gray-50 cursor-pointer">
+                <input type="checkbox" checked={selectedIds.has(s.id)}
+                  onChange={() => setSelectedIds(prev => { const n = new Set(prev); n.has(s.id) ? n.delete(s.id) : n.add(s.id); return n; })}
+                  className="w-4 h-4 rounded border-border text-primary-600 focus:ring-primary-500" />
+                <span className="text-sm font-medium text-gray-700">{s.name}</span>
+                <span className="text-xs text-gray-400 ml-auto">{s.code}</span>
+              </label>
+            ))}
           </div>
-        </div>
-      )}
+        )}
+      </Modal>
     </div>
   );
 }

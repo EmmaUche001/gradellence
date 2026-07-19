@@ -41,6 +41,7 @@ model School {
   documentVerifications DocumentVerification[]
   subscriptions SchoolSubscription[]
   invoices     Invoice[]
+  announcements Announcement[]
 
   @@map("schools")
 }
@@ -72,6 +73,7 @@ model User {
   refreshTokens RefreshToken[]
   emailVerifications EmailVerification[]
   auditLogs     AuditLog[]
+  announcements Announcement[]
   teacher       Teacher?
   student       Student?
   parent        Parent?
@@ -439,6 +441,7 @@ model GradeScale {
   maxScore  Int      @map("max_score")
   remark    String   @map("remark")
   points    Float    @default(0) @map("points")
+  isPass    Boolean  @default(false) @map("is_pass")
   isActive  Boolean  @default(true) @map("is_active")
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @updatedAt @map("updated_at")
@@ -497,6 +500,8 @@ model Result {
   totalScore  Float     @map("total_score")
   grade       String?   @map("grade")
   remark      String?   @map("remark")
+  points      Float?    @map("points")
+  isPass      Boolean   @default(false) @map("is_pass")
   isPublished Boolean   @default(false) @map("is_published")
   publishedAt DateTime? @map("published_at")
   createdAt   DateTime  @default(now()) @map("created_at")
@@ -623,6 +628,28 @@ model DocumentVerification {
   @@index([schoolId])
   @@index([hash])
   @@map("document_verifications")
+}
+
+// ============================================
+// ANNOUNCEMENTS
+// ============================================
+model Announcement {
+  id        String    @id @default(uuid()) @map("id")
+  schoolId  String    @map("school_id")
+  title     String    @map("title")
+  body      String?   @map("body")
+  date      DateTime  @map("date")
+  createdBy String    @map("created_by")
+  createdAt DateTime  @default(now()) @map("created_at")
+  updatedAt DateTime  @updatedAt @map("updated_at")
+
+  // Relations
+  school School @relation(fields: [schoolId], references: [id])
+  author User   @relation(fields: [createdBy], references: [id])
+
+  @@index([schoolId])
+  @@index([date])
+  @@map("announcements")
 }
 
 // ============================================

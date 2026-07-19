@@ -1,9 +1,18 @@
-import { Injectable, UnauthorizedException, BadRequestException, NotFoundException, ForbiddenException, Logger } from '@nestjs/common';
+import {
+  Injectable,
+  UnauthorizedException,
+  BadRequestException,
+  NotFoundException,
+  ForbiddenException,
+  Logger,
+} from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import { ConfigService } from '@nestjs/config';
 import * as bcrypt from 'bcryptjs';
 import { v4 as uuidv4 } from 'uuid';
 import { PrismaService } from '../../database/prisma.service';
+import { RedisService } from '../../common/redis/redis.service';
+import { REDIS_KEYS, REDIS_TTL } from '../../common/redis/redis.constants';
 import { ParentRegisterDto } from './dto/parent-register.dto';
 import { ParentLoginDto } from './dto/parent-login.dto';
 
@@ -15,6 +24,7 @@ export class ParentsService {
     private readonly prisma: PrismaService,
     private readonly jwtService: JwtService,
     private readonly configService: ConfigService,
+    private readonly redisService: RedisService,
   ) {}
 
   async register(dto: ParentRegisterDto) {
@@ -84,7 +94,18 @@ export class ParentsService {
       data: { lastLoginAt: new Date() },
     });
 
-    const tokens = this.generateTokens(parent);
+    const tokens = await this.generateTokens(parent);
+
+    await this.redisService.set(
+      REDIS_KEYS.PARENT_REFRESH_TOKEN(parent.id),
+      tokens.refreshToken,
+      REDIS_TTL.REFRESH_TOKEN,
+    );
+    await this.redisService.set(
+      REDIS_KEYS.PARENT_REFRESH_TOKEN_REVERSE(tokens.refreshToken),
+      parent.id,
+      REDIS_TTL.REFRESH_TOKEN,
+    );
 
     return {
       accessToken: tokens.accessToken,
@@ -139,20 +160,34 @@ export class ParentsService {
   async getStudentResults(parentId: string, studentId: string) {
     await this.verifyParentOwnsStudent(parentId, studentId);
 
+    const student = await this.prisma.student.findUnique({
+      where: { id: studentId },
+      select: { id: true, firstName: true, lastName: true, admissionNumber: true },
+    });
+
     const results = await this.prisma.result.findMany({
       where: { studentId, isPublished: true },
       include: { subject: true, term: { include: { session: true } } },
-      orderBy: [{ term: { session: { name: 'asc' as const } } }, { subject: { name: 'asc' as const } }],
+      orderBy: [
+        { term: { session: { name: 'asc' as const } } },
+        { subject: { name: 'asc' as const } },
+      ],
     });
 
-    return results.map((r: any) => ({
-      subject: r.subject.name,
-      score: r.totalScore,
-      grade: r.grade,
-      remark: r.remark,
-      term: r.term.name,
-      session: r.term.session.name,
-    }));
+    return {
+      student,
+      results: results.map((r: any) => ({
+        subject: r.subject.name,
+        score: r.totalScore,
+        grade: r.grade,
+        remark: r.remark,
+        points: r.points,
+        isPass: r.isPass,
+        term: r.term.name,
+        termId: r.term.id,
+        session: r.term.session.name,
+      })),
+    };
   }
 
   async getStudentAnalytics(parentId: string, studentId: string) {
@@ -183,19 +218,58 @@ export class ParentsService {
     };
   }
 
-  private async verifyParentOwnsStudent(parentId: string, studentId: string) {
+  async verifyParentOwnsStudent(parentId: string, studentId: string) {
     const link = await this.prisma.studentParent.findUnique({
       where: { studentId_parentId: { studentId, parentId } },
     });
     if (!link) throw new ForbiddenException('You do not have access to this student');
   }
 
-  private generateTokens(parent: { id: string; email: string; schoolId: string }) {
-    const payload = { sub: parent.id, email: parent.email, schoolId: parent.schoolId, type: 'parent' };
+  private async generateTokens(parent: { id: string; email: string; schoolId: string }) {
+    const payload = {
+      sub: parent.id,
+      email: parent.email,
+      schoolId: parent.schoolId,
+      type: 'parent',
+    };
     const accessToken = this.jwtService.sign(payload, {
       expiresIn: this.configService.get('JWT_ACCESS_EXPIRATION') || '15m',
     });
     const refreshToken = uuidv4();
     return { accessToken, refreshToken };
+  }
+
+  async refreshToken(token: string) {
+    const parentId = await this.redisService.get(
+      REDIS_KEYS.PARENT_REFRESH_TOKEN_REVERSE(token),
+    );
+    if (!parentId) throw new UnauthorizedException('Invalid refresh token');
+
+    const storedToken = await this.redisService.get(
+      REDIS_KEYS.PARENT_REFRESH_TOKEN(parentId),
+    );
+    if (storedToken !== token) throw new UnauthorizedException('Invalid refresh token');
+
+    const parent = await this.prisma.parent.findUnique({ where: { id: parentId } });
+    if (!parent) throw new UnauthorizedException('Parent not found');
+
+    const tokens = await this.generateTokens(parent);
+
+    // Rotate: delete old keys, store new ones
+    await this.redisService.del(REDIS_KEYS.PARENT_REFRESH_TOKEN(parentId));
+    await this.redisService.del(REDIS_KEYS.PARENT_REFRESH_TOKEN_REVERSE(token));
+
+    await this.redisService.set(
+      REDIS_KEYS.PARENT_REFRESH_TOKEN(parentId),
+      tokens.refreshToken,
+      REDIS_TTL.REFRESH_TOKEN,
+    );
+    await this.redisService.set(
+      REDIS_KEYS.PARENT_REFRESH_TOKEN_REVERSE(tokens.refreshToken),
+      parentId,
+      REDIS_TTL.REFRESH_TOKEN,
+    );
+
+    return { accessToken: tokens.accessToken, refreshToken: tokens.refreshToken };
   }
 }

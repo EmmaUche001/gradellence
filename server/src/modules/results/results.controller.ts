@@ -144,10 +144,7 @@ export class ResultsController {
   @Get('me')
   @Roles('STUDENT')
   @ApiOperation({ summary: 'Get own results for a term (student only)' })
-  getMyResults(
-    @CurrentUser() user: AuthenticatedUser,
-    @Query('termId') termId: string,
-  ) {
+  getMyResults(@CurrentUser() user: AuthenticatedUser, @Query('termId') termId: string) {
     if (!user.studentId) {
       throw new ForbiddenException('Student record not linked to this user');
     }
@@ -165,7 +162,11 @@ export class ResultsController {
     if (!user.studentId) {
       throw new ForbiddenException('Student record not linked to this user');
     }
-    const pdfBuffer = await this.pdfService.generateReportCard(user.studentId, termId, user.schoolId);
+    const pdfBuffer = await this.pdfService.generateReportCard(
+      user.studentId,
+      termId,
+      user.schoolId,
+    );
 
     res.set({
       'Content-Type': 'application/pdf',
@@ -232,6 +233,22 @@ export class ResultsController {
       'Content-Disposition': `attachment; filename="broadsheet-${classId}-${termId}.pdf"`,
     });
 
+    res.send(pdfBuffer);
+  }
+
+  @Get('academic-summary/:studentId')
+  @Roles('SCHOOL_ADMIN', 'TEACHER', 'PARENT')
+  @ApiOperation({ summary: 'Generate PDF academic summary for a student (all terms)' })
+  async generateAcademicSummary(
+    @Param('studentId') studentId: string,
+    @CurrentUser() user: AuthenticatedUser,
+    @Res() res: Response,
+  ) {
+    const pdfBuffer = await this.pdfService.generateAcademicSummary(studentId, user.schoolId);
+    res.set({
+      'Content-Type': 'application/pdf',
+      'Content-Disposition': `attachment; filename="academic-summary-${studentId}.pdf"`,
+    });
     res.send(pdfBuffer);
   }
 

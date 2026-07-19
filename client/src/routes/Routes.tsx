@@ -10,7 +10,9 @@ import SuperAdminGuard from '../components/guards/SuperAdminGuard';
 import SuperAdminDashboard from '../features/super-admin/pages/SuperAdminDashboard';
 import SchoolsPage from '../features/super-admin/pages/SchoolsPage';
 import SuperAdminSubscriptionsPage from '../features/super-admin/pages/SubscriptionsPage';
+import ActiveSubscriptionsPage from '../features/super-admin/pages/ActiveSubscriptionsPage';
 import PlatformAnalyticsPage from '../features/super-admin/pages/PlatformAnalyticsPage';
+import PlatformAuditLogsPage from '../features/super-admin/pages/PlatformAuditLogsPage';
 import { SuperAdminLoginPage } from '../features/super-admin/pages/SuperAdminLoginPage';
 import { DashboardPage } from '../features/dashboard/pages/DashboardPage';
 import { StudentsListPage } from '../features/students/pages/StudentsListPage';
@@ -37,6 +39,7 @@ import { UsersListPage } from '../features/users/pages/UsersListPage';
 import { RolesListPage } from '../features/roles/pages/RolesListPage';
 import { RoleFormPage } from '../features/roles/pages/RoleFormPage';
 import { AuditLogsListPage } from '../features/audit-logs/pages/AuditLogsListPage';
+import { AnnouncementsPage } from '../features/announcements/pages/AnnouncementsPage';
 import { BillingPage } from '../features/billing/pages/BillingPage';
 import { SchoolSettingsPage } from '../features/schools/pages/SchoolSettingsPage';
 import { AnalyticsDashboardPage } from '../features/analytics/pages/AnalyticsDashboardPage';
@@ -45,8 +48,11 @@ import ParentRegisterPage from '../features/parents/pages/ParentRegisterPage';
 import ParentDashboard from '../features/parents/pages/ParentDashboard';
 import StudentResultsPage from '../features/parents/pages/StudentResultsPage';
 import StudentAnalyticsPage from '../features/parents/pages/StudentAnalyticsPage';
+import ParentRoute from '../features/parents/guards/ParentRoute';
 import { StudentImportPage } from '../features/students/pages/StudentImportPage';
 import { ScoreImportPage } from '../features/assessments/pages/ScoreImportPage';
+import { ScoreEntryPage } from '../features/assessments/pages/ScoreEntryPage';
+import { MyResultsPage } from '../features/results/pages/MyResultsPage';
 
 function RedirectToDashboard({ to }: { to: string }) {
   return <Navigate to={to} replace />;
@@ -86,9 +92,12 @@ const routes = [
   { path: 'roles/new', element: <RoleFormPage /> },
   { path: 'roles/:id/edit', element: <RoleFormPage /> },
   { path: 'audit-logs', element: <AuditLogsListPage /> },
+  { path: 'announcements', element: <AnnouncementsPage /> },
   { path: 'billing', element: <BillingPage /> },
   { path: 'settings', element: <SchoolSettingsPage /> },
   { path: 'analytics', element: <AnalyticsDashboardPage /> },
+  { path: 'assessments/score-entry', element: <ScoreEntryPage /> },
+  { path: 'my-results', element: <MyResultsPage /> },
 ];
 
 export function Routes() {
@@ -134,9 +143,11 @@ export function Routes() {
       {/* Parent Portal Routes */}
       <Route path="/parent/login" element={<ParentLoginPage />} />
       <Route path="/parent/register" element={<ParentRegisterPage />} />
-      <Route path="/parent/dashboard" element={<ParentDashboard />} />
-      <Route path="/parent/students/:studentId/results" element={<StudentResultsPage />} />
-      <Route path="/parent/students/:studentId/analytics" element={<StudentAnalyticsPage />} />
+      <Route element={<ParentRoute />}>
+        <Route path="/parent/dashboard" element={<ParentDashboard />} />
+        <Route path="/parent/students/:studentId/results" element={<StudentResultsPage />} />
+        <Route path="/parent/students/:studentId/analytics" element={<StudentAnalyticsPage />} />
+      </Route>
 
       {/* Import Routes */}
       <Route path="/students/import" element={<StudentImportPage />} />
@@ -148,7 +159,9 @@ export function Routes() {
           <Route index element={<SuperAdminDashboard />} />
           <Route path="schools" element={<SchoolsPage />} />
           <Route path="subscriptions" element={<SuperAdminSubscriptionsPage />} />
+          <Route path="active-subs" element={<ActiveSubscriptionsPage />} />
           <Route path="analytics" element={<PlatformAnalyticsPage />} />
+          <Route path="audit-logs" element={<PlatformAuditLogsPage />} />
         </Route>
       </Route>
 

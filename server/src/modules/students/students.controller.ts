@@ -1,5 +1,25 @@
-import { Controller, Get, Post, Body, Patch, Param, Delete, UseGuards, Query, Request, DefaultValuePipe, ParseIntPipe } from '@nestjs/common';
-import { ApiTags, ApiOperation, ApiResponse, ApiBearerAuth, ApiConsumes, ApiQuery } from '@nestjs/swagger';
+import {
+  Controller,
+  Get,
+  Post,
+  Body,
+  Patch,
+  Param,
+  Delete,
+  UseGuards,
+  Query,
+  Request,
+  DefaultValuePipe,
+  ParseIntPipe,
+} from '@nestjs/common';
+import {
+  ApiTags,
+  ApiOperation,
+  ApiResponse,
+  ApiBearerAuth,
+  ApiConsumes,
+  ApiQuery,
+} from '@nestjs/swagger';
 import { FileInterceptor } from '@nestjs/platform-express';
 import { StudentsService } from './students.service';
 import { CreateStudentDto } from './dto/create-student.dto';
@@ -21,7 +41,10 @@ import { ExportService } from '../../common/export/export.service';
 @UseGuards(JwtAuthGuard, RolesGuard, TenantGuard)
 @ApiBearerAuth()
 export class StudentsController {
-  constructor(private readonly studentsService: StudentsService, private readonly exportService: ExportService) {}
+  constructor(
+    private readonly studentsService: StudentsService,
+    private readonly exportService: ExportService,
+  ) {}
 
   @Post()
   @Roles(ROLES.SUPER_ADMIN, ROLES.SCHOOL_ADMIN)
@@ -114,7 +137,11 @@ export class StudentsController {
   @ApiOperation({ summary: 'Export students to CSV' })
   @ApiQuery({ name: 'classId', required: false })
   @ApiQuery({ name: 'termId', required: false })
-  async exportStudents(@Request() req: AuthenticatedRequest, @Query('classId') classId?: string, @Query('termId') termId?: string) {
+  async exportStudents(
+    @Request() req: AuthenticatedRequest,
+    @Query('classId') classId?: string,
+    @Query('termId') termId?: string,
+  ) {
     const data = await this.studentsService.export(req.user.schoolId, classId, termId);
     return this.exportService.toCsvStream(data, 'students');
   }

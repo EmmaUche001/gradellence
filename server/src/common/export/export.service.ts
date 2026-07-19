@@ -27,10 +27,7 @@ export class ExportService {
    */
   generateTemplate(headers: string[], exampleRow?: Record<string, string>): string {
     const data = exampleRow ? [exampleRow] : [];
-    const csv = Papa.unparse(
-      { fields: headers, data: data as any },
-      { header: true },
-    );
+    const csv = Papa.unparse({ fields: headers, data: data as any }, { header: true });
     return csv;
   }
 }

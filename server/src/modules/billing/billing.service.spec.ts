@@ -28,8 +28,16 @@ describe('BillingService — tenant isolation', () => {
       },
     };
     const paymentGateway = {
-      initializeTransaction: jest.fn().mockResolvedValue({ authorizationUrl: 'https://paystack.com/pay/test', reference: 'test-ref' }),
-      verifyTransaction: jest.fn().mockResolvedValue({ status: 'success', amount: 5000, paidAt: new Date(), paymentMethod: 'card' }),
+      initializeTransaction: jest.fn().mockResolvedValue({
+        authorizationUrl: 'https://paystack.com/pay/test',
+        reference: 'test-ref',
+      }),
+      verifyTransaction: jest.fn().mockResolvedValue({
+        status: 'success',
+        amount: 5000,
+        paidAt: new Date(),
+        paymentMethod: 'card',
+      }),
     };
     service = new BillingService(prisma as any, paymentGateway as any, { get: jest.fn() } as any);
   });
@@ -58,9 +66,7 @@ describe('BillingService — tenant isolation', () => {
     it('refuses to pay an invoice belonging to another school', async () => {
       prisma.invoice.findFirst.mockResolvedValue(null);
 
-      await expect(service.payInvoice('invoice-1', SCHOOL_A)).rejects.toThrow(
-        NotFoundException,
-      );
+      await expect(service.payInvoice('invoice-1', SCHOOL_A)).rejects.toThrow(NotFoundException);
     });
 
     it("initializes payment for an invoice that belongs to the caller's own school", async () => {

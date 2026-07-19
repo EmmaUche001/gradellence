@@ -4,6 +4,14 @@ import { Teacher, CreateTeacherData, UpdateTeacherData, AssignTeacherSubjectData
 const BASE = '/v1/teachers';
 
 export const teacherService = {
+  async getMyProfile(): Promise<ApiResponse<{
+    teacher: any;
+    stats: { classCount: number; studentCount: number; totalAssessments: number; pendingAssessments: number };
+  }>> {
+    const { data } = await apiClient.get(`${BASE}/me`);
+    return data;
+  },
+
   async getAll(page = 1, limit = 20, search?: string): Promise<ApiResponse<Teacher[]>> {
     const params = new URLSearchParams({ page: String(page), limit: String(limit) });
     if (search) params.append('search', search);

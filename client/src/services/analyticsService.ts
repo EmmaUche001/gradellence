@@ -34,6 +34,26 @@ export interface ClassRankingItem {
   averageScore: number;
 }
 
+export interface EnrollmentHistoryData {
+  period: '7d' | '30d' | '90d' | '1y';
+  totalEnrollments: number;
+  labels: string[];
+  data: number[];
+}
+
+export interface GradeDistributionBand {
+  name: string;
+  count: number;
+  percent: number;
+  color: string;
+}
+
+export interface GradeDistributionData {
+  total: number;
+  termId: string | null;
+  bands: GradeDistributionBand[];
+}
+
 export const analyticsService = {
   async getOverview(): Promise<ApiResponse<OverviewData>> {
     const { data } = await apiClient.get(`${BASE}/overview`);
@@ -48,6 +68,17 @@ export const analyticsService = {
 
   async getClassRankings(classId: string, termId: string): Promise<ApiResponse<ClassRankingItem[]>> {
     const { data } = await apiClient.get(`${BASE}/class-rankings/${classId}?termId=${termId}`);
+    return data;
+  },
+
+  async getEnrollmentHistory(period: '7d' | '30d' | '90d' | '1y' = '30d'): Promise<ApiResponse<EnrollmentHistoryData>> {
+    const { data } = await apiClient.get(`${BASE}/enrollment-history?period=${period}`);
+    return data;
+  },
+
+  async getGradeDistribution(termId?: string): Promise<ApiResponse<GradeDistributionData>> {
+    const params = termId ? `?termId=${termId}` : '';
+    const { data } = await apiClient.get(`${BASE}/grade-distribution${params}`);
     return data;
   },
 };

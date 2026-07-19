@@ -1,3 +1,4 @@
+import * as Sentry from '@sentry/node';
 import {
   ExceptionFilter,
   Catch,
@@ -33,6 +34,7 @@ export class HttpExceptionFilter implements ExceptionFilter {
       status = HttpStatus.INTERNAL_SERVER_ERROR;
       message = 'Internal server error';
       code = 'INTERNAL_SERVER_ERROR';
+      Sentry.captureException(exception);
       this.logger.error(exception);
     }
 

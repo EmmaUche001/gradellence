@@ -442,4 +442,71 @@ export class TeachersService {
       data: assignments,
     };
   }
+
+  async findMyProfile(currentUser: AuthenticatedUser) {
+    // Look up the Teacher record linked to this user
+    const teacher = await this.prisma.teacher.findFirst({
+      where: {
+        userId: (currentUser as any).id,
+        schoolId: currentUser.schoolId,
+        deletedAt: null,
+      } as any,
+      include: {
+        classTeacher: {
+          include: {
+            _count: { select: { enrollments: true } },
+            subjects: { include: { subject: { select: { id: true, name: true, code: true } } } },
+          },
+        },
+        subjectAssignments: {
+          include: {
+            subject: { select: { id: true, name: true, code: true } },
+            class: { select: { id: true, name: true, level: true } },
+          },
+        },
+      },
+    });
+
+    if (!teacher) {
+      throw new NotFoundException('Teacher profile not found for this user');
+    }
+
+    // Unique classes this teacher is assigned to
+    const classIds = [...new Set(teacher.subjectAssignments.map((a: any) => a.classId))];
+
+    // Assessment stats for this teacher's classes
+    const [myAssessments, pendingAssessments] = await Promise.all([
+      this.prisma.assessment.count({
+        where: { schoolId: currentUser.schoolId, teacherId: teacher.id },
+      }),
+      this.prisma.assessment.count({
+        where: { schoolId: currentUser.schoolId, teacherId: teacher.id, isPublished: false } as any,
+      }),
+    ]);
+
+    // Student count across assigned classes (current enrollments)
+    const studentCount =
+      classIds.length > 0
+        ? await this.prisma.enrollment.count({
+            where: {
+              classId: { in: classIds as string[] },
+              student: { schoolId: currentUser.schoolId },
+            },
+          })
+        : 0;
+
+    return {
+      success: true,
+      message: 'Teacher profile retrieved successfully',
+      data: {
+        teacher,
+        stats: {
+          classCount: classIds.length,
+          studentCount,
+          totalAssessments: myAssessments,
+          pendingAssessments,
+        },
+      },
+    };
+  }
 }

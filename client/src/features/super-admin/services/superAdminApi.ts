@@ -60,6 +60,40 @@ export const superAdminApi = {
     return apiClient.get(`/super-admin/subscriptions?${q.toString()}`);
   },
 
+  getAllSchoolSubscriptions(params?: { page?: number; limit?: number; status?: string; planId?: string }) {
+    const q = new URLSearchParams();
+    if (params?.page) q.append('page', String(params.page));
+    if (params?.limit) q.append('limit', String(params.limit));
+    if (params?.status) q.append('status', params.status);
+    if (params?.planId) q.append('planId', params.planId);
+    return apiClient.get<{ data: any[]; meta: { total: number; page: number; limit: number } }>(
+      `/super-admin/school-subscriptions?${q.toString()}`
+    );
+  },
+
+  getSubscriptionPlans() {
+    return apiClient.get<any[]>('/super-admin/subscription-plans');
+  },
+
+  assignPlanToSchool(schoolId: string, planId: string) {
+    return apiClient.post(`/super-admin/schools/${schoolId}/assign-plan`, { planId });
+  },
+
+  cancelSchoolSubscription(schoolId: string) {
+    return apiClient.post(`/super-admin/schools/${schoolId}/cancel-subscription`, {});
+  },
+
+  getPlatformAuditLogs(params?: { page?: number; limit?: number; action?: string; entityType?: string }) {
+    const q = new URLSearchParams();
+    if (params?.page) q.append('page', String(params.page));
+    if (params?.limit) q.append('limit', String(params.limit));
+    if (params?.action) q.append('action', params.action);
+    if (params?.entityType) q.append('entityType', params.entityType);
+    return apiClient.get<{ data: any[]; meta: { total: number; page: number; limit: number } }>(
+      `/super-admin/audit-logs?${q.toString()}`
+    );
+  },
+
   // ── Platform Analytics ───────────────────────────────
   getPlatformStats() {
     return apiClient.get<{ data: PlatformStats }>('/super-admin/analytics/overview');

@@ -1,134 +1,187 @@
 import { useState, useEffect, useCallback } from 'react';
-import { Link } from 'react-router-dom';
+import { useNavigate } from 'react-router-dom';
+import { Layers, Plus, AlertCircle } from 'lucide-react';
 import { gradeScaleService } from '../../../services/gradeScaleService';
 import { GradeScale } from '../../../types/gradeScale';
+import { PageHeader } from '../../../components/ui/PageHeader';
+import { Button } from '../../../components/ui/Button';
+import { Badge, BadgeVariant } from '../../../components/ui/Badge';
+import { EmptyState } from '../../../components/ui/EmptyState';
+import { SkeletonTable } from '../../../components/ui/SkeletonLoader';
+import { ConfirmDialog } from '../../../components/ui/ConfirmDialog';
 
-const getGradeColor = (grade: string): string => {
+// Map grade letter to badge colour
+function gradeBadgeVariant(grade: string): BadgeVariant {
   const g = grade.toUpperCase();
-  if (g.startsWith('A')) return 'bg-green-100 text-green-800';
-  if (g.startsWith('B')) return 'bg-blue-100 text-blue-800';
-  if (g.startsWith('C')) return 'bg-yellow-100 text-yellow-800';
-  return 'bg-red-100 text-red-800';
-};
+  if (g.startsWith('A')) return 'success';
+  if (g.startsWith('B')) return 'primary';
+  if (g.startsWith('C')) return 'info';
+  if (g.startsWith('D')) return 'warning';
+  return 'danger';
+}
 
 export function GradeScalesListPage() {
-  const [scales, setScales] = useState<GradeScale[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-  const [page, setPage] = useState(1);
-  const [totalPages, setTotalPages] = useState(1);
+  const navigate = useNavigate();
+  const [scales, setScales]           = useState<GradeScale[]>([]);
+  const [isLoading, setIsLoading]     = useState(true);
+  const [error, setError]             = useState<string | null>(null);
+  const [page, setPage]               = useState(1);
+  const [totalPages, setTotalPages]   = useState(1);
+  const [deleteTarget, setDeleteTarget] = useState<GradeScale | null>(null);
+  const [deleting, setDeleting]       = useState(false);
 
   const fetchScales = useCallback(async () => {
-    setIsLoading(true);
-    setError(null);
+    setIsLoading(true); setError(null);
     try {
-      const response = await gradeScaleService.getAll(page, 50);
-      const sorted = [...response.data].sort((a, b) => b.minScore - a.minScore);
-      setScales(sorted);
-      if (response.meta) setTotalPages(response.meta.totalPages);
-    } catch (err: any) {
-      setError(err.response?.data?.message || 'Failed to load grade scales');
-    } finally {
-      setIsLoading(false);
-    }
+      const res = await gradeScaleService.getAll(page, 50);
+      // Sort descending by minScore so highest grades appear first
+      setScales([...res.data].sort((a, b) => b.minScore - a.minScore));
+      if (res.meta) setTotalPages(res.meta.totalPages);
+    } catch (err: any) { setError(err.response?.data?.message || 'Failed to load grade scales'); }
+    finally { setIsLoading(false); }
   }, [page]);
 
   useEffect(() => { fetchScales(); }, [fetchScales]);
 
-  const handleDelete = async (id: string, grade: string) => {
-    if (!window.confirm(`Delete grade scale "${grade}"?`)) return;
+  const confirmDelete = async () => {
+    if (!deleteTarget) return;
+    setDeleting(true);
     try {
-      await gradeScaleService.remove(id);
-      fetchScales();
+      await gradeScaleService.remove(deleteTarget.id);
+      setDeleteTarget(null); fetchScales();
     } catch (err: any) {
-      setError(err.response?.data?.message || 'Failed to delete grade scale');
-    }
+      setError(err.response?.data?.message || 'Failed to delete');
+      setDeleteTarget(null);
+    } finally { setDeleting(false); }
   };
+
+  // Width of the range bar as percentage of 100-point scale
+  const rangeWidth = (s: GradeScale) =>
+    Math.min(100, Math.round(((s.maxScore - s.minScore + 1) / 100) * 100));
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl font-bold text-gray-900">Grade Scales</h1>
-          <p className="mt-1 text-sm text-gray-500">Configure the grading system for result computation</p>
+      <PageHeader
+        title="Grade Scales"
+        description="Configure the grading system used for result computation"
+        actions={
+          <Button variant="primary" size="sm" onClick={() => navigate('/grade-scales/new')}>
+            <Plus size={15} /> Add Grade Scale
+          </Button>
+        }
+      />
+
+      {error && (
+        <div className="flex items-start gap-3 px-4 py-3 rounded-xl bg-danger-50 border border-danger-100">
+          <AlertCircle size={16} className="text-danger-600 shrink-0 mt-0.5" />
+          <p className="text-sm text-danger-700">{error}</p>
         </div>
-        <Link to="/grade-scales/new" className="btn-primary">+ Add Grade Scale</Link>
-      </div>
+      )}
 
-      {error && <div className="rounded-md bg-red-50 p-4"><p className="text-sm text-red-700">{error}</p></div>}
-
-      <div className="card">
-        <div className="overflow-x-auto">
-          <table className="min-w-full divide-y divide-gray-200">
-            <thead className="bg-gray-50">
-              <tr>
-                <th className="table-header">Score Range</th>
-                <th className="table-header">Grade</th>
-                <th className="table-header">Points</th>
-                <th className="table-header">Visual</th>
-                <th className="table-header">Remark</th>
-                <th className="table-header">Status</th>
-                <th className="table-header text-right">Actions</th>
-              </tr>
-            </thead>
-            <tbody className="bg-white divide-y divide-gray-200">
-              {isLoading ? (
-                <tr><td colSpan={7} className="px-6 py-12 text-center text-gray-500">Loading grade scales...</td></tr>
-              ) : scales.length === 0 ? (
-                <tr><td colSpan={7} className="px-6 py-12 text-center text-gray-500">
-                  No grade scales found. Click "+ Add Grade Scale" to create one.
-                </td></tr>
-              ) : scales.map((s) => (
-                <tr key={s.id} className="hover:bg-gray-50">
-                  <td className="table-cell font-medium text-gray-900">
-                    {s.minScore} – {s.maxScore}
-                  </td>
-                  <td className="table-cell">
-                    <span className={`inline-flex w-10 h-10 items-center justify-center text-base font-bold rounded-full ${getGradeColor(s.grade)}`}>
-                      {s.grade}
-                    </span>
-                  </td>
-                  <td className="table-cell text-center">
-                    <span className="inline-flex px-2 py-1 text-xs font-semibold rounded-full bg-blue-50 text-blue-700">
-                      {(s.points ?? 0).toFixed(1)} pts
-                    </span>
-                  </td>
-                  <td className="table-cell">
-                    <div className="flex items-center space-x-2">
-                      <div className="w-32 h-2 bg-gray-200 rounded-full overflow-hidden">
-                        <div
-                          className="h-full bg-gradient-to-r from-primary-400 to-primary-600"
-                          style={{ width: `${((s.maxScore - s.minScore + 1) / 100) * 100}%` }}
-                        />
-                      </div>
-                      <span className="text-xs text-gray-500">{s.maxScore - s.minScore + 1} pts</span>
-                    </div>
-                  </td>
-                  <td className="table-cell italic text-gray-600">{s.remark}</td>
-                  <td className="table-cell">
-                    {s.isActive ? (
-                      <span className="inline-flex px-2 py-1 text-xs font-semibold rounded-full bg-green-100 text-green-800">Active</span>
-                    ) : (
-                      <span className="inline-flex px-2 py-1 text-xs font-semibold rounded-full bg-gray-100 text-gray-800">Inactive</span>
-                    )}
-                  </td>
-                  <td className="table-cell text-right space-x-2">
-                    <Link to={`/grade-scales/${s.id}/edit`} className="text-sm text-primary-600 hover:text-primary-800">Edit</Link>
-                    <button onClick={() => handleDelete(s.id, s.grade)} className="text-sm text-red-600 hover:text-red-800">Delete</button>
-                  </td>
+      <div className="bg-surface rounded-card shadow-sm border border-border overflow-hidden">
+        {isLoading ? (
+          <div className="p-5"><SkeletonTable rows={6} cols={7} /></div>
+        ) : scales.length === 0 ? (
+          <EmptyState
+            icon={<Layers size={40} />}
+            title="No grade scales yet"
+            description="Define your grading system so results can be computed and assigned grades."
+            actionLabel="Add Grade Scale"
+            onAction={() => navigate('/grade-scales/new')}
+          />
+        ) : (
+          <div className="overflow-x-auto">
+            <table className="w-full">
+              <thead>
+                <tr className="bg-gray-50 border-b border-border">
+                  {['Score Range', 'Grade', 'Points', 'Range Width', 'Remark', 'Status', ''].map(h => (
+                    <th key={h} className="px-5 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider last:text-right">{h}</th>
+                  ))}
                 </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
+              </thead>
+              <tbody className="divide-y divide-border">
+                {scales.map(s => (
+                  <tr key={s.id} className="hover:bg-gray-50 transition-colors">
+
+                    {/* Score range */}
+                    <td className="px-5 py-3.5 text-sm font-bold text-gray-900 tabular-nums whitespace-nowrap">
+                      {s.minScore} – {s.maxScore}
+                    </td>
+
+                    {/* Grade badge */}
+                    <td className="px-5 py-3.5">
+                      <Badge variant={gradeBadgeVariant(s.grade)}>{s.grade}</Badge>
+                    </td>
+
+                    {/* Points */}
+                    <td className="px-5 py-3.5 text-sm font-semibold text-gray-700 tabular-nums">
+                      {(s.points ?? 0).toFixed(1)}
+                    </td>
+
+                    {/* Range bar */}
+                    <td className="px-5 py-3.5 min-w-[140px]">
+                      <div className="flex items-center gap-2">
+                        <div className="flex-1 h-2.5 bg-gray-100 rounded-full overflow-hidden">
+                          <div
+                            className={[
+                              'h-full rounded-full',
+                              s.grade.toUpperCase().startsWith('A') ? 'bg-success-500' :
+                              s.grade.toUpperCase().startsWith('B') ? 'bg-primary-500' :
+                              s.grade.toUpperCase().startsWith('C') ? 'bg-info-500'    :
+                              s.grade.toUpperCase().startsWith('D') ? 'bg-warning-500' :
+                              'bg-danger-500',
+                            ].join(' ')}
+                            style={{ width: `${rangeWidth(s)}%` }}
+                          />
+                        </div>
+                        <span className="text-xs text-gray-400 tabular-nums w-8">{rangeWidth(s)}%</span>
+                      </div>
+                    </td>
+
+                    {/* Remark */}
+                    <td className="px-5 py-3.5 text-sm italic text-gray-600">{s.remark}</td>
+
+                    {/* Status */}
+                    <td className="px-5 py-3.5">
+                      <Badge variant={s.isActive ? 'success' : 'gray'}>
+                        {s.isActive ? 'Active' : 'Inactive'}
+                      </Badge>
+                    </td>
+
+                    {/* Actions */}
+                    <td className="px-5 py-3.5 text-right">
+                      <div className="flex items-center justify-end gap-3">
+                        <button onClick={() => navigate(`/grade-scales/${s.id}/edit`)}
+                          className="text-sm font-medium text-primary-600 hover:text-primary-700">Edit</button>
+                        <button onClick={() => setDeleteTarget(s)}
+                          className="text-sm font-medium text-danger-600 hover:text-danger-700">Delete</button>
+                      </div>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+
         {totalPages > 1 && (
-          <div className="flex items-center justify-between px-6 py-4 border-t border-gray-200">
-            <button onClick={() => setPage(p => Math.max(1, p - 1))} disabled={page === 1} className="btn-secondary disabled:opacity-50">Previous</button>
-            <span className="text-sm text-gray-600">Page {page} of {totalPages}</span>
-            <button onClick={() => setPage(p => Math.min(totalPages, p + 1))} disabled={page === totalPages} className="btn-secondary disabled:opacity-50">Next</button>
+          <div className="flex items-center justify-between px-5 py-3.5 border-t border-border">
+            <Button variant="secondary" size="sm" onClick={() => setPage(p => p - 1)} disabled={page === 1}>Previous</Button>
+            <span className="text-sm text-gray-600">{page} / {totalPages}</span>
+            <Button variant="secondary" size="sm" onClick={() => setPage(p => p + 1)} disabled={page >= totalPages}>Next</Button>
           </div>
         )}
       </div>
+
+      <ConfirmDialog
+        isOpen={!!deleteTarget}
+        onClose={() => setDeleteTarget(null)}
+        onConfirm={confirmDelete}
+        title="Delete grade scale?"
+        message={`Grade "${deleteTarget?.grade}" (${deleteTarget?.minScore}–${deleteTarget?.maxScore}) will be permanently deleted. Results using this scale may be affected.`}
+        confirmLabel="Delete"
+        loading={deleting}
+      />
     </div>
   );
 }

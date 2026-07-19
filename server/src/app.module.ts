@@ -22,6 +22,7 @@ import { BillingModule } from './modules/billing/billing.module';
 import { ParentsModule } from './modules/parents/parents.module';
 import { AnalyticsModule } from './modules/analytics/analytics.module';
 import { NotificationsModule } from './modules/notifications/notifications.module';
+import { AnnouncementsModule } from './modules/announcements/announcements.module';
 import { SuperAdminModule } from './modules/super-admin/super-admin.module';
 import { VerifyModule } from './common/verify/verify.module';
 import { configValidationSchema } from './config/config.validation';
@@ -80,6 +81,7 @@ import { DomainEventsModule } from './common/events/domain-events.module';
     ParentsModule,
     AnalyticsModule,
     NotificationsModule,
+    AnnouncementsModule,
     SuperAdminModule,
     VerifyModule,
   ],

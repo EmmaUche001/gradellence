@@ -199,7 +199,16 @@ export class AuthService {
 
     if (!user) {
       await this.auditLogsService
-        .logAction('unknown', 'LOGIN_FAILED', 'User', dto.email, undefined, undefined, ipAddress, userAgent)
+        .logAction(
+          'unknown',
+          'LOGIN_FAILED',
+          'User',
+          dto.email,
+          undefined,
+          undefined,
+          ipAddress,
+          userAgent,
+        )
         .catch(() => {});
       throw new UnauthorizedException('Invalid credentials');
     }
@@ -208,14 +217,32 @@ export class AuthService {
 
     if (!isPasswordValid) {
       await this.auditLogsService
-        .logAction(user.id, 'LOGIN_FAILED', 'User', dto.email, undefined, undefined, ipAddress, userAgent)
+        .logAction(
+          user.id,
+          'LOGIN_FAILED',
+          'User',
+          dto.email,
+          undefined,
+          undefined,
+          ipAddress,
+          userAgent,
+        )
         .catch(() => {});
       throw new UnauthorizedException('Invalid credentials');
     }
 
     if (!user.isActive) {
       await this.auditLogsService
-        .logAction(user.id, 'LOGIN_FAILED', 'User', dto.email, undefined, undefined, ipAddress, userAgent)
+        .logAction(
+          user.id,
+          'LOGIN_FAILED',
+          'User',
+          dto.email,
+          undefined,
+          undefined,
+          ipAddress,
+          userAgent,
+        )
         .catch(() => {});
       throw new UnauthorizedException('Account is deactivated');
     }
@@ -274,7 +301,16 @@ export class AuthService {
 
     if (!isPasswordValid) {
       await this.auditLogsService
-        .logAction(user.id, 'LOGIN_FAILED', 'User', user.email, undefined, undefined, ipAddress, userAgent)
+        .logAction(
+          user.id,
+          'LOGIN_FAILED',
+          'User',
+          user.email,
+          undefined,
+          undefined,
+          ipAddress,
+          userAgent,
+        )
         .catch(() => {});
       throw new UnauthorizedException('Invalid credentials');
     }
@@ -287,7 +323,16 @@ export class AuthService {
 
     if (!roleNames.includes('SUPER_ADMIN')) {
       await this.auditLogsService
-        .logAction(user.id, 'LOGIN_FAILED', 'User', user.email, undefined, undefined, ipAddress, userAgent)
+        .logAction(
+          user.id,
+          'LOGIN_FAILED',
+          'User',
+          user.email,
+          undefined,
+          undefined,
+          ipAddress,
+          userAgent,
+        )
         .catch(() => {});
       throw new ForbiddenException('Access denied. Super admin credentials required.');
     }
@@ -297,13 +342,7 @@ export class AuthService {
       data: { lastLoginAt: new Date() },
     });
 
-    const tokens = await this.generateTokens(
-      user.id,
-      user.email,
-      user.schoolId,
-      roleNames,
-      [],
-    );
+    const tokens = await this.generateTokens(user.id, user.email, user.schoolId, roleNames, []);
 
     await this.auditLogsService
       .logAction(user.id, 'LOGIN', 'User', user.id, undefined, undefined, ipAddress, userAgent)
@@ -425,6 +464,47 @@ export class AuthService {
     return {
       success: true,
       message: 'Email verified successfully',
+    };
+  }
+
+  async changePassword(userId: string, currentPassword: string, newPassword: string) {
+    const user = await this.prisma.user.findUnique({
+      where: { id: userId },
+      select: { id: true, passwordHash: true, isActive: true },
+    });
+
+    if (!user || !user.isActive) {
+      throw new UnauthorizedException('User not found or inactive');
+    }
+
+    const isCurrentPasswordValid = await bcrypt.compare(currentPassword, user.passwordHash);
+    if (!isCurrentPasswordValid) {
+      throw new UnauthorizedException('Current password is incorrect');
+    }
+
+    if (newPassword.length < 8) {
+      throw new BadRequestException('New password must be at least 8 characters');
+    }
+
+    const newHash = await bcrypt.hash(newPassword, 12);
+
+    // Update password and revoke all existing refresh tokens (force re-login on other devices)
+    await this.prisma.$transaction([
+      this.prisma.user.update({
+        where: { id: userId },
+        data: { passwordHash: newHash },
+      }),
+      this.prisma.refreshToken.updateMany({
+        where: { userId, revokedAt: null },
+        data: { revokedAt: new Date() },
+      }),
+    ]);
+
+    await this.redisService.deleteRefreshToken(userId);
+
+    return {
+      success: true,
+      message: 'Password changed successfully. Please log in again if prompted.',
     };
   }
 

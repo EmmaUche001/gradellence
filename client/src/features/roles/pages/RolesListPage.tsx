@@ -1,153 +1,120 @@
 import { useState, useEffect } from 'react';
-import { Link } from 'react-router-dom';
+import { useNavigate } from 'react-router-dom';
+import { Shield, Plus, AlertCircle } from 'lucide-react';
 import { roleService } from '../../../services/roleService';
 import { Role } from '../../../types/role';
 import { useToastStore } from '../../../store/toastStore';
+import { PageHeader } from '../../../components/ui/PageHeader';
+import { Button } from '../../../components/ui/Button';
+import { Badge } from '../../../components/ui/Badge';
+import { EmptyState } from '../../../components/ui/EmptyState';
+import { SkeletonTable } from '../../../components/ui/SkeletonLoader';
+import { ConfirmDialog } from '../../../components/ui/ConfirmDialog';
 
 export function RolesListPage() {
-  const [roles, setRoles] = useState<Role[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-  const [deleteId, setDeleteId] = useState<string | null>(null);
-  const [deleting, setDeleting] = useState(false);
+  const navigate = useNavigate();
   const { addToast } = useToastStore();
+  const [roles, setRoles]           = useState<Role[]>([]);
+  const [loading, setLoading]       = useState(true);
+  const [error, setError]           = useState<string | null>(null);
+  const [deleteTarget, setDeleteTarget] = useState<Role | null>(null);
+  const [deleting, setDeleting]     = useState(false);
 
   const fetchRoles = async () => {
-    setLoading(true);
-    setError(null);
+    setLoading(true); setError(null);
     try {
       const res = await roleService.getAll();
       setRoles(res.data || []);
-    } catch (err: any) {
-      setError(err.response?.data?.message || 'Failed to load roles');
-    } finally {
-      setLoading(false);
-    }
+    } catch (err: any) { setError(err.response?.data?.message || 'Failed to load roles'); }
+    finally { setLoading(false); }
   };
 
   useEffect(() => { fetchRoles(); }, []);
 
-  const handleDelete = async () => {
-    if (!deleteId) return;
+  const confirmDelete = async () => {
+    if (!deleteTarget) return;
     setDeleting(true);
     try {
-      await roleService.remove(deleteId);
-      addToast('success', 'Role deleted successfully');
-      setDeleteId(null);
-      fetchRoles();
+      await roleService.remove(deleteTarget.id);
+      addToast('success', 'Role deleted');
+      setDeleteTarget(null); fetchRoles();
     } catch (err: any) {
       addToast('error', err.response?.data?.message || 'Failed to delete role');
-    } finally {
-      setDeleting(false);
-    }
+      setDeleteTarget(null);
+    } finally { setDeleting(false); }
   };
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl font-bold text-gray-900">Roles</h1>
-          <p className="mt-1 text-sm text-gray-500">Manage roles and permissions.</p>
-        </div>
-        <Link to="/roles/new" className="btn-primary">
-          Create Role
-        </Link>
-      </div>
+      <PageHeader
+        title="Roles"
+        description="Manage roles and permissions for staff"
+        actions={
+          <Button variant="primary" size="sm" onClick={() => navigate('/roles/new')}>
+            <Plus size={15} /> Create Role
+          </Button>
+        }
+      />
 
       {error && (
-        <div className="rounded-md bg-red-50 p-4 border border-red-200">
-          <p className="text-sm text-red-700">{error}</p>
+        <div className="flex items-start gap-3 px-4 py-3 rounded-xl bg-danger-50 border border-danger-100">
+          <AlertCircle size={16} className="text-danger-600 shrink-0 mt-0.5" />
+          <p className="text-sm text-danger-700">{error}</p>
         </div>
       )}
 
-      <div className="card overflow-hidden">
-        <div className="overflow-x-auto">
-          <table className="table">
+      <div className="bg-surface rounded-card shadow-sm border border-border overflow-hidden">
+        {loading ? (
+          <div className="p-5"><SkeletonTable rows={4} cols={6} /></div>
+        ) : roles.length === 0 ? (
+          <EmptyState
+            icon={<Shield size={40} />}
+            title="No roles yet"
+            description="Create a role to start assigning permissions to staff."
+            actionLabel="Create Role"
+            onAction={() => navigate('/roles/new')}
+          />
+        ) : (
+          <table className="w-full">
             <thead>
-              <tr>
-                <th className="table-header">Name</th>
-                <th className="table-header">Description</th>
-                <th className="table-header">Permissions</th>
-                <th className="table-header">Users</th>
-                <th className="table-header">Type</th>
-                <th className="table-header">Actions</th>
+              <tr className="bg-gray-50 border-b border-border">
+                {['Name', 'Description', 'Permissions', 'Users', 'Type', ''].map(h => (
+                  <th key={h} className="px-5 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider last:text-right">{h}</th>
+                ))}
               </tr>
             </thead>
-            <tbody>
-              {loading ? (
-                <tr>
-                  <td colSpan={6} className="table-cell text-center text-gray-500 py-8">Loading roles...</td>
+            <tbody className="divide-y divide-border">
+              {roles.map(role => (
+                <tr key={role.id} className="hover:bg-gray-50 transition-colors">
+                  <td className="px-5 py-3.5 text-sm font-semibold text-gray-900">{role.name}</td>
+                  <td className="px-5 py-3.5 text-sm text-gray-500 max-w-xs truncate">{role.description || '—'}</td>
+                  <td className="px-5 py-3.5">
+                    <span className="inline-flex items-center justify-center w-7 h-7 rounded-full bg-primary-50 text-primary-700 text-xs font-bold">
+                      {role.permissions.length}
+                    </span>
+                  </td>
+                  <td className="px-5 py-3.5 text-sm text-gray-700 tabular-nums">{role._count?.users ?? 0}</td>
+                  <td className="px-5 py-3.5">
+                    <Badge variant={role.isGlobal ? 'warning' : 'primary'}>{role.isGlobal ? 'Global' : 'School'}</Badge>
+                  </td>
+                  <td className="px-5 py-3.5 text-right">
+                    <div className="flex items-center justify-end gap-3">
+                      <button onClick={() => navigate(`/roles/${role.id}/edit`)} className="text-sm font-medium text-primary-600 hover:text-primary-700">Edit</button>
+                      <button onClick={() => setDeleteTarget(role)} className="text-sm font-medium text-danger-600 hover:text-danger-700">Delete</button>
+                    </div>
+                  </td>
                 </tr>
-              ) : roles.length === 0 ? (
-                <tr>
-                  <td colSpan={6} className="table-cell text-center text-gray-400 py-8">No roles found.</td>
-                </tr>
-              ) : (
-                roles.map((role) => (
-                  <tr key={role.id}>
-                    <td className="table-cell font-medium">{role.name}</td>
-                    <td className="table-cell">{role.description || '—'}</td>
-                    <td className="table-cell">{role.permissions.length}</td>
-                    <td className="table-cell">{role._count?.users ?? 0}</td>
-                    <td className="table-cell">
-                      <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
-                        role.isGlobal ? 'bg-purple-100 text-purple-800' : 'bg-blue-100 text-blue-800'
-                      }`}>
-                        {role.isGlobal ? 'Global' : 'School'}
-                      </span>
-                    </td>
-                    <td className="table-cell">
-                      <div className="flex items-center space-x-2">
-                        <Link
-                          to={`/roles/${role.id}/edit`}
-                          className="text-xs px-2 py-1 rounded bg-primary-100 text-primary-800 hover:bg-primary-200"
-                        >
-                          Edit
-                        </Link>
-                        <button
-                          onClick={() => setDeleteId(role.id)}
-                          className="text-xs px-2 py-1 rounded bg-red-100 text-red-800 hover:bg-red-200"
-                        >
-                          Delete
-                        </button>
-                      </div>
-                    </td>
-                  </tr>
-                ))
-              )}
+              ))}
             </tbody>
           </table>
-        </div>
+        )}
       </div>
 
-      {/* Delete Confirmation Dialog */}
-      {deleteId && (
-        <div className="fixed inset-0 bg-black bg-opacity-30 flex items-center justify-center z-50">
-          <div className="bg-white rounded-lg p-6 max-w-md w-full mx-4">
-            <h3 className="text-lg font-semibold text-gray-900 mb-2">Delete Role</h3>
-            <p className="text-sm text-gray-600 mb-4">
-              Are you sure you want to delete this role? This action cannot be undone.
-            </p>
-            {deleting && <p className="text-sm text-gray-500 mb-4">Deleting...</p>}
-            <div className="flex justify-end space-x-2">
-              <button
-                onClick={() => setDeleteId(null)}
-                disabled={deleting}
-                className="px-4 py-2 text-sm text-gray-700 bg-gray-100 rounded hover:bg-gray-200 disabled:opacity-50"
-              >
-                Cancel
-              </button>
-              <button
-                onClick={handleDelete}
-                disabled={deleting}
-                className="px-4 py-2 text-sm text-white bg-red-600 rounded hover:bg-red-700 disabled:opacity-50"
-              >
-                Delete
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
+      <ConfirmDialog
+        isOpen={!!deleteTarget} onClose={() => setDeleteTarget(null)} onConfirm={confirmDelete}
+        title="Delete role?" loading={deleting}
+        message={`"${deleteTarget?.name}" will be permanently deleted. Users with this role will lose its permissions.`}
+        confirmLabel="Delete" />
     </div>
   );
 }

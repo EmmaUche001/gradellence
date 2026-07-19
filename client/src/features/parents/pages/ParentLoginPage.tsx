@@ -1,90 +1,82 @@
 import React, { useState } from 'react';
-import { useNavigate, Link } from 'react-router-dom';
+import { Link, useNavigate, useLocation } from 'react-router-dom';
+import { Eye, EyeOff, AlertCircle, CheckCircle2 } from 'lucide-react';
 import { parentAuth } from '../services/parentApi';
+import { ParentAuthLayout } from '../components/ParentAuthLayout';
+import { Input } from '../../../components/ui/Input';
+import { Button } from '../../../components/ui/Button';
 
 const ParentLoginPage: React.FC = () => {
   const navigate = useNavigate();
-  const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
-  const [error, setError] = useState('');
+  const location = useLocation();
+  const successMsg = (location.state as any)?.message as string | undefined;
+
+  const [email, setEmail]     = useState('');
+  const [password, setPass]   = useState('');
+  const [showPwd, setShowPwd] = useState(false);
+  const [error, setError]     = useState('');
   const [loading, setLoading] = useState(false);
 
   const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setError('');
-    setLoading(true);
-
+    e.preventDefault(); setError(''); setLoading(true);
     try {
       const result = await parentAuth.login({ email, password });
       localStorage.setItem('parent_token', result.accessToken);
       navigate('/parent/dashboard');
     } catch (err: any) {
-      setError(err?.response?.data?.message || 'Login failed');
-    } finally {
-      setLoading(false);
-    }
+      setError(err?.response?.data?.message || 'Invalid email or password.');
+    } finally { setLoading(false); }
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gray-50">
-      <div className="max-w-md w-full space-y-8 p-8 bg-white rounded-lg shadow-md">
-        <div className="text-center">
-          <h2 className="text-3xl font-bold text-gray-900">Parent Portal</h2>
-          <p className="mt-2 text-gray-600">Sign in to monitor your child's performance</p>
-        </div>
-
-        <form onSubmit={handleSubmit} className="mt-8 space-y-6">
-          {error && (
-            <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded">
-              {error}
-            </div>
-          )}
-
-          <div>
-            <label htmlFor="email" className="block text-sm font-medium text-gray-700">
-              Email
-            </label>
-            <input
-              id="email"
-              type="email"
-              required
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500"
-            />
-          </div>
-
-          <div>
-            <label htmlFor="password" className="block text-sm font-medium text-gray-700">
-              Password
-            </label>
-            <input
-              id="password"
-              type="password"
-              required
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500"
-            />
-          </div>
-
-          <button
-            type="submit"
-            disabled={loading}
-            className="w-full flex justify-center py-2 px-4 border border-transparent rounded-md shadow-sm text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 disabled:opacity-50"
-          >
-            {loading ? 'Signing in...' : 'Sign In'}
-          </button>
-
-          <p className="text-center text-sm text-gray-600">
-            Don't have an account?{' '}
-            <Link to="/parent/register" className="text-blue-600 hover:text-blue-500">
-              Register here
-            </Link>
-          </p>
-        </form>
+    <ParentAuthLayout>
+      <div className="mb-8">
+        <h1 className="text-2xl font-bold text-gray-900">Parent Portal</h1>
+        <p className="mt-1.5 text-sm text-gray-500">Sign in to monitor your child's performance</p>
       </div>
-    </div>
+
+      {successMsg && (
+        <div className="flex items-start gap-3 px-4 py-3 mb-5 rounded-xl bg-success-50 border border-success-100">
+          <CheckCircle2 size={16} className="text-success-600 shrink-0 mt-0.5" />
+          <p className="text-sm text-success-700">{successMsg}</p>
+        </div>
+      )}
+
+      {error && (
+        <div className="flex items-start gap-3 px-4 py-3 mb-5 rounded-xl bg-danger-50 border border-danger-100">
+          <AlertCircle size={16} className="text-danger-600 shrink-0 mt-0.5" />
+          <p className="text-sm text-danger-700">{error}</p>
+        </div>
+      )}
+
+      <form onSubmit={handleSubmit} className="space-y-4" noValidate>
+        <Input id="email" type="email" label="Email address" placeholder="you@example.com"
+          value={email} onChange={e => setEmail(e.target.value)} autoComplete="email" required />
+
+        <Input id="password" type={showPwd ? 'text' : 'password'} label="Password"
+          placeholder="••••••••" value={password} onChange={e => setPass(e.target.value)}
+          autoComplete="current-password" required
+          endIcon={
+            <button type="button" onClick={() => setShowPwd(v => !v)}
+              className="text-gray-400 hover:text-gray-600 transition-colors pointer-events-auto"
+              aria-label={showPwd ? 'Hide password' : 'Show password'}>
+              {showPwd ? <EyeOff size={16} /> : <Eye size={16} />}
+            </button>
+          } />
+
+        <Button type="submit" variant="primary" fullWidth loading={loading}
+          className="!bg-success-600 hover:!bg-success-700 focus:ring-success-500">
+          Sign in
+        </Button>
+      </form>
+
+      <p className="mt-6 text-center text-sm text-gray-500">
+        Don't have an account?{' '}
+        <Link to="/parent/register" className="font-semibold text-success-600 hover:text-success-700">
+          Register here
+        </Link>
+      </p>
+    </ParentAuthLayout>
   );
 };
 

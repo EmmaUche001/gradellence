@@ -92,9 +92,9 @@ describe('ClassesService', () => {
       // a cross-tenant id won't match.
       prisma.class.findFirst.mockResolvedValue(null);
 
-      await expect(
-        service.findOne('class-from-school-b', currentUser),
-      ).rejects.toThrow(NotFoundException);
+      await expect(service.findOne('class-from-school-b', currentUser)).rejects.toThrow(
+        NotFoundException,
+      );
     });
 
     it('returns the class when it belongs to the same school', async () => {
@@ -117,9 +117,7 @@ describe('ClassesService', () => {
       // Simulate enrollments present
       prisma.enrollment.count.mockResolvedValue(3);
 
-      await expect(service.remove('class-a', currentUser)).rejects.toThrow(
-        BadRequestException,
-      );
+      await expect(service.remove('class-a', currentUser)).rejects.toThrow(BadRequestException);
 
       // Soft-delete should NOT have been called
       expect(prisma.class.update).not.toHaveBeenCalled();
@@ -128,9 +126,9 @@ describe('ClassesService', () => {
     it('throws NotFoundException when the class belongs to a different school', async () => {
       prisma.class.findFirst.mockResolvedValue(null);
 
-      await expect(
-        service.remove('class-from-school-b', currentUser),
-      ).rejects.toThrow(NotFoundException);
+      await expect(service.remove('class-from-school-b', currentUser)).rejects.toThrow(
+        NotFoundException,
+      );
     });
 
     it('soft-deletes the class when there are no enrollments', async () => {

@@ -15,6 +15,34 @@ export interface School {
   _count?: { users: number; students: number; teachers: number };
 }
 
+export interface SchoolSubscription {
+  id: string;
+  status: 'ACTIVE' | 'EXPIRED' | 'CANCELLED' | 'PENDING' | 'TRIAL';
+  startDate: string;
+  endDate: string;
+  autoRenew: boolean;
+  trialEndsAt?: string;
+  cancelledAt?: string;
+  plan: {
+    id: string;
+    name: string;
+    priceNGN: number;
+    duration: number;
+    maxStudents: number;
+    maxUsers: number;
+    maxBranches: number;
+    storageGB: number;
+  };
+}
+
+export interface SchoolDetails extends School {
+  subscriptions?: SchoolSubscription[];
+  users: any[];
+  students: any[];
+  teachers: any[];
+}
+
+// Keep legacy alias used in other places
 export interface Subscription {
   id: string;
   schoolId: string;
@@ -26,13 +54,6 @@ export interface Subscription {
   autoRenew: boolean;
   trialEndsAt?: string;
   cancelledAt?: string;
-}
-
-export interface SchoolDetails extends School {
-  subscription?: Subscription;
-  users: any[];
-  students: any[];
-  teachers: any[];
 }
 
 export interface Plan {

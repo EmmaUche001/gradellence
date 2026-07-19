@@ -55,12 +55,13 @@ export class BulkStudentsService extends BaseImportService {
     const parentEmails = Array.from(
       new Set(data.map((r) => r.parentEmail?.trim()).filter((x): x is string => !!x)),
     );
-    const parents = parentEmails.length > 0
-      ? await this.prisma.parent.findMany({
-          where: { schoolId, email: { in: parentEmails } },
-          select: { id: true, email: true },
-        })
-      : [];
+    const parents =
+      parentEmails.length > 0
+        ? await this.prisma.parent.findMany({
+            where: { schoolId, email: { in: parentEmails } },
+            select: { id: true, email: true },
+          })
+        : [];
     const parentMap = new Map(parents.map((p) => [p.email, p.id]));
 
     // Max 50 writes per transaction to avoid timeouts

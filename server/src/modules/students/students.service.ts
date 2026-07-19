@@ -246,13 +246,16 @@ export class StudentsService {
     };
   }
 
-  async promoteStudents(dto: {
-    fromClassId: string;
-    toClassId: string;
-    termId: string;
-    nextTermId: string;
-    studentIds?: string[];
-  }, currentUser: AuthenticatedUser) {
+  async promoteStudents(
+    dto: {
+      fromClassId: string;
+      toClassId: string;
+      termId: string;
+      nextTermId: string;
+      studentIds?: string[];
+    },
+    currentUser: AuthenticatedUser,
+  ) {
     const { fromClassId, toClassId, termId, nextTermId, studentIds } = dto;
 
     const fromClass = await this.prisma.class.findFirst({

@@ -20,7 +20,14 @@ async function registerSchool(
 ) {
   const res = await request(app.getHttpServer())
     .post('/api/v1/auth/register')
-    .send({ schoolName, schoolAlias: alias, email, password: PW, firstName: 'Admin', lastName: 'User' })
+    .send({
+      schoolName,
+      schoolAlias: alias,
+      email,
+      password: PW,
+      firstName: 'Admin',
+      lastName: 'User',
+    })
     .expect(201);
   return res.body.data;
 }
@@ -78,8 +85,18 @@ describe('SRMS Endpoint Coverage & Security (e2e)', () => {
     await app.init();
     prisma = app.get(PrismaService);
 
-    const a = await registerSchool(app, 'School A', 'school-a-' + Date.now(), `admin-a-${Date.now()}@test.com`);
-    const b = await registerSchool(app, 'School B', 'school-b-' + Date.now(), `admin-b-${Date.now()}@test.com`);
+    const a = await registerSchool(
+      app,
+      'School A',
+      'school-a-' + Date.now(),
+      `admin-a-${Date.now()}@test.com`,
+    );
+    const b = await registerSchool(
+      app,
+      'School B',
+      'school-b-' + Date.now(),
+      `admin-b-${Date.now()}@test.com`,
+    );
     tokenA = a.accessToken;
     tokenB = b.accessToken;
     schoolAId = a.user.schoolId;
@@ -89,10 +106,14 @@ describe('SRMS Endpoint Coverage & Security (e2e)', () => {
   afterAll(async () => {
     try {
       await prisma.auditLog.deleteMany({ where: { actorId: { in: [schoolAId, schoolBId] } } });
-      await prisma.documentVerification.deleteMany({ where: { schoolId: { in: [schoolAId, schoolBId] } } });
+      await prisma.documentVerification.deleteMany({
+        where: { schoolId: { in: [schoolAId, schoolBId] } },
+      });
       await prisma.assessment.deleteMany({ where: { schoolId: { in: [schoolAId, schoolBId] } } });
       await prisma.result.deleteMany({ where: { schoolId: { in: [schoolAId, schoolBId] } } });
-      await prisma.enrollment.deleteMany({ where: { student: { schoolId: { in: [schoolAId, schoolBId] } } } });
+      await prisma.enrollment.deleteMany({
+        where: { student: { schoolId: { in: [schoolAId, schoolBId] } } },
+      });
       await prisma.student.deleteMany({ where: { schoolId: { in: [schoolAId, schoolBId] } } });
       await prisma.class.deleteMany({ where: { schoolId: { in: [schoolAId, schoolBId] } } });
       await prisma.subject.deleteMany({ where: { schoolId: { in: [schoolAId, schoolBId] } } });
@@ -128,7 +149,9 @@ describe('SRMS Endpoint Coverage & Security (e2e)', () => {
         .expect(201);
     });
     it('POST /api/v1/auth/login → 401 bad creds', async () => {
-      await post('/api/v1/auth/login', undefined, { email: 'nope@x.com', password: 'bad' }).expect(401);
+      await post('/api/v1/auth/login', undefined, { email: 'nope@x.com', password: 'bad' }).expect(
+        401,
+      );
     });
     it('POST /api/v1/auth/logout → 401 without token', async () => {
       await post('/api/v1/auth/logout').expect(401);
@@ -137,7 +160,10 @@ describe('SRMS Endpoint Coverage & Security (e2e)', () => {
       await post('/api/v1/auth/forgot-password', undefined, { email: 'x@y.com' }).expect(200);
     });
     it('POST /api/v1/auth/reset-password → 400 bad token', async () => {
-      await post('/api/v1/auth/reset-password', undefined, { token: 'bad', newPassword: PW }).expect(400);
+      await post('/api/v1/auth/reset-password', undefined, {
+        token: 'bad',
+        newPassword: PW,
+      }).expect(400);
     });
     it('POST /api/v1/auth/verify-email → 400 bad token', async () => {
       await post('/api/v1/auth/verify-email', undefined, { token: 'bad' }).expect(400);

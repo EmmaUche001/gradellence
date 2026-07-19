@@ -1,7 +1,13 @@
 import { Injectable, Logger } from '@nestjs/common';
 import PDFDocument from 'pdfkit';
 import { PrismaService } from '../../database/prisma.service';
-import { resolveGrade, assignPositions, GradeScaleEntry } from '../../modules/results/grading.util';
+import {
+  resolveGrade,
+  assignPositions,
+  GradeScaleEntry,
+  calculateGPA,
+  calculateCumulativeGPA,
+} from '../../modules/results/grading.util';
 import { VerifyService } from '../verify/verify.service';
 
 @Injectable()
@@ -17,8 +23,15 @@ export class PdfService {
     return this.prisma.gradeScale.findMany({
       where: { schoolId, isActive: true },
       orderBy: { minScore: 'desc' },
-      select: { grade: true, minScore: true, maxScore: true, remark: true },
-    });
+      select: {
+        grade: true,
+        minScore: true,
+        maxScore: true,
+        remark: true,
+        points: true,
+        isPass: true,
+      },
+    }) as unknown as GradeScaleEntry[];
   }
 
   private addWatermark(doc: any) {
@@ -80,7 +93,11 @@ export class PdfService {
     }
   }
 
-  private async addSchoolBranding(doc: any, school: { name: string; logo?: string | null; signatureUrl?: string | null }, y?: number) {
+  private async addSchoolBranding(
+    doc: any,
+    school: { name: string; logo?: string | null; signatureUrl?: string | null },
+    y?: number,
+  ) {
     const startY = y || 50;
 
     if (school.logo) {
@@ -154,7 +171,16 @@ export class PdfService {
         school: true,
         results: {
           where: { termId },
-          include: { subject: true, term: true },
+          select: {
+            id: true,
+            totalScore: true,
+            grade: true,
+            remark: true,
+            points: true,
+            isPass: true,
+            subject: true,
+            term: true,
+          },
         },
         enrollments: {
           where: { termId },
@@ -215,14 +241,16 @@ export class PdfService {
         doc.font('Helvetica').fontSize(9);
         let totalScore = 0;
         let subjectCount = 0;
+        const resultsForGPA: { points: number | null }[] = [];
 
         for (const result of student.results) {
-          const { grade, remark } =
+          const { grade, remark, points } =
             result.grade !== null
-              ? { grade: result.grade, remark: result.remark }
+              ? { grade: result.grade, remark: result.remark, points: result.points }
               : resolveGrade(result.totalScore, gradeScales);
           totalScore += result.totalScore;
           subjectCount++;
+          resultsForGPA.push({ points });
 
           doc.text(result.subject.name, 50, doc.y, { width: 200 });
           doc.text(result.totalScore.toFixed(1), 250, doc.y - 11, { width: 80, align: 'center' });
@@ -236,10 +264,12 @@ export class PdfService {
         doc.moveDown(0.5);
         doc.font('Helvetica-Bold').fontSize(10);
         const average = subjectCount > 0 ? totalScore / subjectCount : 0;
+        const gpa = calculateGPA(resultsForGPA);
         const overallGrade = resolveGrade(average, gradeScales).grade;
         doc.text(`Total Subjects: ${subjectCount}`);
         doc.text(`Average Score: ${average.toFixed(1)}`);
         doc.text(`Overall Grade: ${overallGrade ?? '-'}`);
+        doc.text(`Term GPA: ${gpa.toFixed(2)}`);
 
         doc.moveDown(2);
         doc.font('Helvetica').fontSize(8).fillColor('gray');
@@ -247,12 +277,12 @@ export class PdfService {
         doc.fontSize(8).fillColor('gray');
         doc.text('School Stamp / Signature', { align: 'center' });
 
-    const schoolSignature = (student.school as any).signatureUrl;
-    if (schoolSignature) {
-      this.addSignatureImage(doc, schoolSignature, doc.y + 10);
-    }
+        const schoolSignature = (student.school as any).signatureUrl;
+        if (schoolSignature) {
+          this.addSignatureImage(doc, schoolSignature, doc.y + 10);
+        }
 
-    this.addFooterWithQR(doc, qrDataUrl, 0).then(() => {
+        this.addFooterWithQR(doc, qrDataUrl, 0).then(() => {
           doc.end();
         });
       });
@@ -361,7 +391,10 @@ export class PdfService {
         x += 35;
         doc.text('Grade', x, startY, { width: 35, align: 'center' });
 
-        doc.moveTo(30, doc.y + 5).lineTo(820, doc.y).stroke();
+        doc
+          .moveTo(30, doc.y + 5)
+          .lineTo(820, doc.y)
+          .stroke();
         doc.moveDown();
 
         doc.font('Helvetica').fontSize(7);
@@ -409,7 +442,13 @@ export class PdfService {
       include: {
         school: true,
         results: {
-          include: {
+          select: {
+            id: true,
+            totalScore: true,
+            grade: true,
+            remark: true,
+            points: true,
+            isPass: true,
             subject: true,
             term: { include: { session: true } },
           },
@@ -428,7 +467,7 @@ export class PdfService {
 
     const termsMap = new Map<string, { term: any; session: any; results: any[] }>();
     for (const result of student.results) {
-      const termKey = `${result.term.sessionId}-${result.termId}`;
+      const termKey = `${result.term.sessionId}-${result.term.id}`;
       if (!termsMap.has(termKey)) {
         termsMap.set(termKey, {
           term: result.term,
@@ -465,7 +504,10 @@ export class PdfService {
       this.addWatermark(doc);
 
       this.addSchoolBranding(doc, student.school, 50).then(() => {
-        doc.fontSize(16).font('Helvetica-Bold').text('OFFICIAL ACADEMIC TRANSCRIPT', { align: 'center' });
+        doc
+          .fontSize(16)
+          .font('Helvetica-Bold')
+          .text('OFFICIAL ACADEMIC TRANSCRIPT', { align: 'center' });
         doc.moveDown();
 
         doc.fontSize(12).font('Helvetica');
@@ -550,6 +592,178 @@ export class PdfService {
         }
 
         doc.text('Transcript is valid only with the institution seal and signature.', {
+          align: 'center',
+        });
+
+        this.addFooterWithQR(doc, qrDataUrl, 0).then(() => {
+          doc.end();
+        });
+      });
+    });
+  }
+
+  async generateAcademicSummary(studentId: string, schoolId: string): Promise<Buffer> {
+    const student = await this.prisma.student.findFirst({
+      where: { id: studentId, schoolId },
+      include: {
+        school: true,
+        results: {
+          select: {
+            id: true,
+            totalScore: true,
+            grade: true,
+            remark: true,
+            points: true,
+            isPass: true,
+            subject: true,
+            term: { include: { session: true } },
+          },
+          orderBy: [{ term: { session: { name: 'asc' } } }, { term: { name: 'asc' } }],
+        },
+      },
+    });
+
+    if (!student) {
+      throw new Error('Student not found');
+    }
+
+    const termsMap = new Map<string, { term: any; session: any; results: any[] }>();
+    const termsArray: { results: { points: number | null }[] }[] = [];
+    for (const result of student.results) {
+      const termKey = `${result.term.sessionId}-${result.term.id}`;
+      if (!termsMap.has(termKey)) {
+        termsMap.set(termKey, {
+          term: result.term,
+          session: result.term.session,
+          results: [],
+        });
+      }
+      termsMap.get(termKey)!.results.push(result);
+    }
+
+    // Prepare termsArray for calculateCumulativeGPA
+    for (const [, termData] of termsMap) {
+      termsArray.push({ results: termData.results });
+    }
+
+    const gradeScales = await this.getActiveGradeScales(schoolId);
+    const studentName = `${student.firstName} ${student.lastName}`;
+    const { qrDataUrl } = await this.verifyService.createVerification({
+      documentType: 'academic-summary',
+      entityId: studentId,
+      schoolId,
+      studentId,
+      studentName,
+    });
+
+    // Calculate overall stats
+    let totalScore = 0;
+    let totalSubjects = 0;
+    let passedSubjects = 0;
+
+    for (const [, termData] of termsMap) {
+      for (const result of termData.results) {
+        totalScore += result.totalScore;
+        totalSubjects++;
+        // Use result.isPass or resolve to get isPass
+        const isPass =
+          result.isPass !== undefined
+            ? result.isPass
+            : resolveGrade(result.totalScore, gradeScales).isPass;
+        if (isPass) {
+          passedSubjects++;
+        }
+      }
+    }
+
+    const overallAverage = totalSubjects > 0 ? totalScore / totalSubjects : 0;
+    const overallGrade = resolveGrade(overallAverage, gradeScales).grade;
+    const cumulativeGPA = calculateCumulativeGPA(termsArray);
+
+    return new Promise((resolve, reject) => {
+      const doc = new PDFDocument({ size: 'A4', margin: 50 });
+      const chunks: Buffer[] = [];
+
+      doc.on('data', (chunk: Buffer) => chunks.push(chunk));
+      doc.on('end', () => resolve(Buffer.concat(chunks)));
+      doc.on('error', reject);
+
+      this.addWatermark(doc);
+
+      this.addSchoolBranding(doc, student.school, 50).then(() => {
+        doc.fontSize(16).font('Helvetica-Bold').text('ACADEMIC SUMMARY', { align: 'center' });
+        doc.moveDown();
+
+        doc.fontSize(12).font('Helvetica');
+        doc.text(`Student: ${studentName}`);
+        doc.text(`Admission No: ${student.admissionNumber}`);
+        doc.text(`Date of Birth: ${student.dateOfBirth?.toLocaleDateString() || 'N/A'}`);
+        doc.moveDown();
+
+        doc.font('Helvetica-Bold').fontSize(14).text('Overall Performance', { underline: true });
+        doc.moveDown(0.5);
+        doc.fontSize(12).font('Helvetica');
+        doc.text(`Total Subjects: ${totalSubjects}`);
+        doc.text(`Overall Average Score: ${overallAverage.toFixed(2)}`);
+        doc.text(`Overall Grade: ${overallGrade || 'N/A'}`);
+        doc.text(`Passed Subjects: ${passedSubjects} / ${totalSubjects}`);
+        doc.text(
+          `Pass Rate: ${totalSubjects > 0 ? ((passedSubjects / totalSubjects) * 100).toFixed(1) : 0}%`,
+        );
+        doc.text(`Cumulative GPA: ${cumulativeGPA.toFixed(2)}`);
+        doc.moveDown(1);
+
+        doc.font('Helvetica-Bold').fontSize(14).text('Term-wise Performance', { underline: true });
+        doc.moveDown(0.5);
+
+        for (const [, termData] of termsMap) {
+          const { term, session, results } = termData;
+          doc.font('Helvetica-Bold').fontSize(11).text(`${session.name} - ${term.name}`);
+          doc.moveDown(0.3);
+
+          // Calculate term stats
+          let termTotalScore = 0;
+          let termTotalSubjects = 0;
+          let termPassed = 0;
+
+          for (const result of results) {
+            termTotalScore += result.totalScore;
+            termTotalSubjects++;
+            const isPass =
+              result.isPass !== undefined
+                ? result.isPass
+                : resolveGrade(result.totalScore, gradeScales).isPass;
+            if (isPass) {
+              termPassed++;
+            }
+          }
+
+          const termAverage = termTotalSubjects > 0 ? termTotalScore / termTotalSubjects : 0;
+          const termGrade = resolveGrade(termAverage, gradeScales).grade;
+          const termGPA = calculateGPA(results);
+
+          doc.font('Helvetica').fontSize(10);
+          doc.text(`  Subjects: ${termTotalSubjects}`);
+          doc.text(`  Average Score: ${termAverage.toFixed(2)}`);
+          doc.text(`  Grade: ${termGrade || 'N/A'}`);
+          doc.text(`  Term GPA: ${termGPA.toFixed(2)}`);
+          doc.text(
+            `  Pass Rate: ${termTotalSubjects > 0 ? ((termPassed / termTotalSubjects) * 100).toFixed(1) : 0}%`,
+          );
+          doc.moveDown(0.8);
+        }
+
+        doc.moveDown(2);
+        doc.font('Helvetica').fontSize(8).fillColor('gray');
+        doc.text('________________________________', { align: 'center' });
+        doc.text('School Stamp / Signature', { align: 'center' });
+
+        const summarySignature = (student.school as any).signatureUrl;
+        if (summarySignature) {
+          this.addSignatureImage(doc, summarySignature, doc.y + 10);
+        }
+
+        doc.text('Academic Summary is valid only with the institution seal and signature.', {
           align: 'center',
         });
 

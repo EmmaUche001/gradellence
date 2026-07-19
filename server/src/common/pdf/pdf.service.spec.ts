@@ -37,7 +37,9 @@ describe('PdfService — grade source', () => {
       documentVerification: { upsert: jest.fn(), findUnique: jest.fn(), update: jest.fn() },
     };
     verifyService = {
-      createVerification: jest.fn().mockResolvedValue({ hash: 'test-hash', qrDataUrl: 'data:image/png;base64,test' }),
+      createVerification: jest
+        .fn()
+        .mockResolvedValue({ hash: 'test-hash', qrDataUrl: 'data:image/png;base64,test' }),
       verifyDocument: jest.fn(),
       generateHash: jest.fn().mockReturnValue('test-hash'),
     };
@@ -45,7 +47,7 @@ describe('PdfService — grade source', () => {
   });
 
   describe('generateReportCard', () => {
-    it('queries the school\'s own active GradeScale, not a hardcoded one', async () => {
+    it("queries the school's own active GradeScale, not a hardcoded one", async () => {
       prisma.student.findFirst.mockResolvedValue({
         id: 'student-1',
         firstName: 'Jane',
@@ -113,7 +115,12 @@ describe('PdfService — grade source', () => {
             grade: 'A',
             subject: { name: 'Math' },
             termId: 'term-1',
-            term: { id: 'term-1', name: 'Term 1', sessionId: 'session-1', session: { id: 'session-1', name: '2025/2026' } },
+            term: {
+              id: 'term-1',
+              name: 'Term 1',
+              sessionId: 'session-1',
+              session: { id: 'session-1', name: '2025/2026' },
+            },
           },
         ],
       });

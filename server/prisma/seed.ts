@@ -132,7 +132,7 @@ async function main() {
   await seedPermissions(prisma);
 
   // ── Create SUPER ADMIN user ──────────────────────
-  const superAdminEmail = 'irismonde.black@gmail.com';
+  const superAdminEmail = process.env.SUPER_ADMIN_EMAIL ?? 'admin@gradellence.com';
   let superAdmin = await prisma.user.findUnique({
     where: { email: superAdminEmail },
   });
@@ -145,14 +145,18 @@ async function main() {
       return;
     }
 
-    const passwordHash = await bcrypt.hash('Laptop-me-llence', 12);
+    if (!process.env.SUPER_ADMIN_PASSWORD) {
+      console.warn('⚠ Using default SUPER_ADMIN_PASSWORD — CHANGE THIS IMMEDIATELY in production');
+    }
+
+    const passwordHash = await bcrypt.hash(process.env.SUPER_ADMIN_PASSWORD ?? 'Admin@Gradellence2026!', 12);
 
     superAdmin = await prisma.user.create({
       data: {
         email: superAdminEmail,
         passwordHash,
-        firstName: 'Iris',
-        lastName: 'Monde',
+        firstName: 'Super',
+        lastName: 'Admin',
         schoolId: firstSchool.id,
         isActive: true,
         emailVerified: true,

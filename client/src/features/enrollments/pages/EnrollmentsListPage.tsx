@@ -1,106 +1,145 @@
 import { useState, useEffect, useCallback } from 'react';
-import { Link } from 'react-router-dom';
+import { useNavigate } from 'react-router-dom';
+import { Users, Plus, AlertCircle } from 'lucide-react';
 import { enrollmentService } from '../../../services/enrollmentService';
 import { Enrollment } from '../../../types/enrollment';
+import { PageHeader } from '../../../components/ui/PageHeader';
+import { Button } from '../../../components/ui/Button';
+import { Badge } from '../../../components/ui/Badge';
+import { EmptyState } from '../../../components/ui/EmptyState';
+import { SkeletonTable } from '../../../components/ui/SkeletonLoader';
+import { ConfirmDialog } from '../../../components/ui/ConfirmDialog';
 
 export function EnrollmentsListPage() {
+  const navigate = useNavigate();
   const [enrollments, setEnrollments] = useState<Enrollment[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-  const [page, setPage] = useState(1);
-  const [totalPages, setTotalPages] = useState(1);
+  const [isLoading, setIsLoading]     = useState(true);
+  const [error, setError]             = useState<string | null>(null);
+  const [page, setPage]               = useState(1);
+  const [totalPages, setTotalPages]   = useState(1);
+  const [total, setTotal]             = useState(0);
+  const [deleteTarget, setDeleteTarget] = useState<Enrollment | null>(null);
+  const [deleting, setDeleting]       = useState(false);
 
   const fetchEnrollments = useCallback(async () => {
-    setIsLoading(true);
-    setError(null);
+    setIsLoading(true); setError(null);
     try {
-      const response = await enrollmentService.getAll(page, 20);
-      setEnrollments(response.data);
-      if (response.meta) setTotalPages(response.meta.totalPages);
-    } catch (err: any) {
-      setError(err.response?.data?.message || 'Failed to load enrollments');
-    } finally {
-      setIsLoading(false);
-    }
+      const res = await enrollmentService.getAll(page, 20);
+      setEnrollments(res.data);
+      if (res.meta) { setTotalPages(res.meta.totalPages); setTotal(res.meta.total ?? res.data.length); }
+    } catch (err: any) { setError(err.response?.data?.message || 'Failed to load enrollments'); }
+    finally { setIsLoading(false); }
   }, [page]);
 
   useEffect(() => { fetchEnrollments(); }, [fetchEnrollments]);
 
-  const handleDelete = async (id: string, label: string) => {
-    if (!window.confirm(`Remove enrollment for "${label}"?`)) return;
+  const confirmDelete = async () => {
+    if (!deleteTarget) return;
+    setDeleting(true);
     try {
-      await enrollmentService.remove(id);
-      fetchEnrollments();
+      await enrollmentService.remove(deleteTarget.id);
+      setDeleteTarget(null); fetchEnrollments();
     } catch (err: any) {
       setError(err.response?.data?.message || 'Failed to remove enrollment');
-    }
+      setDeleteTarget(null);
+    } finally { setDeleting(false); }
   };
+
+  const start = (page - 1) * 20 + 1;
+  const end   = Math.min(page * 20, total);
+  const targetName = deleteTarget?.student
+    ? `${deleteTarget.student.firstName} ${deleteTarget.student.lastName}`
+    : 'this student';
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl font-bold text-gray-900">Enrollments</h1>
-          <p className="mt-1 text-sm text-gray-500">Manage student class enrollments</p>
-        </div>
-        <div className="flex space-x-2">
-          <Link to="/enrollments/bulk" className="btn-secondary">Bulk Enroll</Link>
-          <Link to="/enrollments/new" className="btn-primary">+ New Enrollment</Link>
-        </div>
-      </div>
+      <PageHeader
+        title="Enrollments"
+        description="Manage student class enrollments"
+        actions={
+          <>
+            <Button variant="ghost" size="sm" onClick={() => navigate('/enrollments/bulk')}>
+              <Users size={15} /> Bulk Enroll
+            </Button>
+            <Button variant="primary" size="sm" onClick={() => navigate('/enrollments/new')}>
+              <Plus size={15} /> New Enrollment
+            </Button>
+          </>
+        }
+      />
 
-      {error && <div className="rounded-md bg-red-50 p-4"><p className="text-sm text-red-700">{error}</p></div>}
+      {error && (
+        <div className="flex items-start gap-3 px-4 py-3 rounded-xl bg-danger-50 border border-danger-100">
+          <AlertCircle size={16} className="text-danger-600 shrink-0 mt-0.5" />
+          <p className="text-sm text-danger-700">{error}</p>
+        </div>
+      )}
 
-      <div className="card">
-        <div className="overflow-x-auto">
-          <table className="min-w-full divide-y divide-gray-200">
-            <thead className="bg-gray-50">
-              <tr>
-                <th className="table-header">Student</th>
-                <th className="table-header">Admission No.</th>
-                <th className="table-header">Class</th>
-                <th className="table-header">Term</th>
-                <th className="table-header">Enrolled On</th>
-                <th className="table-header">Status</th>
-                <th className="table-header text-right">Actions</th>
-              </tr>
-            </thead>
-            <tbody className="bg-white divide-y divide-gray-200">
-              {isLoading ? (
-                <tr><td colSpan={7} className="px-6 py-12 text-center text-gray-500">Loading enrollments...</td></tr>
-              ) : enrollments.length === 0 ? (
-                <tr><td colSpan={7} className="px-6 py-12 text-center text-gray-500">No enrollments found.</td></tr>
-              ) : enrollments.map((e) => {
-                const label = e.student ? `${e.student.firstName} ${e.student.lastName}` : 'Student';
-                return (
-                  <tr key={e.id} className="hover:bg-gray-50">
-                    <td className="table-cell font-medium text-gray-900">{label}</td>
-                    <td className="table-cell">{e.student?.admissionNumber || '—'}</td>
-                    <td className="table-cell">{e.class ? `${e.class.name} (Level ${e.class.level})` : '—'}</td>
-                    <td className="table-cell">{e.term?.name || '—'}</td>
-                    <td className="table-cell">{new Date(e.enrollmentDate).toLocaleDateString()}</td>
-                    <td className="table-cell">
-                      <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${e.isActive ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'}`}>
-                        {e.isActive ? 'Active' : 'Inactive'}
-                      </span>
+      <div className="bg-surface rounded-card shadow-sm border border-border overflow-hidden">
+        {isLoading ? (
+          <div className="p-5"><SkeletonTable rows={6} cols={7} /></div>
+        ) : enrollments.length === 0 ? (
+          <EmptyState
+            icon={<Users size={40} />}
+            title="No enrollments yet"
+            description="Enrol students in a class to track their academic progress."
+            actionLabel="New Enrollment"
+            onAction={() => navigate('/enrollments/new')}
+          />
+        ) : (
+          <div className="overflow-x-auto">
+            <table className="w-full">
+              <thead>
+                <tr className="bg-gray-50 border-b border-border">
+                  {['Student', 'Admission No.', 'Class', 'Term', 'Enrolled On', 'Status', ''].map(h => (
+                    <th key={h} className="px-5 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider last:text-right">{h}</th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-border">
+                {enrollments.map(e => (
+                  <tr key={e.id} className="hover:bg-gray-50 transition-colors">
+                    <td className="px-5 py-3.5 text-sm font-semibold text-gray-900">
+                      {e.student ? `${e.student.firstName} ${e.student.lastName}` : '—'}
                     </td>
-                    <td className="table-cell text-right">
-                      <button onClick={() => handleDelete(e.id, label)} className="text-sm text-red-600 hover:text-red-800">Remove</button>
+                    <td className="px-5 py-3.5 text-sm text-gray-500">{e.student?.admissionNumber || '—'}</td>
+                    <td className="px-5 py-3.5 text-sm text-gray-700">
+                      {e.class ? `${e.class.name} (Level ${e.class.level})` : '—'}
+                    </td>
+                    <td className="px-5 py-3.5 text-sm text-gray-600">{e.term?.name || '—'}</td>
+                    <td className="px-5 py-3.5 text-sm text-gray-500">
+                      {new Date(e.enrollmentDate).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' })}
+                    </td>
+                    <td className="px-5 py-3.5">
+                      <Badge variant={e.isActive ? 'success' : 'danger'}>{e.isActive ? 'Active' : 'Inactive'}</Badge>
+                    </td>
+                    <td className="px-5 py-3.5 text-right">
+                      <button onClick={() => setDeleteTarget(e)} className="text-sm font-medium text-danger-600 hover:text-danger-700">Remove</button>
                     </td>
                   </tr>
-                );
-              })}
-            </tbody>
-          </table>
-        </div>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+
         {totalPages > 1 && (
-          <div className="flex items-center justify-between px-6 py-4 border-t border-gray-200">
-            <button onClick={() => setPage(p => Math.max(1, p - 1))} disabled={page === 1} className="btn-secondary disabled:opacity-50">Previous</button>
-            <span className="text-sm text-gray-600">Page {page} of {totalPages}</span>
-            <button onClick={() => setPage(p => Math.min(totalPages, p + 1))} disabled={page === totalPages} className="btn-secondary disabled:opacity-50">Next</button>
+          <div className="flex items-center justify-between px-5 py-3.5 border-t border-border">
+            <p className="text-sm text-gray-500">Showing {start}–{end} of {total}</p>
+            <div className="flex items-center gap-2">
+              <Button variant="secondary" size="sm" onClick={() => setPage(p => p - 1)} disabled={page === 1}>Previous</Button>
+              <span className="text-sm text-gray-600 px-1">{page} / {totalPages}</span>
+              <Button variant="secondary" size="sm" onClick={() => setPage(p => p + 1)} disabled={page >= totalPages}>Next</Button>
+            </div>
           </div>
         )}
       </div>
+
+      <ConfirmDialog
+        isOpen={!!deleteTarget} onClose={() => setDeleteTarget(null)} onConfirm={confirmDelete}
+        title="Remove enrollment?" loading={deleting}
+        message={`Remove ${targetName}'s enrollment from ${deleteTarget?.class?.name ?? 'this class'}? The student's results will remain.`}
+        confirmLabel="Remove" />
     </div>
   );
 }

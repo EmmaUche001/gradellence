@@ -34,9 +34,7 @@ export class BaseImportService {
 
     // Validate headers
     const actualHeaders = result.meta.fields || [];
-    const missingHeaders = expectedHeaders.filter(
-      (h) => !actualHeaders.includes(h),
-    );
+    const missingHeaders = expectedHeaders.filter((h) => !actualHeaders.includes(h));
     if (missingHeaders.length > 0) {
       errors.push({
         row: 1,

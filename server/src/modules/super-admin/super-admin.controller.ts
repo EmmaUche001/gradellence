@@ -5,6 +5,7 @@ import {
   Delete,
   Param,
   Query,
+  Body,
   UseGuards,
   DefaultValuePipe,
   ParseIntPipe,
@@ -65,6 +66,52 @@ export class SuperAdminController {
   @ApiOperation({ summary: 'Soft delete a school (Super Admin)' })
   async deleteSchool(@Param('id') id: string) {
     return this.superAdminService.deleteSchool(id);
+  }
+
+  // ── School Subscriptions ───────────────────────────
+
+  @Get('school-subscriptions')
+  @ApiOperation({ summary: 'List all school subscriptions (Super Admin)' })
+  async getAllSchoolSubscriptions(
+    @Query('page', new DefaultValuePipe(1), ParseIntPipe) page: number,
+    @Query('limit', new DefaultValuePipe(20), ParseIntPipe) limit: number,
+    @Query('status') status?: string,
+    @Query('planId') planId?: string,
+  ) {
+    return this.superAdminService.getAllSchoolSubscriptions(page, limit, status, planId);
+  }
+
+  @Post('schools/:id/assign-plan')
+  @RateLimit(RATE_LIMIT_PRESETS.WRITE)
+  @ApiOperation({ summary: 'Assign a subscription plan to a school (Super Admin)' })
+  async assignPlan(@Param('id') id: string, @Body('planId') planId: string) {
+    return this.superAdminService.assignPlanToSchool(id, planId);
+  }
+
+  @Post('schools/:id/cancel-subscription')
+  @RateLimit(RATE_LIMIT_PRESETS.WRITE)
+  @ApiOperation({ summary: "Cancel a school's active subscription (Super Admin)" })
+  async cancelSubscription(@Param('id') id: string) {
+    return this.superAdminService.cancelSchoolSubscription(id);
+  }
+
+  @Get('subscription-plans')
+  @ApiOperation({ summary: 'Get all subscription plans (Super Admin)' })
+  async getSubscriptionPlans() {
+    return this.superAdminService.getAllSubscriptionPlans();
+  }
+
+  // ── Platform Audit Logs ─────────────────────────────
+
+  @Get('audit-logs')
+  @ApiOperation({ summary: 'Get platform-wide audit logs (Super Admin)' })
+  async getPlatformAuditLogs(
+    @Query('page', new DefaultValuePipe(1), ParseIntPipe) page: number,
+    @Query('limit', new DefaultValuePipe(20), ParseIntPipe) limit: number,
+    @Query('action') action?: string,
+    @Query('entityType') entityType?: string,
+  ) {
+    return this.superAdminService.getPlatformAuditLogs(page, limit, action, entityType);
   }
 
   // ── Platform Analytics ──────────────────────────────

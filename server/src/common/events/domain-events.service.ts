@@ -57,12 +57,12 @@ export class DomainEventsService {
     this.emitter.setMaxListeners(50);
   }
 
-  emit(event: typeof DOMAIN_EVENTS[keyof typeof DOMAIN_EVENTS], payload: unknown): void {
+  emit(event: (typeof DOMAIN_EVENTS)[keyof typeof DOMAIN_EVENTS], payload: unknown): void {
     this.emitter.emit(event, payload);
   }
 
   on(
-    event: typeof DOMAIN_EVENTS[keyof typeof DOMAIN_EVENTS],
+    event: (typeof DOMAIN_EVENTS)[keyof typeof DOMAIN_EVENTS],
     listener: (payload: any) => void,
   ): void {
     this.emitter.on(event, listener);

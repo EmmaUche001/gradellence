@@ -31,7 +31,10 @@ yarn-error.log*
 *.swo
 
 # Prisma
-//prisma/migrations/
+prisma/migrations/
+
+# Backups
+backups/
 
 # Docker
 docker-compose.override.yml

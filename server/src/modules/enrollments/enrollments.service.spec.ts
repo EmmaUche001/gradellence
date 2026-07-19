@@ -1,8 +1,4 @@
-import {
-  BadRequestException,
-  ConflictException,
-  NotFoundException,
-} from '@nestjs/common';
+import { BadRequestException, ConflictException, NotFoundException } from '@nestjs/common';
 import { EnrollmentsService } from './enrollments.service';
 import { AuthenticatedUser } from '../../common/types/express.types';
 
@@ -116,15 +112,21 @@ describe('EnrollmentsService', () => {
       // student.schoolId — a cross-tenant id won't match.
       prisma.enrollment.findFirst.mockResolvedValue(null);
 
-      await expect(
-        service.findOne('enrollment-from-school-b', currentUser),
-      ).rejects.toThrow(NotFoundException);
+      await expect(service.findOne('enrollment-from-school-b', currentUser)).rejects.toThrow(
+        NotFoundException,
+      );
     });
 
     it('returns the enrollment when it belongs to the same school', async () => {
       const ownEnrollment = {
         id: 'enrollment-1',
-        student: { id: 'student-a', schoolId: 'school-a', firstName: 'Jane', lastName: 'Doe', admissionNumber: 'A1' },
+        student: {
+          id: 'student-a',
+          schoolId: 'school-a',
+          firstName: 'Jane',
+          lastName: 'Doe',
+          admissionNumber: 'A1',
+        },
         class: { id: 'class-a', name: 'JSS1', level: '1' },
         term: { id: 'term-a', name: 'Term 1', session: { id: 'sess-1', name: '2024/2025' } },
       };

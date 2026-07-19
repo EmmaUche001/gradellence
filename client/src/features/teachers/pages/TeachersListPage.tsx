@@ -1,422 +1,297 @@
 import { useState, useEffect, useCallback } from 'react';
-import { Link } from 'react-router-dom';
+import { useNavigate } from 'react-router-dom';
+import { Users, Plus, Search, AlertCircle, X } from 'lucide-react';
 import { teacherService } from '../../../services/teacherService';
 import { classService } from '../../../services/classService';
 import { Teacher } from '../../../types/teacher';
 import { Class } from '../../../types/class';
 import { Subject } from '../../../types/subject';
+import { PageHeader } from '../../../components/ui/PageHeader';
+import { Button } from '../../../components/ui/Button';
+import { Badge } from '../../../components/ui/Badge';
+import { EmptyState } from '../../../components/ui/EmptyState';
+import { SkeletonTable } from '../../../components/ui/SkeletonLoader';
+import { ConfirmDialog } from '../../../components/ui/ConfirmDialog';
+import { Modal } from '../../../components/ui/Modal';
+import { Select } from '../../../components/ui/Select';
 
 export function TeachersListPage() {
-  const [teachers, setTeachers] = useState<Teacher[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-  const [page, setPage] = useState(1);
-  const [totalPages, setTotalPages] = useState(1);
-  const [search, setSearch] = useState('');
+  const navigate = useNavigate();
+  const [teachers, setTeachers]       = useState<Teacher[]>([]);
+  const [isLoading, setIsLoading]     = useState(true);
+  const [error, setError]             = useState<string | null>(null);
+  const [page, setPage]               = useState(1);
+  const [totalPages, setTotalPages]   = useState(1);
+  const [total, setTotal]             = useState(0);
+  const [search, setSearch]           = useState('');
+  const [deleteTarget, setDeleteTarget] = useState<Teacher | null>(null);
+  const [deleting, setDeleting]       = useState(false);
 
-  // Assignment modal state
-  const [modalTeacher, setModalTeacher] = useState<Teacher | null>(null);
-  const [classes, setClasses] = useState<Class[]>([]);
-  const [classSubjects, setClassSubjects] = useState<Subject[]>([]);
-  const [selectedClassId, setSelectedClassId] = useState('');
+  // Assignment modal
+  const [modalTeacher, setModalTeacher]           = useState<Teacher | null>(null);
+  const [classes, setClasses]                     = useState<Class[]>([]);
+  const [classSubjects, setClassSubjects]         = useState<Subject[]>([]);
+  const [selectedClassId, setSelectedClassId]     = useState('');
   const [selectedSubjectIds, setSelectedSubjectIds] = useState<Set<string>>(new Set());
-  const [assignments, setAssignments] = useState<any[]>([]);
-  const [modalLoading, setModalLoading] = useState(false);
-  const [assigning, setAssigning] = useState(false);
-  const [assigningClassTeacher, setAssigningClassTeacher] = useState(false);
-  const [subjectsLoading, setSubjectsLoading] = useState(false);
+  const [assignments, setAssignments]             = useState<any[]>([]);
+  const [modalLoading, setModalLoading]           = useState(false);
+  const [assigning, setAssigning]                 = useState(false);
+  const [assigningCT, setAssigningCT]             = useState(false);
+  const [subjectsLoading, setSubjectsLoading]     = useState(false);
 
   const fetchTeachers = useCallback(async () => {
-    setIsLoading(true);
-    setError(null);
+    setIsLoading(true); setError(null);
     try {
-      const response = await teacherService.getAll(page, 20, search || undefined);
-      setTeachers(response.data);
-      if (response.meta) {
-        setTotalPages(response.meta.totalPages);
-      }
+      const res = await teacherService.getAll(page, 20, search || undefined);
+      setTeachers(res.data);
+      if (res.meta) { setTotalPages(res.meta.totalPages); setTotal(res.meta.total ?? res.data.length); }
     } catch (err: any) {
       setError(err.response?.data?.message || 'Failed to load teachers');
-    } finally {
-      setIsLoading(false);
-    }
+    } finally { setIsLoading(false); }
   }, [page, search]);
 
-  useEffect(() => {
-    fetchTeachers();
-  }, [fetchTeachers]);
+  useEffect(() => { fetchTeachers(); }, [fetchTeachers]);
 
-  const handleDelete = async (id: string, name: string) => {
-    if (!window.confirm(`Delete teacher "${name}"? This action cannot be undone.`)) return;
+  const confirmDelete = async () => {
+    if (!deleteTarget) return;
+    setDeleting(true);
     try {
-      await teacherService.remove(id);
-      fetchTeachers();
+      await teacherService.remove(deleteTarget.id);
+      setDeleteTarget(null); fetchTeachers();
     } catch (err: any) {
-      setError(err.response?.data?.message || 'Failed to delete teacher');
-    }
+      setError(err.response?.data?.message || 'Failed to delete'); setDeleteTarget(null);
+    } finally { setDeleting(false); }
   };
 
   const fetchClassSubjects = async (classId: string) => {
-    if (!classId) {
-      setClassSubjects([]);
-      return;
-    }
+    if (!classId) { setClassSubjects([]); return; }
     setSubjectsLoading(true);
+    try { setClassSubjects((await classService.getClassSubjects(classId)).data); }
+    catch { setClassSubjects([]); }
+    finally { setSubjectsLoading(false); }
+  };
+
+  const openModal = async (t: Teacher) => {
+    setModalTeacher(t); setModalLoading(true); setError(null);
+    setSelectedClassId(''); setSelectedSubjectIds(new Set()); setClassSubjects([]);
     try {
-      const res = await classService.getClassSubjects(classId);
-      setClassSubjects(res.data);
-    } catch {
-      setClassSubjects([]);
-    } finally {
-      setSubjectsLoading(false);
-    }
+      const [cr, ar] = await Promise.all([classService.getAll(1, 100), teacherService.getAssignments(t.id)]);
+      setClasses(cr.data.filter(c => c.isActive)); setAssignments(ar.data || []);
+    } catch { setError('Failed to load assignment data'); }
+    finally { setModalLoading(false); }
   };
 
-  const openAssignmentModal = async (teacher: Teacher) => {
-    setModalTeacher(teacher);
-    setModalLoading(true);
-    setError(null);
-    setSelectedClassId('');
-    setSelectedSubjectIds(new Set());
-    setClassSubjects([]);
-    try {
-      const [classesRes, assignmentsRes] = await Promise.all([
-        classService.getAll(1, 100),
-        teacherService.getAssignments(teacher.id),
-      ]);
-      setClasses(classesRes.data.filter(c => c.isActive));
-      setAssignments(assignmentsRes.data || []);
-    } catch (err: any) {
-      setError('Failed to load data');
-    } finally {
-      setModalLoading(false);
-    }
-  };
-
-  const closeAssignmentModal = () => {
-    setModalTeacher(null);
-    setClasses([]);
-    setClassSubjects([]);
-    setAssignments([]);
-    setSelectedSubjectIds(new Set());
-  };
-
-  const toggleSubjectSelection = (id: string) => {
-    setSelectedSubjectIds(prev => {
-      const next = new Set(prev);
-      if (next.has(id)) next.delete(id);
-      else next.add(id);
-      return next;
-    });
+  const closeModal = () => {
+    setModalTeacher(null); setClasses([]); setClassSubjects([]);
+    setAssignments([]); setSelectedSubjectIds(new Set());
   };
 
   const handleAssign = async () => {
     if (!modalTeacher || !selectedClassId || selectedSubjectIds.size === 0) return;
     setAssigning(true);
-    setError(null);
     try {
-      const promises = Array.from(selectedSubjectIds).map(subjectId =>
-        teacherService.assignSubject({
-          teacherId: modalTeacher.id,
-          subjectId,
-          classId: selectedClassId,
-        })
-      );
-      await Promise.all(promises);
-      // Refresh assignments
-      const res = await teacherService.getAssignments(modalTeacher.id);
-      setAssignments(res.data || []);
+      await Promise.all(Array.from(selectedSubjectIds).map(sid =>
+        teacherService.assignSubject({ teacherId: modalTeacher.id, subjectId: sid, classId: selectedClassId })
+      ));
+      setAssignments((await teacherService.getAssignments(modalTeacher.id)).data || []);
+      setSelectedClassId(''); setSelectedSubjectIds(new Set());
+    } catch (err: any) { setError(err.response?.data?.message || 'Failed to assign'); }
+    finally { setAssigning(false); }
+  };
+
+  const handleAssignCT = async () => {
+    if (!modalTeacher || !selectedClassId) return;
+    setAssigningCT(true);
+    try {
+      await teacherService.assignAsClassTeacher(modalTeacher.id, selectedClassId);
+      setAssignments((await teacherService.getAssignments(modalTeacher.id)).data || []);
       setSelectedClassId('');
-      setSelectedSubjectIds(new Set());
-    } catch (err: any) {
-      setError(err.response?.data?.message || 'Failed to assign subjects');
-    } finally {
-      setAssigning(false);
-    }
+    } catch (err: any) { setError(err.response?.data?.message || 'Failed'); }
+    finally { setAssigningCT(false); }
   };
 
   const handleRemoveAssignment = async (subjectId: string, classId: string) => {
     if (!modalTeacher) return;
     try {
       await teacherService.removeSubjectAssignment(modalTeacher.id, subjectId, classId);
-      const res = await teacherService.getAssignments(modalTeacher.id);
-      setAssignments(res.data || []);
-    } catch (err: any) {
-      setError('Failed to remove assignment');
-    }
+      setAssignments((await teacherService.getAssignments(modalTeacher.id)).data || []);
+    } catch { setError('Failed to remove assignment'); }
   };
 
-  const handleAssignAsClassTeacher = async () => {
-    if (!modalTeacher || !selectedClassId) return;
-    setAssigningClassTeacher(true);
-    setError(null);
-    try {
-      await teacherService.assignAsClassTeacher(modalTeacher.id, selectedClassId);
-      setSelectedClassId('');
-      // Refresh assignments list
-      const resAssignments = await teacherService.getAssignments(modalTeacher.id);
-      setAssignments(resAssignments.data || []);
-    } catch (err: any) {
-      setError(err.response?.data?.message || 'Failed to assign class teacher');
-    } finally {
-      setAssigningClassTeacher(false);
-    }
-  };
+  const start = (page - 1) * 20 + 1;
+  const end   = Math.min(page * 20, total);
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl font-bold text-gray-900">Teachers</h1>
-          <p className="mt-1 text-sm text-gray-500">Manage all teachers in your school</p>
-        </div>
-        <Link to="/teachers/new" className="btn-primary">
-          + Add Teacher
-        </Link>
-      </div>
+      <PageHeader
+        title="Teachers"
+        description="Manage staff and their subject assignments"
+        actions={
+          <Button variant="primary" size="sm" onClick={() => navigate('/teachers/new')}>
+            <Plus size={15} /> Add Teacher
+          </Button>
+        }
+      />
 
       {error && (
-        <div className="rounded-md bg-red-50 p-4">
-          <p className="text-sm text-red-700">{error}</p>
+        <div className="flex items-start gap-3 px-4 py-3 rounded-xl bg-danger-50 border border-danger-100">
+          <AlertCircle size={16} className="text-danger-600 shrink-0 mt-0.5" />
+          <p className="text-sm text-danger-700">{error}</p>
         </div>
       )}
 
-      <div className="card">
-        <div className="p-4 border-b border-gray-200">
-          <input
-            type="text"
-            placeholder="Search by name, employee ID, or email..."
-            value={search}
-            onChange={(e) => { setSearch(e.target.value); setPage(1); }}
-            className="input max-w-md"
-          />
+      <div className="bg-surface rounded-card shadow-sm border border-border overflow-hidden">
+        {/* Toolbar */}
+        <div className="flex items-center gap-3 px-5 py-4 border-b border-border">
+          <div className="relative flex-1 max-w-sm">
+            <Search size={15} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-gray-400" />
+            <input type="text" placeholder="Search by name or employee ID…" value={search}
+              onChange={e => { setSearch(e.target.value); setPage(1); }}
+              className="w-full h-10 pl-10 pr-4 text-sm bg-gray-50 border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 focus:bg-surface placeholder-gray-400" />
+          </div>
+          {!isLoading && total > 0 && <span className="text-sm text-gray-500 ml-auto">{total} teacher{total !== 1 ? 's' : ''}</span>}
         </div>
 
-        <div className="overflow-x-auto">
-          <table className="min-w-full divide-y divide-gray-200">
-            <thead className="bg-gray-50">
-              <tr>
-                <th className="table-header">Employee ID</th>
-                <th className="table-header">First Name</th>
-                <th className="table-header">Last Name</th>
-                <th className="table-header">Qualification</th>
-                <th className="table-header">Status</th>
-                <th className="table-header text-right">Actions</th>
-              </tr>
-            </thead>
-            <tbody className="bg-white divide-y divide-gray-200">
-              {isLoading ? (
-                <tr>
-                  <td colSpan={6} className="px-6 py-12 text-center text-gray-500">
-                    Loading teachers...
-                  </td>
+        {/* Content */}
+        {isLoading ? (
+          <div className="p-5"><SkeletonTable rows={5} cols={6} /></div>
+        ) : teachers.length === 0 ? (
+          <EmptyState icon={<Users size={40} />} title="No teachers yet"
+            description={search ? `No teachers match "${search}".` : 'Add your first teacher to get started.'}
+            actionLabel={search ? undefined : 'Add Teacher'}
+            onAction={search ? undefined : () => navigate('/teachers/new')} />
+        ) : (
+          <div className="overflow-x-auto">
+            <table className="w-full">
+              <thead>
+                <tr className="bg-gray-50 border-b border-border">
+                  {['Employee ID', 'Name', 'Qualification', 'Status', ''].map(h => (
+                    <th key={h} className="px-5 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider last:text-right">{h}</th>
+                  ))}
                 </tr>
-              ) : teachers.length === 0 ? (
-                <tr>
-                  <td colSpan={6} className="px-6 py-12 text-center text-gray-500">
-                    No teachers found. Click "+ Add Teacher" to create one.
-                  </td>
-                </tr>
-              ) : (
-                teachers.map((teacher) => (
-                  <tr key={teacher.id} className="hover:bg-gray-50">
-                    <td className="table-cell font-medium text-gray-900">
-                      {teacher.employeeId}
+              </thead>
+              <tbody className="divide-y divide-border">
+                {teachers.map(t => (
+                  <tr key={t.id} className="hover:bg-gray-50 transition-colors">
+                    <td className="px-5 py-3.5 text-sm font-semibold text-gray-900">{t.employeeId}</td>
+                    <td className="px-5 py-3.5 text-sm text-gray-700">{t.firstName} {t.lastName}</td>
+                    <td className="px-5 py-3.5 text-sm text-gray-500">{t.qualification || '—'}</td>
+                    <td className="px-5 py-3.5">
+                      <Badge variant={t.isActive ? 'success' : 'danger'}>{t.isActive ? 'Active' : 'Inactive'}</Badge>
                     </td>
-                    <td className="table-cell">{teacher.firstName}</td>
-                    <td className="table-cell">{teacher.lastName}</td>
-                    <td className="table-cell">{teacher.qualification || '—'}</td>
-                    <td className="table-cell">
-                      <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${
-                        teacher.isActive
-                          ? 'bg-green-100 text-green-800'
-                          : 'bg-red-100 text-red-800'
-                      }`}>
-                        {teacher.isActive ? 'Active' : 'Inactive'}
-                      </span>
-                    </td>
-                    <td className="table-cell text-right space-x-2">
-                      <button
-                        onClick={() => openAssignmentModal(teacher)}
-                        className="text-sm text-primary-600 hover:text-primary-800"
-                      >
-                        Assignments
-                      </button>
-                      <Link
-                        to={`/teachers/${teacher.id}/edit`}
-                        className="text-sm text-primary-600 hover:text-primary-800"
-                      >
-                        Edit
-                      </Link>
-                      <button
-                        onClick={() => handleDelete(teacher.id, `${teacher.firstName} ${teacher.lastName}`)}
-                        className="text-sm text-red-600 hover:text-red-800"
-                      >
-                        Delete
-                      </button>
+                    <td className="px-5 py-3.5 text-right">
+                      <div className="flex items-center justify-end gap-3">
+                        <button onClick={() => openModal(t)} className="text-sm font-medium text-primary-600 hover:text-primary-700">Assignments</button>
+                        <button onClick={() => navigate(`/teachers/${t.id}/edit`)} className="text-sm font-medium text-primary-600 hover:text-primary-700">Edit</button>
+                        <button onClick={() => setDeleteTarget(t)} className="text-sm font-medium text-danger-600 hover:text-danger-700">Delete</button>
+                      </div>
                     </td>
                   </tr>
-                ))
-              )}
-            </tbody>
-          </table>
-        </div>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
 
         {totalPages > 1 && (
-          <div className="flex items-center justify-between px-6 py-4 border-t border-gray-200">
-            <button
-              onClick={() => setPage((p) => Math.max(1, p - 1))}
-              disabled={page === 1}
-              className="btn-secondary disabled:opacity-50"
-            >
-              Previous
-            </button>
-            <span className="text-sm text-gray-600">
-              Page {page} of {totalPages}
-            </span>
-            <button
-              onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
-              disabled={page === totalPages}
-              className="btn-secondary disabled:opacity-50"
-            >
-              Next
-            </button>
+          <div className="flex items-center justify-between px-5 py-3.5 border-t border-border">
+            <p className="text-sm text-gray-500">Showing {start}–{end} of {total}</p>
+            <div className="flex items-center gap-2">
+              <Button variant="secondary" size="sm" onClick={() => setPage(p => p - 1)} disabled={page === 1}>Previous</Button>
+              <span className="text-sm text-gray-600 px-1">{page} / {totalPages}</span>
+              <Button variant="secondary" size="sm" onClick={() => setPage(p => p + 1)} disabled={page >= totalPages}>Next</Button>
+            </div>
           </div>
         )}
       </div>
 
+      {/* Delete confirm */}
+      <ConfirmDialog isOpen={!!deleteTarget} onClose={() => setDeleteTarget(null)} onConfirm={confirmDelete}
+        title="Delete teacher?" loading={deleting}
+        message={`"${deleteTarget?.firstName} ${deleteTarget?.lastName}" will be permanently removed.`}
+        confirmLabel="Delete" />
+
       {/* Assignment Modal */}
-      {modalTeacher && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
-          <div className="bg-white rounded-lg shadow-xl max-w-lg w-full mx-4 max-h-[80vh] flex flex-col">
-            <div className="flex items-center justify-between p-4 border-b border-gray-200">
-              <h3 className="text-lg font-semibold text-gray-900">
-                Assignments — {modalTeacher.firstName} {modalTeacher.lastName}
-              </h3>
-              <button onClick={closeAssignmentModal} className="text-gray-400 hover:text-gray-600 text-xl">&times;</button>
+      <Modal isOpen={!!modalTeacher} onClose={closeModal} size="md"
+        title={`Assignments — ${modalTeacher?.firstName} ${modalTeacher?.lastName}`}
+        footer={<Button variant="ghost" onClick={closeModal}>Close</Button>}>
+        {modalLoading ? (
+          <div className="py-8 text-center text-sm text-gray-400">Loading…</div>
+        ) : (
+          <div className="space-y-6">
+            {/* Assign as Class Teacher */}
+            <div className="space-y-3 pb-5 border-b border-border">
+              <h4 className="text-sm font-semibold text-gray-800">Assign as Class Teacher</h4>
+              <Select
+                options={classes.map(c => ({ value: c.id, label: c.name }))}
+                placeholder="Select class…"
+                value={selectedClassId}
+                onChange={e => setSelectedClassId(e.target.value)}
+              />
+              <Button variant="secondary" size="sm" onClick={handleAssignCT}
+                loading={assigningCT} disabled={!selectedClassId}>
+                Assign as Class Teacher
+              </Button>
+              <p className="text-xs text-gray-400">Sets this teacher as class teacher and auto-assigns all class subjects.</p>
             </div>
 
-            <div className="p-4 overflow-y-auto flex-1">
-              {modalLoading ? (
-                <p className="text-gray-500 text-center py-8">Loading...</p>
+            {/* Assign Subject */}
+            <div className="space-y-3 pb-5 border-b border-border">
+              <h4 className="text-sm font-semibold text-gray-800">Assign Subject</h4>
+              <Select
+                options={classes.map(c => ({ value: c.id, label: c.name }))}
+                placeholder="Select class…"
+                value={selectedClassId}
+                onChange={e => { setSelectedClassId(e.target.value); setSelectedSubjectIds(new Set()); fetchClassSubjects(e.target.value); }}
+              />
+              {selectedClassId && (
+                <div className="max-h-44 overflow-y-auto border border-border rounded-xl p-2 space-y-1">
+                  {subjectsLoading ? (
+                    <p className="text-xs text-gray-400 text-center py-3">Loading subjects…</p>
+                  ) : classSubjects.length === 0 ? (
+                    <p className="text-xs text-gray-400 text-center py-3">No subjects assigned to this class.</p>
+                  ) : classSubjects.map(s => (
+                    <label key={s.id} className="flex items-center gap-2.5 p-1.5 rounded-lg hover:bg-gray-50 cursor-pointer">
+                      <input type="checkbox" checked={selectedSubjectIds.has(s.id)}
+                        onChange={() => setSelectedSubjectIds(prev => { const n = new Set(prev); n.has(s.id) ? n.delete(s.id) : n.add(s.id); return n; })}
+                        className="w-4 h-4 rounded border-border text-primary-600 focus:ring-primary-500" />
+                      <span className="text-sm text-gray-700">{s.name}</span>
+                      <span className="text-xs text-gray-400">({s.code})</span>
+                    </label>
+                  ))}
+                </div>
+              )}
+              <Button variant="primary" size="sm" onClick={handleAssign}
+                loading={assigning} disabled={!selectedClassId || selectedSubjectIds.size === 0}>
+                Assign {selectedSubjectIds.size > 0 ? `${selectedSubjectIds.size} Subject${selectedSubjectIds.size > 1 ? 's' : ''}` : 'Subject'}
+              </Button>
+            </div>
+
+            {/* Current assignments */}
+            <div>
+              <h4 className="text-sm font-semibold text-gray-800 mb-3">Current Assignments</h4>
+              {assignments.length === 0 ? (
+                <p className="text-sm text-gray-400">No assignments yet.</p>
               ) : (
-                <>
-                  {/* Tab 1: Assign as Class Teacher */}
-                  <div className="space-y-3 pb-4 border-b border-gray-200">
-                    <h4 className="text-sm font-semibold text-gray-700">Assign as Class Teacher</h4>
-                    <div>
-                      <label className="text-xs text-gray-500">Class</label>
-                      <select
-                        className="input text-sm"
-                        value={selectedClassId}
-                        onChange={(e) => setSelectedClassId(e.target.value)}
-                      >
-                        <option value="">Select class</option>
-                        {classes.map((c) => (
-                          <option key={c.id} value={c.id}>{c.name}</option>
-                        ))}
-                      </select>
-                    </div>
-                    <button
-                      onClick={handleAssignAsClassTeacher}
-                      disabled={assigningClassTeacher || !selectedClassId}
-                      className="btn-primary text-sm disabled:opacity-50"
-                    >
-                      {assigningClassTeacher ? 'Assigning...' : 'Assign as Class Teacher'}
-                    </button>
-                    <p className="text-xs text-gray-500">
-                      This will set the teacher as the class teacher and auto-assign all current class subjects.
-                    </p>
-                  </div>
-
-                  {/* Tab 2: Assign Subject (Multi-select) */}
-                  <div className="space-y-3 pb-4 border-b border-gray-200 pt-4">
-                    <h4 className="text-sm font-semibold text-gray-700">Assign Subject</h4>
-                    <div>
-                      <label className="text-xs text-gray-500">Class</label>
-                      <select
-                        className="input text-sm"
-                        value={selectedClassId}
-                        onChange={(e) => { setSelectedClassId(e.target.value); setSelectedSubjectIds(new Set()); fetchClassSubjects(e.target.value); }}
-                      >
-                        <option value="">Select class</option>
-                        {classes.map((c) => (
-                          <option key={c.id} value={c.id}>{c.name}</option>
-                        ))}
-                      </select>
-                    </div>
-                    {selectedClassId && (
-                      <div>
-                        <label className="text-xs text-gray-500">Subjects (select one or more)</label>
-                        <div className="mt-1 max-h-48 overflow-y-auto border border-gray-200 rounded-md p-2 space-y-1">
-                          {subjectsLoading ? (
-                            <p className="text-xs text-gray-400 py-2 text-center">Loading subjects...</p>
-                          ) : classSubjects.length === 0 ? (
-                            <p className="text-xs text-gray-400 py-2 text-center">No subjects assigned to this class yet. Assign subjects to the class first.</p>
-                          ) : (
-                            classSubjects.map((s) => (
-                              <label key={s.id} className="flex items-center space-x-2 p-1.5 rounded hover:bg-gray-50 cursor-pointer">
-                                <input
-                                  type="checkbox"
-                                  checked={selectedSubjectIds.has(s.id)}
-                                  onChange={() => toggleSubjectSelection(s.id)}
-                                  className="h-4 w-4 text-primary-600 rounded"
-                                />
-                                <span className="text-sm text-gray-700">{s.name}</span>
-                                <span className="text-xs text-gray-400">({s.code})</span>
-                              </label>
-                            ))
-                          )}
-                        </div>
+                <ul className="space-y-2">
+                  {assignments.map((a: any, i: number) => (
+                    <li key={i} className="flex items-center justify-between text-sm bg-gray-50 rounded-xl px-3 py-2.5">
+                      <span className="font-medium text-gray-800">{a.subject?.name || 'Subject'}</span>
+                      <div className="flex items-center gap-3">
+                        <span className="text-xs text-gray-500">{a.class?.name || 'Class'}</span>
+                        <button onClick={() => handleRemoveAssignment(a.subjectId, a.classId)}
+                          className="text-danger-500 hover:text-danger-700 transition-colors" aria-label="Remove">
+                          <X size={14} />
+                        </button>
                       </div>
-                    )}
-                    {!selectedClassId && (
-                      <p className="text-xs text-gray-400 py-2">Select a class first to see available subjects</p>
-                    )}
-                    <button
-                      onClick={handleAssign}
-                      disabled={assigning || !selectedClassId || selectedSubjectIds.size === 0}
-                      className="btn-primary text-sm disabled:opacity-50"
-                    >
-                      {assigning ? 'Assigning...' : `Assign Subject${selectedSubjectIds.size > 0 ? ` (${selectedSubjectIds.size})` : ''}`}
-                    </button>
-                  </div>
-
-                  {/* Existing assignments */}
-                  <div className="pt-4">
-                    <h4 className="text-sm font-semibold text-gray-700 mb-2">Current Assignments</h4>
-                    {assignments.length === 0 ? (
-                      <p className="text-sm text-gray-500">No assignments yet.</p>
-                    ) : (
-                      <ul className="space-y-2">
-                        {assignments.map((a: any, i: number) => (
-                          <li key={i} className="flex items-center justify-between text-sm bg-gray-50 p-2 rounded">
-                            <span>
-                              <strong>{a.subject?.name || 'Subject'}</strong>
-                              {' — '}
-                              {a.class?.name || 'Class'}
-                            </span>
-                            <button
-                              onClick={() => handleRemoveAssignment(a.subjectId, a.classId)}
-                              className="text-red-600 hover:text-red-800 text-xs"
-                            >
-                              Remove
-                            </button>
-                          </li>
-                        ))}
-                      </ul>
-                    )}
-                  </div>
-                </>
+                    </li>
+                  ))}
+                </ul>
               )}
             </div>
-
-            <div className="flex items-center justify-end p-4 border-t border-gray-200">
-              <button onClick={closeAssignmentModal} className="btn-secondary">Close</button>
-            </div>
           </div>
-        </div>
-      )}
+        )}
+      </Modal>
     </div>
   );
 }

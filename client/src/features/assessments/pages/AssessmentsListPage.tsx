@@ -1,122 +1,207 @@
 import { useState, useEffect, useCallback } from 'react';
-import { Link } from 'react-router-dom';
+import { useNavigate } from 'react-router-dom';
+import { ClipboardCheck, Plus, Upload, AlertCircle, Grid3x3 } from 'lucide-react';
 import { assessmentService } from '../../../services/assessmentService';
 import { Assessment } from '../../../types/assessment';
+import { PageHeader } from '../../../components/ui/PageHeader';
+import { Button } from '../../../components/ui/Button';
+import { Badge } from '../../../components/ui/Badge';
+import { EmptyState } from '../../../components/ui/EmptyState';
+import { SkeletonTable } from '../../../components/ui/SkeletonLoader';
+import { ConfirmDialog } from '../../../components/ui/ConfirmDialog';
+
+// Assessment type → badge variant
+function typeBadge(type: string) {
+  const map: Record<string, 'primary' | 'info' | 'warning' | 'success' | 'gray'> = {
+    CA1: 'primary', CA2: 'primary', CA3: 'primary', EXAM: 'info',
+  };
+  return map[type] ?? 'gray';
+}
 
 export function AssessmentsListPage() {
+  const navigate = useNavigate();
   const [assessments, setAssessments] = useState<Assessment[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-  const [page, setPage] = useState(1);
-  const [totalPages, setTotalPages] = useState(1);
+  const [isLoading, setIsLoading]     = useState(true);
+  const [error, setError]             = useState<string | null>(null);
+  const [page, setPage]               = useState(1);
+  const [totalPages, setTotalPages]   = useState(1);
+  const [total, setTotal]             = useState(0);
+
+  // Confirm dialogs
+  const [publishTarget, setPublishTarget] = useState<Assessment | null>(null);
+  const [deleteTarget, setDeleteTarget]   = useState<Assessment | null>(null);
+  const [publishing, setPublishing]       = useState(false);
+  const [deleting, setDeleting]           = useState(false);
 
   const fetchAssessments = useCallback(async () => {
-    setIsLoading(true);
-    setError(null);
+    setIsLoading(true); setError(null);
     try {
-      const response = await assessmentService.getAll(page, 20);
-      setAssessments(response.data);
-      if (response.meta) setTotalPages(response.meta.totalPages);
+      const res = await assessmentService.getAll(page, 20);
+      setAssessments(res.data);
+      if (res.meta) { setTotalPages(res.meta.totalPages); setTotal(res.meta.total ?? res.data.length); }
     } catch (err: any) {
       setError(err.response?.data?.message || 'Failed to load assessments');
-    } finally {
-      setIsLoading(false);
-    }
+    } finally { setIsLoading(false); }
   }, [page]);
 
   useEffect(() => { fetchAssessments(); }, [fetchAssessments]);
 
-  const handlePublish = async (id: string, name: string) => {
-    if (!window.confirm(`Publish assessment "${name}"? This will lock the scores.`)) return;
+  const confirmPublish = async () => {
+    if (!publishTarget) return;
+    setPublishing(true);
     try {
-      await assessmentService.publish(id);
+      await assessmentService.publish(publishTarget.id);
+      setPublishTarget(null);
       fetchAssessments();
     } catch (err: any) {
-      setError(err.response?.data?.message || 'Failed to publish assessment');
-    }
+      setError(err.response?.data?.message || 'Failed to publish');
+      setPublishTarget(null);
+    } finally { setPublishing(false); }
   };
 
-  const handleDelete = async (id: string, name: string) => {
-    if (!window.confirm(`Delete assessment "${name}"?`)) return;
+  const confirmDelete = async () => {
+    if (!deleteTarget) return;
+    setDeleting(true);
     try {
-      await assessmentService.remove(id);
+      await assessmentService.remove(deleteTarget.id);
+      setDeleteTarget(null);
       fetchAssessments();
     } catch (err: any) {
-      setError(err.response?.data?.message || 'Failed to delete assessment');
-    }
+      setError(err.response?.data?.message || 'Failed to delete');
+      setDeleteTarget(null);
+    } finally { setDeleting(false); }
   };
+
+  const start = (page - 1) * 20 + 1;
+  const end   = Math.min(page * 20, total);
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl font-bold text-gray-900">Assessments</h1>
-          <p className="mt-1 text-sm text-gray-500">Manage student scores and assessments</p>
+      <PageHeader
+        title="Assessments"
+        description="Manage student scores and assessments"
+        actions={
+          <>
+            <Button variant="ghost" size="sm" onClick={() => navigate('/assessments/import')}>
+              <Upload size={15} /> Import Scores
+            </Button>
+            <Button variant="secondary" size="sm" onClick={() => navigate('/assessments/score-entry')}>
+              <Grid3x3 size={15} /> Score Entry
+            </Button>
+            <Button variant="primary" size="sm" onClick={() => navigate('/assessments/new')}>
+              <Plus size={15} /> New Assessment
+            </Button>
+          </>
+        }
+      />
+
+      {error && (
+        <div className="flex items-start gap-3 px-4 py-3 rounded-xl bg-danger-50 border border-danger-100">
+          <AlertCircle size={16} className="text-danger-600 shrink-0 mt-0.5" />
+          <p className="text-sm text-danger-700">{error}</p>
         </div>
-        <Link to="/assessments/new" className="btn-primary">+ New Assessment</Link>
-      </div>
+      )}
 
-      {error && <div className="rounded-md bg-red-50 p-4"><p className="text-sm text-red-700">{error}</p></div>}
+      <div className="bg-surface rounded-card shadow-sm border border-border overflow-hidden">
+        {/* Toolbar */}
+        <div className="flex items-center gap-3 px-5 py-4 border-b border-border">
+          {!isLoading && total > 0 && (
+            <span className="text-sm text-gray-500 ml-auto">{total} assessment{total !== 1 ? 's' : ''}</span>
+          )}
+        </div>
 
-      <div className="card">
-        <div className="overflow-x-auto">
-          <table className="min-w-full divide-y divide-gray-200">
-            <thead className="bg-gray-50">
-              <tr>
-                <th className="table-header">Student</th>
-                <th className="table-header">Subject</th>
-                <th className="table-header">Type</th>
-                <th className="table-header">Score</th>
-                <th className="table-header">Term</th>
-                <th className="table-header">Status</th>
-                <th className="table-header text-right">Actions</th>
-              </tr>
-            </thead>
-            <tbody className="bg-white divide-y divide-gray-200">
-              {isLoading ? (
-                <tr><td colSpan={7} className="px-6 py-12 text-center text-gray-500">Loading assessments...</td></tr>
-              ) : assessments.length === 0 ? (
-                <tr><td colSpan={7} className="px-6 py-12 text-center text-gray-500">No assessments found.</td></tr>
-              ) : assessments.map((a) => {
-                const label = a.student ? `${a.student.firstName} ${a.student.lastName}` : 'Student';
-                const name = `${label} - ${a.subject?.name || ''} (${a.type})`;
-                return (
-                  <tr key={a.id} className="hover:bg-gray-50">
-                    <td className="table-cell font-medium text-gray-900">{label}</td>
-                    <td className="table-cell">{a.subject?.name || '—'}</td>
-                    <td className="table-cell">
-                      <span className="inline-flex px-2 py-1 text-xs font-semibold rounded-full bg-purple-100 text-purple-800">{a.type}</span>
+        {isLoading ? (
+          <div className="p-5"><SkeletonTable rows={6} cols={7} /></div>
+        ) : assessments.length === 0 ? (
+          <EmptyState
+            icon={<ClipboardCheck size={40} />}
+            title="No assessments yet"
+            description="Record student scores to get started."
+            actionLabel="New Assessment"
+            onAction={() => navigate('/assessments/new')}
+          />
+        ) : (
+          <div className="overflow-x-auto">
+            <table className="w-full">
+              <thead>
+                <tr className="bg-gray-50 border-b border-border">
+                  {['Student', 'Subject', 'Type', 'Score', 'Term', 'Status', ''].map(h => (
+                    <th key={h} className="px-5 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider last:text-right">{h}</th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-border">
+                {assessments.map(a => (
+                  <tr key={a.id} className="hover:bg-gray-50 transition-colors">
+                    <td className="px-5 py-3.5">
+                      <p className="text-sm font-semibold text-gray-900">
+                        {a.student ? `${a.student.firstName} ${a.student.lastName}` : '—'}
+                      </p>
+                      {a.student && <p className="text-xs text-gray-400">{a.student.admissionNumber}</p>}
                     </td>
-                    <td className="table-cell">{a.score} / {a.maxScore}</td>
-                    <td className="table-cell">{a.term?.name || '—'}</td>
-                    <td className="table-cell">
-                      {a.isPublished ? (
-                        <span className="inline-flex px-2 py-1 text-xs font-semibold rounded-full bg-green-100 text-green-800">Published</span>
-                      ) : (
-                        <span className="inline-flex px-2 py-1 text-xs font-semibold rounded-full bg-yellow-100 text-yellow-800">Draft</span>
-                      )}
+                    <td className="px-5 py-3.5 text-sm text-gray-700">{a.subject?.name || '—'}</td>
+                    <td className="px-5 py-3.5">
+                      <Badge variant={typeBadge(a.type)}>{a.type}</Badge>
                     </td>
-                    <td className="table-cell text-right space-x-2">
-                      <Link to={`/assessments/${a.id}/edit`} className="text-sm text-primary-600 hover:text-primary-800">Edit</Link>
-                      {!a.isPublished && (
-                        <button onClick={() => handlePublish(a.id, name)} className="text-sm text-green-600 hover:text-green-800">Publish</button>
-                      )}
-                      <button onClick={() => handleDelete(a.id, name)} className="text-sm text-red-600 hover:text-red-800">Delete</button>
+                    <td className="px-5 py-3.5 text-sm font-semibold text-gray-900 tabular-nums">
+                      {a.score} <span className="text-gray-400 font-normal">/ {a.maxScore}</span>
+                    </td>
+                    <td className="px-5 py-3.5 text-sm text-gray-600">{a.term?.name || '—'}</td>
+                    <td className="px-5 py-3.5">
+                      <Badge variant={a.isPublished ? 'success' : 'gray'}>
+                        {a.isPublished ? 'Published' : 'Draft'}
+                      </Badge>
+                    </td>
+                    <td className="px-5 py-3.5 text-right">
+                      <div className="flex items-center justify-end gap-3">
+                        <button onClick={() => navigate(`/assessments/${a.id}/edit`)} className="text-sm font-medium text-primary-600 hover:text-primary-700">Edit</button>
+                        {!a.isPublished && (
+                          <button onClick={() => setPublishTarget(a)} className="text-sm font-medium text-success-600 hover:text-success-700">Publish</button>
+                        )}
+                        <button onClick={() => setDeleteTarget(a)} className="text-sm font-medium text-danger-600 hover:text-danger-700">Delete</button>
+                      </div>
                     </td>
                   </tr>
-                );
-              })}
-            </tbody>
-          </table>
-        </div>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+
         {totalPages > 1 && (
-          <div className="flex items-center justify-between px-6 py-4 border-t border-gray-200">
-            <button onClick={() => setPage(p => Math.max(1, p - 1))} disabled={page === 1} className="btn-secondary disabled:opacity-50">Previous</button>
-            <span className="text-sm text-gray-600">Page {page} of {totalPages}</span>
-            <button onClick={() => setPage(p => Math.min(totalPages, p + 1))} disabled={page === totalPages} className="btn-secondary disabled:opacity-50">Next</button>
+          <div className="flex items-center justify-between px-5 py-3.5 border-t border-border">
+            <p className="text-sm text-gray-500">Showing {start}–{end} of {total}</p>
+            <div className="flex items-center gap-2">
+              <Button variant="secondary" size="sm" onClick={() => setPage(p => p - 1)} disabled={page === 1}>Previous</Button>
+              <span className="text-sm text-gray-600 px-1">{page} / {totalPages}</span>
+              <Button variant="secondary" size="sm" onClick={() => setPage(p => p + 1)} disabled={page >= totalPages}>Next</Button>
+            </div>
           </div>
         )}
       </div>
+
+      {/* Publish confirm */}
+      <ConfirmDialog
+        isOpen={!!publishTarget}
+        onClose={() => setPublishTarget(null)}
+        onConfirm={confirmPublish}
+        variant="primary"
+        title="Publish assessment?"
+        message="This will lock the scores and make the assessment visible. This action cannot be undone."
+        confirmLabel="Publish"
+        loading={publishing}
+      />
+
+      {/* Delete confirm */}
+      <ConfirmDialog
+        isOpen={!!deleteTarget}
+        onClose={() => setDeleteTarget(null)}
+        onConfirm={confirmDelete}
+        title="Delete assessment?"
+        message="This assessment and its scores will be permanently removed."
+        confirmLabel="Delete"
+        loading={deleting}
+      />
     </div>
   );
 }

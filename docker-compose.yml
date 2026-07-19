@@ -8,7 +8,7 @@ services:
     restart: unless-stopped
     environment:
       POSTGRES_USER: postgres
-      POSTGRES_PASSWORD: adminroot
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
       POSTGRES_DB: srms
     ports:
       - '5432:5432'
@@ -47,21 +47,22 @@ services:
     environment:
       NODE_ENV: development
       PORT: 3000
-      DATABASE_URL: postgresql://postgres:adminroot@postgres:5432/srms?schema=public
+      DATABASE_URL: postgresql://postgres:${POSTGRES_PASSWORD}@postgres:5432/srms?schema=public
       REDIS_HOST: redis
       REDIS_PORT: 6379
       REDIS_PASSWORD:
       REDIS_DB: 0
-      JWT_ACCESS_SECRET: your-access-secret-key-change-in-production
-      JWT_REFRESH_SECRET: your-refresh-secret-key-change-in-production
+      JWT_ACCESS_SECRET: ${JWT_ACCESS_SECRET}
+      JWT_REFRESH_SECRET: ${JWT_REFRESH_SECRET}
       JWT_ACCESS_EXPIRATION: 15m
       JWT_REFRESH_EXPIRATION: 7d
       SMTP_HOST: smtp.gmail.com
       SMTP_PORT: 587
       SMTP_USER: gradellence.noreply@gmail.com
-      SMTP_PASS: qpufeglgmmbanwzm
+      SMTP_PASS: ${SMTP_PASS}
       SMTP_FROM: "Gradellence <gradellence.noreply@gmail.com>"
       FRONTEND_URL: http://localhost
+      SENTRY_DSN: ${SENTRY_DSN:-}
     depends_on:
       postgres:
         condition: service_healthy
@@ -81,6 +82,23 @@ services:
       - '80:80'
     depends_on:
       - backend
+
+  pg-backup:
+    image: prodrigestivus/pg-backup:latest
+    container_name: srms-pg-backup
+    restart: unless-stopped
+    environment:
+      SCHEDULE: '@daily'
+      BACKUP_DIR: /backups
+      POSTGRES_HOST: postgres
+      POSTGRES_DB: srms
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+    volumes:
+      - ./backups:/backups
+    depends_on:
+      postgres:
+        condition: service_healthy
 
 volumes:
   postgres_data:

@@ -34,7 +34,7 @@ export class SubscriptionGuard implements CanActivate {
 
     const request = context.switchToHttp().getRequest();
     const user = request.user;
-    
+
     // Super admins bypass subscription checks
     if (user?.roles?.includes('SUPER_ADMIN')) {
       return true;

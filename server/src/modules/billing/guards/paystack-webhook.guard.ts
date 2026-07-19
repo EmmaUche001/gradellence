@@ -17,10 +17,7 @@ export class PaystackWebhookGuard implements CanActivate {
     const secret = this.configService.get<string>('PAYSTACK_SECRET_KEY', '');
     const rawBody = request.rawBody || JSON.stringify(request.body);
 
-    const hash = crypto
-      .createHmac('sha512', secret)
-      .update(rawBody)
-      .digest('hex');
+    const hash = crypto.createHmac('sha512', secret).update(rawBody).digest('hex');
 
     if (hash !== signature) {
       throw new ForbiddenException('Invalid Paystack signature');

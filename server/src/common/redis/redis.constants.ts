@@ -22,6 +22,14 @@ export const REDIS_KEYS = {
   CACHE: (schoolId: string, feature: string, key: string) =>
     `${REDIS_KEY_PREFIX}:cache:${schoolId}:${feature}:${key}`,
 
+  // Parent auth refresh tokens — keyed by parentId for forward lookup
+  PARENT_REFRESH_TOKEN: (parentId: string) =>
+    `${REDIS_KEY_PREFIX}:auth:parent:refresh:${parentId}`,
+
+  // Reverse lookup: given a raw refresh token string, find the parentId
+  PARENT_REFRESH_TOKEN_REVERSE: (token: string) =>
+    `srms:auth:parent:refresh:rev:${token}`,
+
   // Sessions (for WebSocket or future use)
   SESSION: (sessionId: string) => `${REDIS_KEY_PREFIX}:session:${sessionId}`,
 
@@ -31,20 +39,20 @@ export const REDIS_KEYS = {
 
 export const REDIS_TTL = {
   // Token TTLs (match JWT config)
-  REFRESH_TOKEN: 7 * 24 * 60 * 60,      // 7 days in seconds
-  ACCESS_TOKEN_BLACKLIST: 15 * 60,        // 15 minutes (access token expiry)
+  REFRESH_TOKEN: 7 * 24 * 60 * 60, // 7 days in seconds
+  ACCESS_TOKEN_BLACKLIST: 15 * 60, // 15 minutes (access token expiry)
 
   // Password reset tokens expire after 1 hour
-  PASSWORD_RESET: 60 * 60,               // 1 hour
+  PASSWORD_RESET: 60 * 60, // 1 hour
 
   // Rate limiting
-  RATE_LIMIT_WINDOW: 60,                  // 1 minute window
+  RATE_LIMIT_WINDOW: 60, // 1 minute window
 
   // Cache TTLs
-  CACHE_SHORT: 60,                        // 1 minute
-  CACHE_MEDIUM: 5 * 60,                   // 5 minutes
-  CACHE_LONG: 60 * 60,                    // 1 hour
+  CACHE_SHORT: 60, // 1 minute
+  CACHE_MEDIUM: 5 * 60, // 5 minutes
+  CACHE_LONG: 60 * 60, // 1 hour
 
   // Lock TTL
-  LOCK: 30,                               // 30 seconds
+  LOCK: 30, // 30 seconds
 } as const;

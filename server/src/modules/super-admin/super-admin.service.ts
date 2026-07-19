@@ -84,32 +84,133 @@ export class SuperAdminService {
     });
   }
 
-  // ── Platform Analytics ──────────────────────────────
+  // ── Subscription Plans ──────────────────────────────
+
+  async getAllSubscriptionPlans() {
+    return this.prisma.subscriptionPlan.findMany({ orderBy: { priceNGN: 'asc' } });
+  }
+
+  // ── School Subscriptions ─────────────────────────────
+
+  async getAllSchoolSubscriptions(page: number, limit: number, status?: string, planId?: string) {
+    const where: any = {};
+    if (status) where.status = status;
+    if (planId) where.planId = planId;
+
+    const [data, total] = await Promise.all([
+      this.prisma.schoolSubscription.findMany({
+        where,
+        skip: (page - 1) * limit,
+        take: limit,
+        orderBy: { createdAt: 'desc' },
+        include: {
+          school: {
+            select: {
+              id: true,
+              name: true,
+              slug: true,
+              email: true,
+              logo: true,
+              isActive: true,
+              _count: { select: { students: true, users: true } },
+            },
+          },
+          plan: {
+            select: {
+              id: true,
+              name: true,
+              priceNGN: true,
+              duration: true,
+              maxStudents: true,
+              maxUsers: true,
+              storageGB: true,
+            },
+          },
+        },
+      }),
+      this.prisma.schoolSubscription.count({ where }),
+    ]);
+    return { data, meta: { total, page, limit } };
+  }
+
+  async assignPlanToSchool(schoolId: string, planId: string) {
+    const school = await this.prisma.school.findUnique({ where: { id: schoolId } });
+    if (!school) throw new NotFoundException('School not found');
+
+    const plan = await this.prisma.subscriptionPlan.findUnique({ where: { id: planId } });
+    if (!plan) throw new NotFoundException('Plan not found');
+
+    await this.prisma.schoolSubscription.updateMany({
+      where: { schoolId, status: { in: ['ACTIVE', 'TRIAL'] } },
+      data: { status: 'CANCELLED', cancelledAt: new Date() },
+    });
+
+    const endDate = new Date();
+    endDate.setDate(endDate.getDate() + plan.duration);
+
+    return this.prisma.schoolSubscription.create({
+      data: { schoolId, planId, endDate, status: 'ACTIVE', autoRenew: true },
+      include: { plan: true, school: { select: { id: true, name: true } } },
+    });
+  }
+
+  async cancelSchoolSubscription(schoolId: string) {
+    const sub = await this.prisma.schoolSubscription.findFirst({
+      where: { schoolId, status: { in: ['ACTIVE', 'TRIAL'] } },
+    });
+    if (!sub) throw new NotFoundException('No active subscription found');
+    return this.prisma.schoolSubscription.update({
+      where: { id: sub.id },
+      data: { status: 'CANCELLED', cancelledAt: new Date() },
+    });
+  }
+
+  // ── Platform Audit Logs ──────────────────────────────
+
+  async getPlatformAuditLogs(page: number, limit: number, action?: string, entityType?: string) {
+    const where: any = {};
+    if (action) where.action = { contains: action, mode: 'insensitive' };
+    if (entityType) where.entityType = { contains: entityType, mode: 'insensitive' };
+
+    const [data, total] = await Promise.all([
+      this.prisma.auditLog.findMany({
+        where,
+        skip: (page - 1) * limit,
+        take: limit,
+        orderBy: { createdAt: 'desc' },
+        include: {
+          actor: {
+            select: {
+              id: true,
+              firstName: true,
+              lastName: true,
+              email: true,
+              schoolId: true,
+              school: { select: { id: true, name: true } },
+            },
+          },
+        },
+      }),
+      this.prisma.auditLog.count({ where }),
+    ]);
+    return { data, meta: { total, page, limit } };
+  }
 
   async getPlatformStats() {
-    const [
-      totalSchools,
-      activeSchools,
-      totalUsers,
-      totalStudents,
-      totalTeachers,
-      subscriptions,
-    ] = await Promise.all([
-      this.prisma.school.count({ where: { deletedAt: null } }),
-      this.prisma.school.count({ where: { isActive: true, deletedAt: null } }),
-      this.prisma.user.count({ where: { deletedAt: null } }),
-      this.prisma.student.count({ where: { deletedAt: null } }),
-      this.prisma.teacher.count({ where: { deletedAt: null } }),
-      this.prisma.schoolSubscription.findMany({
-        where: { status: 'ACTIVE' },
-        include: { plan: true },
-      }),
-    ]);
+    const [totalSchools, activeSchools, totalUsers, totalStudents, totalTeachers, subscriptions] =
+      await Promise.all([
+        this.prisma.school.count({ where: { deletedAt: null } }),
+        this.prisma.school.count({ where: { isActive: true, deletedAt: null } }),
+        this.prisma.user.count({ where: { deletedAt: null } }),
+        this.prisma.student.count({ where: { deletedAt: null } }),
+        this.prisma.teacher.count({ where: { deletedAt: null } }),
+        this.prisma.schoolSubscription.findMany({
+          where: { status: 'ACTIVE' },
+          include: { plan: true },
+        }),
+      ]);
 
-    const totalRevenue = subscriptions.reduce(
-      (sum, sub) => sum + sub.plan.priceNGN,
-      0,
-    );
+    const totalRevenue = subscriptions.reduce((sum, sub) => sum + sub.plan.priceNGN, 0);
 
     const monthlyRecurringRevenue = subscriptions.reduce((sum, sub) => {
       const months = Math.max(1, sub.plan.duration / 30);

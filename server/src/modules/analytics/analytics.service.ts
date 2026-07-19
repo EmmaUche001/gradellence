@@ -22,9 +22,7 @@ export class AnalyticsService {
       totalTeachers,
       totalClasses,
       totalSubjects,
-      activeSession: activeSession
-        ? { id: activeSession.id, name: activeSession.name }
-        : null,
+      activeSession: activeSession ? { id: activeSession.id, name: activeSession.name } : null,
       currentTerm: currentTerm ? { id: currentTerm.id, name: currentTerm.name } : null,
     };
   }
@@ -147,5 +145,126 @@ export class AnalyticsService {
       totalScore: row.totalScore,
       averageScore: row.averageScore,
     }));
+  }
+
+  // ── Enrollment history ──────────────────────────────────────────────────
+  // Groups new enrollments by month/week for the enrollment trend chart.
+  async getEnrollmentHistory(schoolId: string, period: '7d' | '30d' | '90d' | '1y' = '30d') {
+    const now = new Date();
+    const from = new Date(now);
+    if (period === '7d') from.setDate(now.getDate() - 7);
+    else if (period === '30d') from.setDate(now.getDate() - 30);
+    else if (period === '90d') from.setDate(now.getDate() - 90);
+    else from.setFullYear(now.getFullYear() - 1);
+
+    const enrollments = await this.prisma.enrollment.findMany({
+      where: {
+        student: { schoolId },
+        createdAt: { gte: from },
+      },
+      select: { createdAt: true },
+      orderBy: { createdAt: 'asc' },
+    });
+
+    // Bucket by label depending on period
+    const buckets = new Map<string, number>();
+
+    const labelFor = (d: Date): string => {
+      if (period === '7d' || period === '30d') {
+        // Daily buckets: "Jun 1"
+        return d.toLocaleDateString('en-GB', { day: '2-digit', month: 'short' });
+      }
+      // Monthly buckets: "Jun 2026"
+      return d.toLocaleDateString('en-GB', { month: 'short', year: 'numeric' });
+    };
+
+    // Pre-fill all expected labels with 0 so the chart has no gaps
+    if (period === '7d') {
+      for (let i = 6; i >= 0; i--) {
+        const d = new Date(now);
+        d.setDate(now.getDate() - i);
+        buckets.set(labelFor(d), 0);
+      }
+    } else if (period === '30d') {
+      for (let i = 29; i >= 0; i--) {
+        const d = new Date(now);
+        d.setDate(now.getDate() - i);
+        buckets.set(labelFor(d), 0);
+      }
+    } else if (period === '90d') {
+      for (let i = 2; i >= 0; i--) {
+        const d = new Date(now);
+        d.setMonth(now.getMonth() - i);
+        d.setDate(1);
+        buckets.set(labelFor(d), 0);
+      }
+    } else {
+      for (let i = 11; i >= 0; i--) {
+        const d = new Date(now);
+        d.setMonth(now.getMonth() - i);
+        d.setDate(1);
+        buckets.set(labelFor(d), 0);
+      }
+    }
+
+    for (const e of enrollments) {
+      const label = labelFor(new Date(e.createdAt));
+      buckets.set(label, (buckets.get(label) ?? 0) + 1);
+    }
+
+    const labels = Array.from(buckets.keys());
+    const data = Array.from(buckets.values());
+
+    return {
+      period,
+      totalEnrollments: enrollments.length,
+      labels,
+      data,
+    };
+  }
+
+  // ── Grade distribution ──────────────────────────────────────────────────
+  // Returns a count of results per grade band (A/B/C/D/F) for a given term.
+  async getGradeDistribution(schoolId: string, termId?: string) {
+    const where: any = { schoolId, isPublished: true };
+    if (termId) where.termId = termId;
+
+    const results = await this.prisma.result.findMany({
+      where,
+      select: { totalScore: true, grade: true },
+    });
+
+    const total = results.length;
+
+    // Use the school's configured grade scales to determine bands
+    const gradeScales = await this.prisma.gradeScale.findMany({
+      where: { schoolId, isActive: true },
+      orderBy: { minScore: 'desc' },
+    });
+
+    // Build bands: Excellent (≥80), Good (60-79), Average (40-59), Needs Support (<40)
+    const bands = [
+      { name: 'Excellent (80-100%)', min: 80, max: 100, count: 0, color: '#2563EB' },
+      { name: 'Good (60-79%)', min: 60, max: 79, count: 0, color: '#22C55E' },
+      { name: 'Average (40-59%)', min: 40, max: 59, count: 0, color: '#F59E0B' },
+      { name: 'Needs Support (<40%)', min: 0, max: 39, count: 0, color: '#EF4444' },
+    ];
+
+    for (const r of results) {
+      const score = r.totalScore;
+      const band = bands.find((b) => score >= b.min && score <= b.max);
+      if (band) band.count++;
+    }
+
+    return {
+      total,
+      termId: termId ?? null,
+      bands: bands.map((b) => ({
+        name: b.name,
+        count: b.count,
+        percent: total > 0 ? Math.round((b.count / total) * 10000) / 100 : 0,
+        color: b.color,
+      })),
+    };
   }
 }

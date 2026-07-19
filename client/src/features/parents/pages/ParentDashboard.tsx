@@ -1,6 +1,12 @@
 import React, { useEffect, useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
+import { GraduationCap, TrendingUp, BarChart3, AlertCircle } from 'lucide-react';
 import { parentDashboard } from '../services/parentApi';
+import { ParentPortalLayout } from '../components/ParentPortalLayout';
+import { Avatar } from '../../../components/ui/Avatar';
+import { Badge } from '../../../components/ui/Badge';
+import { EmptyState } from '../../../components/ui/EmptyState';
+import { SkeletonCard } from '../../../components/ui/SkeletonLoader';
 
 interface Student {
   id: string;
@@ -12,112 +18,119 @@ interface Student {
   latestAverage: number | null;
 }
 
+function avgBadge(avg: number | null): 'success' | 'warning' | 'danger' | 'gray' {
+  if (avg === null) return 'gray';
+  if (avg >= 70) return 'success';
+  if (avg >= 50) return 'warning';
+  return 'danger';
+}
+
 const ParentDashboard: React.FC = () => {
   const navigate = useNavigate();
   const [students, setStudents] = useState<Student[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState('');
+  const [loading, setLoading]   = useState(true);
+  const [error, setError]       = useState('');
 
   useEffect(() => {
     const token = localStorage.getItem('parent_token');
-    if (!token) {
-      navigate('/parent/login');
-      return;
-    }
+    if (!token) { navigate('/parent/login'); return; }
 
-    parentDashboard
-      .getStudents()
+    parentDashboard.getStudents()
       .then(setStudents)
-      .catch((err) => {
+      .catch(err => {
         if (err?.response?.status === 401) {
           localStorage.removeItem('parent_token');
           navigate('/parent/login');
+          return;
         }
-        setError('Failed to load students');
+        setError('Failed to load students.');
       })
       .finally(() => setLoading(false));
   }, [navigate]);
 
-  const handleLogout = () => {
-    localStorage.removeItem('parent_token');
-    navigate('/parent/login');
-  };
-
-  if (loading) {
-    return (
-      <div className="min-h-screen flex items-center justify-center">
-        <div className="text-gray-600">Loading...</div>
-      </div>
-    );
-  }
-
   return (
-    <div className="min-h-screen bg-gray-50">
-      <header className="bg-white shadow">
-        <div className="max-w-7xl mx-auto px-4 py-4 flex justify-between items-center">
-          <h1 className="text-2xl font-bold text-gray-900">Parent Dashboard</h1>
-          <button onClick={handleLogout} className="text-sm text-red-600 hover:text-red-800">
-            Logout
-          </button>
+    <ParentPortalLayout>
+      <div className="space-y-6">
+        {/* Heading */}
+        <div>
+          <h1 className="text-page-title text-gray-900">My Children</h1>
+          <p className="mt-1 text-sm text-gray-500">Track academic results and performance for each child.</p>
         </div>
-      </header>
 
-      <main className="max-w-7xl mx-auto px-4 py-8">
         {error && (
-          <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded mb-6">
-            {error}
+          <div className="flex items-start gap-3 px-4 py-3 rounded-xl bg-danger-50 border border-danger-100">
+            <AlertCircle size={16} className="text-danger-600 shrink-0 mt-0.5" />
+            <p className="text-sm text-danger-700">{error}</p>
           </div>
         )}
 
-        {students.length === 0 ? (
-          <div className="text-center py-12">
-            <p className="text-gray-500 text-lg">No students linked to your account.</p>
-            <p className="text-gray-400 mt-2">
-              Contact your school to link your children.
-            </p>
+        {loading ? (
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
+            {[0, 1, 2].map(i => <SkeletonCard key={i} />)}
+          </div>
+        ) : students.length === 0 ? (
+          <div className="bg-surface rounded-card border border-border">
+            <EmptyState
+              icon={<GraduationCap size={40} />}
+              title="No students linked"
+              description="Contact your school admin to link your children to your parent account."
+            />
           </div>
         ) : (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-            {students.map((student) => (
-              <div key={student.id} className="bg-white rounded-lg shadow-md p-6">
-                <h3 className="text-lg font-semibold text-gray-900">
-                  {student.firstName} {student.lastName}
-                </h3>
-                <p className="text-sm text-gray-500 mt-1">
-                  Admission: {student.admissionNumber}
-                </p>
-                {student.currentClass && (
-                  <p className="text-sm text-gray-500">Class: {student.currentClass}</p>
-                )}
-                {student.currentTerm && (
-                  <p className="text-sm text-gray-500">Term: {student.currentTerm}</p>
-                )}
-                {student.latestAverage !== null && (
-                  <p className="text-sm font-medium text-blue-600 mt-2">
-                    Latest Average: {student.latestAverage.toFixed(1)}
-                  </p>
-                )}
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
+            {students.map(student => (
+              <div key={student.id}
+                className="bg-surface rounded-card p-6 shadow-sm border border-border hover:-translate-y-0.5 hover:shadow-md transition-all duration-150">
+                {/* Avatar + name */}
+                <div className="flex items-center gap-3 mb-4">
+                  <Avatar name={`${student.firstName} ${student.lastName}`} size="md" />
+                  <div>
+                    <p className="text-sm font-bold text-gray-900">{student.firstName} {student.lastName}</p>
+                    <p className="text-xs text-gray-400">{student.admissionNumber}</p>
+                  </div>
+                </div>
 
-                <div className="mt-4 space-y-2">
-                  <Link
-                    to={`/parent/students/${student.id}/results`}
-                    className="block text-center py-2 px-4 bg-blue-600 text-white rounded hover:bg-blue-700 text-sm"
-                  >
-                    View Results
+                {/* Info pills */}
+                <div className="space-y-2 mb-5">
+                  {student.currentClass && (
+                    <div className="flex items-center justify-between text-sm">
+                      <span className="text-gray-500">Class</span>
+                      <span className="font-medium text-gray-800">{student.currentClass}</span>
+                    </div>
+                  )}
+                  {student.currentTerm && (
+                    <div className="flex items-center justify-between text-sm">
+                      <span className="text-gray-500">Term</span>
+                      <span className="font-medium text-gray-800">{student.currentTerm}</span>
+                    </div>
+                  )}
+                  {student.latestAverage !== null && (
+                    <div className="flex items-center justify-between text-sm">
+                      <span className="text-gray-500">Latest avg.</span>
+                      <Badge variant={avgBadge(student.latestAverage)}>
+                        {student.latestAverage.toFixed(1)}%
+                      </Badge>
+                    </div>
+                  )}
+                </div>
+
+                {/* CTAs */}
+                <div className="grid grid-cols-2 gap-2">
+                  <Link to={`/parent/students/${student.id}/results`}
+                    className="flex items-center justify-center gap-1.5 h-9 text-xs font-semibold text-primary-600 bg-primary-50 rounded-lg hover:bg-primary-100 transition-colors">
+                    <BarChart3 size={13} /> Results
                   </Link>
-                  <Link
-                    to={`/parent/students/${student.id}/analytics`}
-                    className="block text-center py-2 px-4 bg-green-600 text-white rounded hover:bg-green-700 text-sm"
-                  >
-                    View Analytics
+                  <Link to={`/parent/students/${student.id}/analytics`}
+                    className="flex items-center justify-center gap-1.5 h-9 text-xs font-semibold text-success-600 bg-success-50 rounded-lg hover:bg-success-100 transition-colors">
+                    <TrendingUp size={13} /> Analytics
                   </Link>
                 </div>
               </div>
             ))}
           </div>
         )}
-      </main>
-    </div>
+      </div>
+    </ParentPortalLayout>
   );
 };
 

@@ -3,134 +3,86 @@ import { useNavigate, useParams } from 'react-router-dom';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
+import { AlertCircle } from 'lucide-react';
 import { classService } from '../../../services/classService';
+import { PageHeader } from '../../../components/ui/PageHeader';
+import { Input } from '../../../components/ui/Input';
+import { FormSection, FormActions } from '../../../components/ui/FormSection';
+import { SkeletonCard } from '../../../components/ui/SkeletonLoader';
 
-const classSchema = z.object({
-  names: z.string().min(1, 'At least one class name is required'),
+const schema = z.object({
+  names:  z.string().min(1, 'At least one class name is required'),
   stream: z.string().optional(),
 });
-
-type ClassFormData = z.infer<typeof classSchema>;
+type FormData = z.infer<typeof schema>;
 
 export function ClassFormPage() {
   const { id } = useParams();
   const navigate = useNavigate();
   const isEdit = Boolean(id);
-  const [isLoading, setIsLoading] = useState(false);
-  const [isFetching, setIsFetching] = useState(isEdit);
-  const [error, setError] = useState<string | null>(null);
+  const [saving, setSaving]     = useState(false);
+  const [fetching, setFetching] = useState(isEdit);
+  const [error, setError]       = useState<string | null>(null);
 
-  const {
-    register,
-    handleSubmit,
-    reset,
-    formState: { errors },
-  } = useForm<ClassFormData>({
-    resolver: zodResolver(classSchema),
-  });
+  const { register, handleSubmit, reset, formState: { errors } } = useForm<FormData>({ resolver: zodResolver(schema) });
 
   useEffect(() => {
-    if (id) {
-      setIsFetching(true);
-      classService
-        .getById(id)
-        .then((response) => {
-          const cls = response.data;
-          reset({
-            names: cls.name,
-            stream: cls.stream || '',
-          });
-        })
-        .catch((err) => setError(err.response?.data?.message || 'Failed to load class'))
-        .finally(() => setIsFetching(false));
-    }
+    if (!id) return;
+    setFetching(true);
+    classService.getById(id)
+      .then(r => reset({ names: r.data.name, stream: r.data.stream || '' }))
+      .catch(e => setError(e.response?.data?.message || 'Failed to load'))
+      .finally(() => setFetching(false));
   }, [id, reset]);
 
-  const onSubmit = async (data: ClassFormData) => {
-    setIsLoading(true);
-    setError(null);
-
+  const onSubmit = async (data: FormData) => {
+    setSaving(true); setError(null);
     try {
-      if (isEdit && id) {
-        await classService.update(id, data);
-      } else {
-        await classService.create(data);
-      }
+      isEdit && id ? await classService.update(id, data) : await classService.create(data);
       navigate('/classes');
-    } catch (err: any) {
-      setError(err.response?.data?.message || 'Failed to save class');
-    } finally {
-      setIsLoading(false);
-    }
+    } catch (e: any) { setError(e.response?.data?.message || 'Failed to save'); }
+    finally { setSaving(false); }
   };
 
-  if (isFetching) {
-    return (
-      <div className="flex items-center justify-center h-64">
-        <p className="text-gray-500">Loading class details...</p>
-      </div>
-    );
-  }
+  if (fetching) return <div className="max-w-2xl mx-auto"><SkeletonCard /></div>;
 
   return (
     <div className="max-w-2xl mx-auto space-y-6">
-      <div>
-        <h1 className="text-2xl font-bold text-gray-900">
-          {isEdit ? 'Edit Class' : 'Add New Classes'}
-        </h1>
-        <p className="mt-1 text-sm text-gray-500">
-          {isEdit ? 'Update class information' : 'Enter class names separated by commas to create multiple classes at once'}
-        </p>
-      </div>
+      <PageHeader
+        title={isEdit ? 'Edit Class' : 'Add New Classes'}
+        description={isEdit ? 'Update class information' : 'Enter names separated by commas to create multiple classes at once'}
+        breadcrumbs={[{ label: 'Classes', onClick: () => navigate('/classes') }, { label: isEdit ? 'Edit' : 'New' }]}
+      />
 
       {error && (
-        <div className="rounded-md bg-red-50 p-4">
-          <p className="text-sm text-red-700">{error}</p>
+        <div className="flex items-start gap-3 px-4 py-3 rounded-xl bg-danger-50 border border-danger-100">
+          <AlertCircle size={16} className="text-danger-600 shrink-0 mt-0.5" />
+          <p className="text-sm text-danger-700">{error}</p>
         </div>
       )}
 
-      <form onSubmit={handleSubmit(onSubmit)} className="card p-6 space-y-6">
-        <div>
-          <label className="label">Class Names *</label>
-          <textarea
-            {...register('names')}
-            className="input"
-            rows={3}
-            placeholder="e.g. JSS1, JSS2, SS1A, SS1B, SS1C"
-          />
-          {errors.names && (
-            <p className="mt-1 text-sm text-red-600">{errors.names.message}</p>
-          )}
-          <p className="mt-1 text-xs text-gray-500">
-            Separate multiple classes with commas
-          </p>
-        </div>
+      <form onSubmit={handleSubmit(onSubmit)} className="space-y-5">
+        <FormSection title="Class Details">
+          <div className="space-y-4">
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1.5">
+                Class Names <span className="text-danger-500">*</span>
+              </label>
+              <textarea
+                {...register('names')}
+                rows={isEdit ? 2 : 4}
+                placeholder={isEdit ? 'Class name' : 'e.g. JSS1A, JSS1B, JSS2A, SS1A, SS1B'}
+                className="w-full rounded-input border border-border px-4 py-3 text-sm text-gray-900 placeholder-gray-400 bg-surface
+                  focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-primary-500 resize-none"
+              />
+              {errors.names && <p className="mt-1.5 text-xs font-medium text-danger-600">{errors.names.message}</p>}
+              {!isEdit && <p className="mt-1.5 text-xs text-gray-400">Separate multiple class names with commas.</p>}
+            </div>
+            <Input {...register('stream')} id="stream" label="Stream" placeholder="e.g. Science, Arts (optional)" />
+          </div>
+        </FormSection>
 
-        <div>
-          <label className="label">Stream</label>
-          <input
-            {...register('stream')}
-            className="input"
-            placeholder="e.g. A (optional)"
-          />
-        </div>
-
-        <div className="flex items-center justify-end space-x-4 pt-4 border-t border-gray-200">
-          <button
-            type="button"
-            onClick={() => navigate('/classes')}
-            className="btn-secondary"
-          >
-            Cancel
-          </button>
-          <button
-            type="submit"
-            disabled={isLoading}
-            className="btn-primary disabled:opacity-50"
-          >
-            {isLoading ? 'Saving...' : isEdit ? 'Update Class' : 'Create Classes'}
-          </button>
-        </div>
+        <FormActions onCancel={() => navigate('/classes')} submitLabel={isEdit ? 'Update Class' : 'Create Classes'} loading={saving} />
       </form>
     </div>
   );

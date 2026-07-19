@@ -31,7 +31,14 @@ export class ParentJwtStrategy extends PassportStrategy(Strategy, 'parent-jwt') 
 
     const parent = await this.prisma.parent.findUnique({
       where: { id: payload.sub },
-      select: { id: true, email: true, schoolId: true, firstName: true, lastName: true, isActive: true },
+      select: {
+        id: true,
+        email: true,
+        schoolId: true,
+        firstName: true,
+        lastName: true,
+        isActive: true,
+      },
     });
 
     if (!parent || !parent.isActive) {

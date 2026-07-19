@@ -1,87 +1,109 @@
 import React from 'react';
 import { Outlet, NavLink, useNavigate } from 'react-router-dom';
+import {
+  LayoutDashboard, School, CreditCard, BarChart3,
+  LogOut, ArrowLeftRight, Shield, BookMarked, Users,
+} from 'lucide-react';
 import { useAuthStore } from '../store/authStore';
+import { Avatar } from '../components/ui/Avatar';
+import { ToastContainer } from '../components/ui/Toast';
 
 const navItems = [
-  { to: '/super-admin', label: 'Dashboard', icon: '📊', end: true },
-  { to: '/super-admin/schools', label: 'Schools', icon: '🏫' },
-  { to: '/super-admin/subscriptions', label: 'Subscriptions', icon: '💳' },
-  { to: '/super-admin/analytics', label: 'Analytics', icon: '📈' },
-  { to: '/super-admin/audit-logs', label: 'Audit Logs', icon: '📋' },
+  { to: '/super-admin',                    label: 'Dashboard',     icon: LayoutDashboard, end: true },
+  { to: '/super-admin/schools',            label: 'Schools',       icon: School },
+  { to: '/super-admin/subscriptions',      label: 'Plans',         icon: CreditCard },
+  { to: '/super-admin/active-subs',        label: 'Subscriptions', icon: Users },
+  { to: '/super-admin/analytics',          label: 'Analytics',     icon: BarChart3 },
+  { to: '/super-admin/audit-logs',         label: 'Audit Logs',    icon: BookMarked },
 ];
 
 const SuperAdminLayout: React.FC = () => {
   const { user, logout } = useAuthStore();
   const navigate = useNavigate();
 
-  const handleLogout = () => {
-    logout();
-    navigate('/login');
-  };
+  const handleLogout = () => { logout(); navigate('/login'); };
 
   return (
-    <div className="min-h-screen bg-gray-50">
-      {/* Top Navigation */}
-      <header className="bg-indigo-900 text-white shadow-lg">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex items-center justify-between h-16">
-            <div className="flex items-center space-x-3">
-              <span className="text-2xl">⚙️</span>
-              <h1 className="text-xl font-bold">SRMS Admin</h1>
-            </div>
-            <div className="flex items-center space-x-4">
-              <span className="text-sm text-indigo-200">
-                {user?.firstName} {user?.lastName}
-              </span>
-              <span className="px-2 py-1 text-xs bg-yellow-500 text-black rounded-full font-semibold">
-                SUPER ADMIN
-              </span>
-              <button
-                onClick={() => navigate('/dashboard')}
-                className="text-sm text-indigo-200 hover:text-white transition-colors"
-              >
-                Switch to School
-              </button>
-              <button
-                onClick={handleLogout}
-                className="px-3 py-1.5 text-sm bg-red-600 hover:bg-red-700 rounded-md transition-colors"
-              >
-                Logout
-              </button>
-            </div>
+    <div className="min-h-screen bg-gray-900 flex">
+
+      {/* ── Sidebar ─────────────────────────────────────── */}
+      <aside className="w-[240px] bg-gray-900 border-r border-gray-800 flex flex-col flex-shrink-0">
+
+        {/* Logo */}
+        <div className="h-16 flex items-center gap-3 px-5 border-b border-gray-800">
+          <div className="w-8 h-8 bg-primary-600 rounded-lg flex items-center justify-center">
+            <Shield size={18} className="text-white" />
+          </div>
+          <div>
+            <p className="text-sm font-bold text-white leading-tight">Gradellence</p>
+            <p className="text-[10px] font-semibold text-primary-400 uppercase tracking-wider">Super Admin</p>
           </div>
         </div>
-      </header>
 
-      <div className="flex">
-        {/* Sidebar */}
-        <aside className="w-64 bg-white shadow-md min-h-[calc(100vh-4rem)]">
-          <nav className="mt-4 px-2 space-y-1">
-            {navItems.map((item) => (
-              <NavLink
-                key={item.to}
-                to={item.to}
-                end={item.end}
-                className={({ isActive }) =>
-                  `flex items-center px-4 py-3 text-sm font-medium rounded-lg transition-colors ${
-                    isActive
-                      ? 'bg-indigo-50 text-indigo-700 border-r-2 border-indigo-700'
-                      : 'text-gray-600 hover:bg-gray-50 hover:text-gray-900'
-                  }`
-                }
-              >
-                <span className="mr-3 text-lg">{item.icon}</span>
-                {item.label}
-              </NavLink>
-            ))}
-          </nav>
-        </aside>
+        {/* Nav */}
+        <nav className="flex-1 py-4 px-3 space-y-0.5">
+          {navItems.map(item => (
+            <NavLink
+              key={item.to}
+              to={item.to}
+              end={item.end}
+              className={({ isActive }) => [
+                'flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-all duration-150',
+                isActive
+                  ? 'bg-primary-600/20 text-primary-400'
+                  : 'text-gray-400 hover:bg-gray-800 hover:text-gray-100',
+              ].join(' ')}
+            >
+              <item.icon size={17} className="shrink-0" />
+              {item.label}
+            </NavLink>
+          ))}
+        </nav>
 
-        {/* Main Content */}
-        <main className="flex-1 p-6 lg:p-8">
-          <Outlet />
+        {/* Footer */}
+        <div className="border-t border-gray-800 p-4 space-y-2">
+          <button
+            onClick={() => navigate('/dashboard')}
+            className="flex items-center gap-2.5 w-full px-3 py-2 text-sm text-gray-400 hover:text-gray-100 hover:bg-gray-800 rounded-lg transition-colors"
+          >
+            <ArrowLeftRight size={15} />
+            Switch to School
+          </button>
+          <div className="flex items-center gap-2.5 px-3 py-2">
+            <Avatar name={`${user?.firstName} ${user?.lastName}`} size="xs" />
+            <div className="flex-1 min-w-0">
+              <p className="text-xs font-medium text-gray-300 truncate">{user?.firstName} {user?.lastName}</p>
+            </div>
+            <button
+              onClick={handleLogout}
+              className="p-1 rounded text-gray-500 hover:text-danger-400 transition-colors"
+              aria-label="Logout"
+            >
+              <LogOut size={14} />
+            </button>
+          </div>
+        </div>
+      </aside>
+
+      {/* ── Main ────────────────────────────────────────── */}
+      <div className="flex-1 flex flex-col min-w-0">
+        {/* Top bar */}
+        <header className="h-16 bg-gray-900 border-b border-gray-800 flex items-center px-6 flex-shrink-0">
+          <div className="flex items-center gap-2">
+            <span className="text-xs font-bold px-2.5 py-1 rounded-full bg-warning-500/20 text-warning-400 border border-warning-500/30 uppercase tracking-wider">
+              Platform Admin
+            </span>
+          </div>
+        </header>
+
+        <main className="flex-1 overflow-auto bg-gray-50">
+          <div className="max-w-[1440px] mx-auto p-6 lg:p-8">
+            <Outlet />
+          </div>
         </main>
       </div>
+
+      <ToastContainer />
     </div>
   );
 };

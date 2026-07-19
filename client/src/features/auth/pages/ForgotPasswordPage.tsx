@@ -1,17 +1,20 @@
 import React, { useState } from 'react';
 import { Link } from 'react-router-dom';
+import { Mail, AlertCircle, CheckCircle2, ArrowLeft } from 'lucide-react';
+import { AuthLayout } from '../components/AuthLayout';
+import { Input } from '../../../components/ui/Input';
+import { Button } from '../../../components/ui/Button';
 
 const ForgotPasswordPage: React.FC = () => {
-  const [email, setEmail] = useState('');
-  const [loading, setLoading] = useState(false);
-  const [success, setSuccess] = useState(false);
-  const [error, setError] = useState('');
+  const [email, setEmail]         = useState('');
+  const [loading, setLoading]     = useState(false);
+  const [success, setSuccess]     = useState(false);
+  const [error, setError]         = useState('');
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
     setError('');
-    setSuccess(false);
 
     try {
       const response = await fetch('/api/auth/forgot-password', {
@@ -19,94 +22,104 @@ const ForgotPasswordPage: React.FC = () => {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ email }),
       });
-
       const data = await response.json();
-      
       if (response.ok) {
         setSuccess(true);
       } else {
-        setError(data.error?.message || data.message || 'Failed to send reset email');
+        setError(data.error?.message || data.message || 'Failed to send reset email.');
       }
-    } catch (err) {
-      setError('An error occurred. Please try again.');
+    } catch {
+      setError('Network error. Please try again.');
     } finally {
       setLoading(false);
     }
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gray-50 py-12 px-4 sm:px-6 lg:px-8">
-      <div className="max-w-md w-full space-y-8">
-        <div>
-          <h2 className="mt-6 text-center text-3xl font-extrabold text-gray-900">
-            Forgot your password?
-          </h2>
-          <p className="mt-2 text-center text-sm text-gray-600">
-            Enter your email and we'll send you a reset link
-          </p>
-        </div>
+    <AuthLayout tagline="Secure, reliable access to your school's academic records.">
 
-        {success ? (
-          <div className="rounded-md bg-green-50 p-4">
-            <p className="text-sm text-green-700">
-              If an account with that email exists, we've sent a password reset link.
-              Please check your inbox.
-            </p>
-            <div className="mt-4">
-              <Link
-                to="/login"
-                className="font-medium text-indigo-600 hover:text-indigo-500"
-              >
-                Back to login
-              </Link>
+      {success ? (
+        /* ── Success state ───────────────────────────────────── */
+        <div className="text-center">
+          <div className="flex justify-center mb-5">
+            <div className="w-16 h-16 bg-success-50 rounded-full flex items-center justify-center">
+              <CheckCircle2 size={32} className="text-success-600" />
             </div>
           </div>
-        ) : (
-          <form className="mt-8 space-y-6" onSubmit={handleSubmit}>
-            {error && (
-              <div className="rounded-md bg-red-50 p-4">
-                <p className="text-sm text-red-700">{error}</p>
-              </div>
-            )}
+          <h1 className="text-2xl font-bold text-gray-900 mb-2">Check your inbox</h1>
+          <p className="text-sm text-gray-500 mb-8 leading-relaxed">
+            If an account exists for <span className="font-medium text-gray-700">{email}</span>,
+            we've sent a password reset link. It may take a minute to arrive.
+          </p>
+          <Link to="/login">
+            <Button variant="primary" fullWidth>
+              Back to sign in
+            </Button>
+          </Link>
+          <button
+            type="button"
+            onClick={() => { setSuccess(false); setEmail(''); }}
+            className="mt-4 text-sm text-gray-500 hover:text-gray-700 transition-colors"
+          >
+            Try a different email
+          </button>
+        </div>
+      ) : (
+        /* ── Form state ──────────────────────────────────────── */
+        <>
+          {/* Back link */}
+          <Link
+            to="/login"
+            className="inline-flex items-center gap-1.5 text-sm text-gray-500 hover:text-gray-700 mb-8 transition-colors"
+          >
+            <ArrowLeft size={15} />
+            Back to sign in
+          </Link>
 
-            <div>
-              <label htmlFor="email" className="block text-sm font-medium text-gray-700">
-                Email address
-              </label>
-              <input
-                id="email"
-                name="email"
-                type="email"
-                required
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                className="mt-1 appearance-none relative block w-full px-3 py-2 border border-gray-300 placeholder-gray-500 text-gray-900 rounded-md focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 focus:z-10 sm:text-sm"
-                placeholder="you@example.com"
-              />
+          {/* Icon */}
+          <div className="flex justify-center mb-6">
+            <div className="w-14 h-14 bg-primary-50 rounded-2xl flex items-center justify-center">
+              <Mail size={26} className="text-primary-600" />
             </div>
+          </div>
 
-            <div>
-              <button
-                type="submit"
-                disabled={loading}
-                className="group relative w-full flex justify-center py-2 px-4 border border-transparent text-sm font-medium rounded-md text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 disabled:opacity-50 disabled:cursor-not-allowed"
-              >
-                {loading ? 'Sending...' : 'Send reset link'}
-              </button>
-            </div>
+          {/* Heading */}
+          <div className="text-center mb-8">
+            <h1 className="text-2xl font-bold text-gray-900">Forgot your password?</h1>
+            <p className="mt-2 text-sm text-gray-500">
+              Enter your email and we'll send you a reset link.
+            </p>
+          </div>
 
-            <div className="text-center">
-              <Link
-                to="/login"
-                className="font-medium text-indigo-600 hover:text-indigo-500"
-              >
-                Back to login
-              </Link>
+          {/* Error */}
+          {error && (
+            <div className="flex items-start gap-3 px-4 py-3 mb-5 rounded-xl bg-danger-50 border border-danger-100">
+              <AlertCircle size={16} className="text-danger-600 shrink-0 mt-0.5" />
+              <p className="text-sm text-danger-700">{error}</p>
             </div>
+          )}
+
+          <form onSubmit={handleSubmit} className="space-y-4" noValidate>
+            <Input
+              id="email"
+              type="email"
+              label="Email address"
+              placeholder="you@school.com"
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              autoComplete="email"
+              required
+              startIcon={<Mail size={16} />}
+            />
+
+            <Button type="submit" variant="primary" fullWidth loading={loading} size="md">
+              Send reset link
+            </Button>
           </form>
-        )}
-      </div>
-    </div>
+        </>
+      )}
+
+    </AuthLayout>
   );
 };
 

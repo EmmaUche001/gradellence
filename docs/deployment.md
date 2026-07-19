@@ -131,3 +131,51 @@ taskkill /PID <PID> /F
 ### CORS Errors
 - Verify `FRONTEND_URL` matches actual frontend domain
 - Check Vite proxy config in `client/vite.config.ts`
+
+
+## Production Deployment with SSL
+
+### Prerequisites
+
+- A domain pointed to your server's IP address
+- Docker and Docker Compose installed on the host
+- `certbot` installed on the host (`apt install certbot` on Ubuntu/Debian)
+
+### Step 1: Create the environment file
+
+Copy the example and fill in all values before deploying:
+
+```bash
+cp server/.env.example server/.env
+# Edit server/.env and set all required variables
+```
+
+### Step 2: Issue an SSL certificate
+
+Stop any process using port 80, then run:
+
+```bash
+certbot certonly --standalone -d yourdomain.com
+```
+
+Certificates are written to `/etc/letsencrypt/live/yourdomain.com/`. The production Nginx config mounts this directory automatically.
+
+### Step 3: Deploy with the production compose override
+
+```bash
+docker-compose -f docker-compose.yml -f docker-compose.prod.yml up -d --build
+```
+
+This brings up the full stack with the production Nginx (`nginx.prod.conf`) serving HTTPS on port 443 and redirecting HTTP on port 80.
+
+### Step 4: Renew certificates
+
+Let's Encrypt certificates expire after 90 days. Use the following command (add it to a cron job or systemd timer for automation):
+
+```bash
+certbot renew \
+  --pre-hook "docker-compose stop nginx" \
+  --post-hook "docker-compose start nginx"
+```
+
+This stops Nginx before renewal (freeing port 80 for the standalone challenge) and restarts it once the new certificate is in place.

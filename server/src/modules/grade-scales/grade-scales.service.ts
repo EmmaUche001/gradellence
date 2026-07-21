@@ -53,6 +53,7 @@ export class GradeScalesService {
 
     const where: any = {
       schoolId: currentUser.schoolId,
+      isActive: isActive ?? true,  // default: only return active grade scales
     };
 
     if (isActive !== undefined) {
@@ -87,6 +88,7 @@ export class GradeScalesService {
       where: {
         id,
         schoolId: currentUser.schoolId,
+        isActive: true,
       },
     });
 

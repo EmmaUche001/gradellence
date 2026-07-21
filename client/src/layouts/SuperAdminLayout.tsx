@@ -2,11 +2,40 @@ import React from 'react';
 import { Outlet, NavLink, useNavigate } from 'react-router-dom';
 import {
   LayoutDashboard, School, CreditCard, BarChart3,
-  LogOut, ArrowLeftRight, Shield, BookMarked, Users,
+  LogOut, ArrowLeftRight, Shield, BookMarked, Users, AlertTriangle,
 } from 'lucide-react';
 import { useAuthStore } from '../store/authStore';
 import { Avatar } from '../components/ui/Avatar';
 import { ToastContainer } from '../components/ui/Toast';
+
+interface ErrorBoundaryState { hasError: boolean; message: string }
+class SuperAdminErrorBoundary extends React.Component<{ children: React.ReactNode }, ErrorBoundaryState> {
+  constructor(props: { children: React.ReactNode }) {
+    super(props);
+    this.state = { hasError: false, message: '' };
+  }
+  static getDerivedStateFromError(error: Error) {
+    return { hasError: true, message: error.message };
+  }
+  render() {
+    if (this.state.hasError) {
+      return (
+        <div className="flex flex-col items-center justify-center h-full min-h-[60vh] gap-4 p-8 text-center">
+          <AlertTriangle size={40} className="text-warning-500" />
+          <h2 className="text-lg font-semibold text-gray-900">Something went wrong</h2>
+          <p className="text-sm text-gray-500 max-w-md">{this.state.message}</p>
+          <button
+            onClick={() => this.setState({ hasError: false, message: '' })}
+            className="px-4 py-2 text-sm font-medium text-white bg-primary-600 rounded-lg hover:bg-primary-700"
+          >
+            Try again
+          </button>
+        </div>
+      );
+    }
+    return this.props.children;
+  }
+}
 
 const navItems = [
   { to: '/super-admin',                    label: 'Dashboard',     icon: LayoutDashboard, end: true },
@@ -98,7 +127,9 @@ const SuperAdminLayout: React.FC = () => {
 
         <main className="flex-1 overflow-auto bg-gray-50">
           <div className="max-w-[1440px] mx-auto p-6 lg:p-8">
-            <Outlet />
+            <SuperAdminErrorBoundary>
+              <Outlet />
+            </SuperAdminErrorBoundary>
           </div>
         </main>
       </div>

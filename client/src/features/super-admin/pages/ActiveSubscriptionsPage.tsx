@@ -21,7 +21,7 @@ function subBadge(status: string): BadgeVariant {
 }
 
 const fmt = {
-  date:     (s: string) => new Date(s).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' }),
+  date:     (s?: string | null) => s ? new Date(s).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' }) : '—',
   currency: (n: number) => new Intl.NumberFormat('en-NG', { style: 'currency', currency: 'NGN', minimumFractionDigits: 0 }).format(n),
 };
 
@@ -73,7 +73,9 @@ const ActiveSubscriptionsPage: React.FC = () => {
     setLoading(true);
     try {
       const res = await superAdminApi.getAllSchoolSubscriptions({ page, limit, status: statusFilter || undefined, planId: planFilter || undefined });
-      let data: SubRecord[] = res.data.data ?? [];
+      const payload = (res.data as any);
+      let data: SubRecord[] = payload?.data ?? [];
+      setTotal(payload?.meta?.total ?? data.length);
       // client-side name search (no server-side search param on this endpoint)
       if (search.trim()) {
         const q = search.toLowerCase();
@@ -84,7 +86,6 @@ const ActiveSubscriptionsPage: React.FC = () => {
         );
       }
       setSubs(data);
-      setTotal(res.data.meta?.total ?? data.length);
     } catch {
       addToast('error', 'Failed to load subscriptions');
     } finally { setLoading(false); }
@@ -94,7 +95,7 @@ const ActiveSubscriptionsPage: React.FC = () => {
 
   useEffect(() => {
     superAdminApi.getSubscriptionPlans()
-      .then(r => setPlans((r.data as any)?.data ?? r.data ?? []))
+      .then(r => setPlans(r.data?.data ?? []))
       .catch(() => {});
   }, []);
 

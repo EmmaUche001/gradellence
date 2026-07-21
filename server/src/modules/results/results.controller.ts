@@ -123,12 +123,7 @@ export class ResultsController {
     );
   }
 
-  @Get(':id')
-  @Roles('SCHOOL_ADMIN', 'TEACHER')
-  @ApiOperation({ summary: 'Get result by ID' })
-  findOne(@Param('id') id: string, @CurrentUser() user: AuthenticatedUser) {
-    return this.resultsService.findOne(id, user);
-  }
+  // ── Static-segment routes MUST come before :id ──────────────────────────
 
   @Get('student/:studentId/:termId')
   @Roles('SCHOOL_ADMIN', 'TEACHER', 'PARENT')
@@ -268,5 +263,14 @@ export class ResultsController {
     });
 
     res.send(pdfBuffer);
+  }
+
+  // ── :id route last to avoid shadowing static segments ───────────────────
+
+  @Get(':id')
+  @Roles('SCHOOL_ADMIN', 'TEACHER')
+  @ApiOperation({ summary: 'Get result by ID' })
+  findOne(@Param('id') id: string, @CurrentUser() user: AuthenticatedUser) {
+    return this.resultsService.findOne(id, user);
   }
 }

@@ -34,7 +34,7 @@ export class SuperAdminService {
       this.prisma.school.count({ where }),
     ]);
 
-    return { data, meta: { total, page, limit } };
+    return { success: true, data, meta: { total, page, limit } };
   }
 
   async findSchoolById(id: string) {
@@ -130,7 +130,7 @@ export class SuperAdminService {
       }),
       this.prisma.schoolSubscription.count({ where }),
     ]);
-    return { data, meta: { total, page, limit } };
+    return { success: true, data, meta: { total, page, limit } };
   }
 
   async assignPlanToSchool(schoolId: string, planId: string) {
@@ -193,7 +193,7 @@ export class SuperAdminService {
       }),
       this.prisma.auditLog.count({ where }),
     ]);
-    return { data, meta: { total, page, limit } };
+    return { success: true, data, meta: { total, page, limit } };
   }
 
   async getPlatformStats() {

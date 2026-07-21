@@ -4,6 +4,7 @@ import {
   Post,
   Body,
   Patch,
+  Put,
   Param,
   Delete,
   UseGuards,
@@ -76,6 +77,7 @@ export class SubjectsController {
   }
 
   @Patch(':id')
+  @Put(':id')
   @Roles(ROLES.SUPER_ADMIN, ROLES.SCHOOL_ADMIN)
   @RateLimit(RATE_LIMIT_PRESETS.WRITE)
   @ApiOperation({ summary: 'Update subject' })

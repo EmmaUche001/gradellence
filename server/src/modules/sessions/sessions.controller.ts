@@ -4,6 +4,7 @@ import {
   Post,
   Body,
   Patch,
+  Put,
   Param,
   Delete,
   UseGuards,
@@ -96,6 +97,7 @@ export class SessionsController {
   }
 
   @Patch(':id')
+  @Put(':id')
   @Roles(ROLES.SUPER_ADMIN, ROLES.SCHOOL_ADMIN)
   @RateLimit(RATE_LIMIT_PRESETS.WRITE)
   @ApiOperation({ summary: 'Update session' })
@@ -167,6 +169,7 @@ export class SessionsController {
   }
 
   @Patch('terms/:id')
+  @Put('terms/:id')
   @Roles(ROLES.SUPER_ADMIN, ROLES.SCHOOL_ADMIN)
   @RateLimit(RATE_LIMIT_PRESETS.WRITE)
   @ApiOperation({ summary: 'Update term' })

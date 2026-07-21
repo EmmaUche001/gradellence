@@ -4,6 +4,7 @@ import {
   Post,
   Body,
   Patch,
+  Put,
   Param,
   Delete,
   UseGuards,
@@ -69,6 +70,22 @@ export class StudentsController {
     return this.studentsService.findAll(req.user, page, limit, search);
   }
 
+  // Static-segment routes must come before :id to avoid shadowing
+  @Get('export')
+  @Roles(ROLES.SUPER_ADMIN, ROLES.SCHOOL_ADMIN)
+  @RateLimit(RATE_LIMIT_PRESETS.READ)
+  @ApiOperation({ summary: 'Export students to CSV' })
+  @ApiQuery({ name: 'classId', required: false })
+  @ApiQuery({ name: 'termId', required: false })
+  async exportStudents(
+    @Request() req: AuthenticatedRequest,
+    @Query('classId') classId?: string,
+    @Query('termId') termId?: string,
+  ) {
+    const data = await this.studentsService.export(req.user.schoolId, classId, termId);
+    return this.exportService.toCsvStream(data, 'students');
+  }
+
   @Get(':id')
   @ApiOperation({ summary: 'Get student by ID' })
   @ApiResponse({ status: 200, description: 'Student retrieved successfully' })
@@ -78,6 +95,7 @@ export class StudentsController {
   }
 
   @Patch(':id')
+  @Put(':id')
   @Roles(ROLES.SUPER_ADMIN, ROLES.SCHOOL_ADMIN)
   @RateLimit(RATE_LIMIT_PRESETS.WRITE)
   @ApiOperation({ summary: 'Update student' })
@@ -129,20 +147,5 @@ export class StudentsController {
   async importStudents(@Request() req: AuthenticatedRequest, @Body() file: any) {
     const csvContent = file?.csv || '';
     return this.studentsService.importCsv(req.user.schoolId, csvContent);
-  }
-
-  @Get('export')
-  @Roles(ROLES.SUPER_ADMIN, ROLES.SCHOOL_ADMIN)
-  @RateLimit(RATE_LIMIT_PRESETS.READ)
-  @ApiOperation({ summary: 'Export students to CSV' })
-  @ApiQuery({ name: 'classId', required: false })
-  @ApiQuery({ name: 'termId', required: false })
-  async exportStudents(
-    @Request() req: AuthenticatedRequest,
-    @Query('classId') classId?: string,
-    @Query('termId') termId?: string,
-  ) {
-    const data = await this.studentsService.export(req.user.schoolId, classId, termId);
-    return this.exportService.toCsvStream(data, 'students');
   }
 }

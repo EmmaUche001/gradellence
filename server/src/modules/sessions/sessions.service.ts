@@ -441,9 +441,10 @@ export class SessionsService {
 
   async getCurrent(currentUser: AuthenticatedUser) {
     const session = await this.prisma.session.findFirst({
-      where: { schoolId: currentUser.schoolId, isCurrent: true },
+      where: { schoolId: currentUser.schoolId, isCurrent: true, deletedAt: null },
       include: {
         terms: {
+          where: { deletedAt: null },
           orderBy: { startDate: 'asc' },
         },
       },

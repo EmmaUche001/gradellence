@@ -4,6 +4,7 @@ import {
   Post,
   Body,
   Patch,
+  Put,
   Param,
   Delete,
   UseGuards,
@@ -11,6 +12,8 @@ import {
   Request,
   DefaultValuePipe,
   ParseIntPipe,
+  HttpCode,
+  HttpStatus,
 } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiResponse, ApiBearerAuth } from '@nestjs/swagger';
 import { ClassesService } from './classes.service';
@@ -70,6 +73,7 @@ export class ClassesController {
   }
 
   @Patch(':id')
+  @Put(':id')
   @Roles(ROLES.SUPER_ADMIN, ROLES.SCHOOL_ADMIN)
   @RateLimit(RATE_LIMIT_PRESETS.WRITE)
   @ApiOperation({ summary: 'Update class' })
@@ -91,5 +95,44 @@ export class ClassesController {
   @ApiResponse({ status: 404, description: 'Class not found' })
   async remove(@Param('id') id: string, @Request() req: AuthenticatedRequest) {
     return this.classesService.remove(id, req.user);
+  }
+
+  // ── Subject assignment routes ──────────────────────────────────────────────
+
+  @Get(':id/subjects')
+  @ApiOperation({ summary: 'Get subjects assigned to a class' })
+  @ApiResponse({ status: 200, description: 'Class subjects retrieved successfully' })
+  @ApiResponse({ status: 404, description: 'Class not found' })
+  async getClassSubjects(@Param('id') id: string, @Request() req: AuthenticatedRequest) {
+    return this.classesService.getClassSubjects(id, req.user);
+  }
+
+  @Post(':id/subjects')
+  @Roles(ROLES.SUPER_ADMIN, ROLES.SCHOOL_ADMIN)
+  @RateLimit(RATE_LIMIT_PRESETS.WRITE)
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: 'Assign subjects to a class' })
+  @ApiResponse({ status: 200, description: 'Subjects assigned successfully' })
+  @ApiResponse({ status: 404, description: 'Class not found' })
+  async assignSubjects(
+    @Param('id') id: string,
+    @Body() body: { subjectIds: string[] },
+    @Request() req: AuthenticatedRequest,
+  ) {
+    return this.classesService.assignSubjects(id, body.subjectIds, req.user);
+  }
+
+  @Delete(':id/subjects/:subjectId')
+  @Roles(ROLES.SUPER_ADMIN, ROLES.SCHOOL_ADMIN)
+  @RateLimit(RATE_LIMIT_PRESETS.DELETE)
+  @ApiOperation({ summary: 'Remove a subject from a class' })
+  @ApiResponse({ status: 200, description: 'Subject removed successfully' })
+  @ApiResponse({ status: 404, description: 'Class or assignment not found' })
+  async removeSubject(
+    @Param('id') id: string,
+    @Param('subjectId') subjectId: string,
+    @Request() req: AuthenticatedRequest,
+  ) {
+    return this.classesService.removeSubject(id, subjectId, req.user);
   }
 }

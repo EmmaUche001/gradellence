@@ -1,4 +1,4 @@
-import { Routes as RouterRoutes, Route, Navigate } from 'react-router-dom';
+import { Routes as RouterRoutes, Route, Navigate, useLocation } from 'react-router-dom';
 import { useAuthStore } from '../store/authStore';
 import { LoginPage } from '../features/auth/pages/LoginPage';
 import { RegisterPage } from '../features/auth/pages/RegisterPage';
@@ -54,8 +54,9 @@ import { ScoreImportPage } from '../features/assessments/pages/ScoreImportPage';
 import { ScoreEntryPage } from '../features/assessments/pages/ScoreEntryPage';
 import { MyResultsPage } from '../features/results/pages/MyResultsPage';
 
-function RedirectToDashboard({ to }: { to: string }) {
-  return <Navigate to={to} replace />;
+function RedirectToDashboard() {
+  const location = useLocation();
+  return <Navigate to={`/dashboard${location.pathname}`} replace />;
 }
 
 const routes = [
@@ -136,7 +137,7 @@ export function Routes() {
         element={isAuthenticated ? <DashboardLayout /> : <Navigate to="/login" />}
       >
         {routes.map((r) => (
-          <Route key={r.path} path={r.path} element={<RedirectToDashboard to={`/dashboard/${r.path}`} />} />
+          <Route key={r.path} path={r.path} element={<RedirectToDashboard />} />
         ))}
       </Route>
 

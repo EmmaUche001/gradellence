@@ -4,6 +4,7 @@ import {
   Post,
   Body,
   Patch,
+  Put,
   Param,
   Delete,
   UseGuards,
@@ -84,6 +85,21 @@ export class TeachersController {
     return this.teachersService.update(id, dto, req.user);
   }
 
+  // Also accept PUT for clients that use it instead of PATCH
+  @Put(':id')
+  @Roles(ROLES.SUPER_ADMIN, ROLES.SCHOOL_ADMIN)
+  @RateLimit(RATE_LIMIT_PRESETS.WRITE)
+  @ApiOperation({ summary: 'Update teacher (PUT)' })
+  @ApiResponse({ status: 200, description: 'Teacher updated successfully' })
+  @ApiResponse({ status: 404, description: 'Teacher not found' })
+  async updatePut(
+    @Param('id') id: string,
+    @Body() dto: UpdateTeacherDto,
+    @Request() req: AuthenticatedRequest,
+  ) {
+    return this.teachersService.update(id, dto, req.user);
+  }
+
   @Delete(':id')
   @Roles(ROLES.SUPER_ADMIN, ROLES.SCHOOL_ADMIN)
   @RateLimit(RATE_LIMIT_PRESETS.DELETE)
@@ -127,5 +143,18 @@ export class TeachersController {
   @ApiResponse({ status: 404, description: 'Teacher not found' })
   async getTeacherAssignments(@Param('id') id: string, @Request() req: AuthenticatedRequest) {
     return this.teachersService.getTeacherAssignments(id, req.user);
+  }
+
+  @Post('assign-class-teacher')
+  @Roles(ROLES.SUPER_ADMIN, ROLES.SCHOOL_ADMIN)
+  @RateLimit(RATE_LIMIT_PRESETS.WRITE)
+  @ApiOperation({ summary: 'Assign a teacher as class teacher' })
+  @ApiResponse({ status: 200, description: 'Teacher assigned as class teacher' })
+  @ApiResponse({ status: 404, description: 'Teacher or class not found' })
+  async assignAsClassTeacher(
+    @Body() body: { teacherId: string; classId: string },
+    @Request() req: AuthenticatedRequest,
+  ) {
+    return this.teachersService.assignAsClassTeacher(body.teacherId, body.classId, req.user);
   }
 }

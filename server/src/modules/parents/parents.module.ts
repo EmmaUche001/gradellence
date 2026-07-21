@@ -6,11 +6,13 @@ import { ParentsService } from './parents.service';
 import { ParentJwtStrategy } from './strategies/parent-jwt.strategy';
 import { PrismaModule } from '../../database/prisma.module';
 import { RedisModule } from '../../common/redis/redis.module';
+import { PdfModule } from '../../common/pdf/pdf.module';
 
 @Module({
   imports: [
     PrismaModule,
     RedisModule,
+    PdfModule,
     JwtModule.registerAsync({
       inject: [ConfigService],
       useFactory: (configService: ConfigService) => ({

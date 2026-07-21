@@ -148,10 +148,13 @@ export function DashboardLayout() {
   };
 
   const userRoles: string[] = user?.roles ?? [];
-  const isActive = (path: string) =>
-    path === '/dashboard'
+  const isActive = (path: string) => {
+    // Nav item paths are relative (e.g. /students); actual URLs are /dashboard/students
+    const fullPath = path === '/dashboard' ? '/dashboard' : `/dashboard${path}`;
+    return path === '/dashboard'
       ? location.pathname === '/dashboard'
-      : location.pathname.startsWith(path);
+      : location.pathname.startsWith(fullPath);
+  };
 
   const sidebarWidth = collapsed ? 'w-[88px]' : 'w-[280px]';
 

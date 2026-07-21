@@ -30,7 +30,9 @@ export const resultService = {
   },
 
   async compute(dto: ComputeResultData): Promise<ApiResponse<{ computedCount: number; studentCount: number; subjectCount: number }>> {
-    const { data } = await apiClient.post(`${BASE}/compute`, dto);
+    const { data } = await apiClient.post(`${BASE}/compute/${dto.classId}/${dto.termId}`, {
+      subjectIds: dto.subjectIds,
+    });
     return data;
   },
 
@@ -45,7 +47,7 @@ export const resultService = {
   },
 
   async getStudentResults(studentId: string, termId: string): Promise<ApiResponse<StudentResultSummary>> {
-    const { data } = await apiClient.get(`${BASE}/student/${studentId}/term/${termId}`);
+    const { data } = await apiClient.get(`${BASE}/student/${studentId}/${termId}`);
     return data;
   },
 

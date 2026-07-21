@@ -81,6 +81,22 @@ export class AssessmentsController {
     return this.assessmentsService.findAll(user, page, limit, studentId, subjectId, termId, type);
   }
 
+  // Static-segment routes must come before :id to avoid shadowing
+  @Get('export')
+  @Roles('SCHOOL_ADMIN', 'TEACHER')
+  @RateLimit(RATE_LIMIT_PRESETS.READ)
+  @ApiOperation({ summary: 'Export assessments to CSV' })
+  @ApiQuery({ name: 'classId', required: false })
+  @ApiQuery({ name: 'termId', required: false })
+  async exportAssessments(
+    @Request() req: AuthenticatedRequest,
+    @Query('classId') classId?: string,
+    @Query('termId') termId?: string,
+  ) {
+    const data = await this.assessmentsService.export(req.user.schoolId, classId, termId);
+    return this.exportService.toCsvStream(data, 'assessments');
+  }
+
   @Get(':id')
   @Roles('SCHOOL_ADMIN', 'TEACHER')
   @ApiOperation({ summary: 'Get assessment by ID' })
@@ -149,18 +165,4 @@ export class AssessmentsController {
     return this.assessmentsService.importCsv(req.user.schoolId, csvContent);
   }
 
-  @Get('export')
-  @Roles('SCHOOL_ADMIN', 'TEACHER')
-  @RateLimit(RATE_LIMIT_PRESETS.READ)
-  @ApiOperation({ summary: 'Export assessments to CSV' })
-  @ApiQuery({ name: 'classId', required: false })
-  @ApiQuery({ name: 'termId', required: false })
-  async exportAssessments(
-    @Request() req: AuthenticatedRequest,
-    @Query('classId') classId?: string,
-    @Query('termId') termId?: string,
-  ) {
-    const data = await this.assessmentsService.export(req.user.schoolId, classId, termId);
-    return this.exportService.toCsvStream(data, 'assessments');
-  }
 }

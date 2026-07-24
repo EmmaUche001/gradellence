@@ -5,7 +5,7 @@ import {
   ClipboardCheck, BarChart3, Shield, Settings, CreditCard,
   Bell, ChevronDown, LogOut, Menu,
   BookMarked, CalendarDays, ScrollText, Layers, Megaphone,
-  KeyRound,
+  KeyRound, UserCheck,
 } from 'lucide-react';
 import { useAuthStore } from '../store/authStore';
 import { ToastContainer } from '../components/ui/Toast';
@@ -54,6 +54,8 @@ const navGroups: NavGroup[] = [
       { label: 'Teachers',    path: '/teachers',    icon: <Users          size={iconSize} />, roles: [ROLES.SUPER_ADMIN, ROLES.SCHOOL_ADMIN] },
       { label: 'Classes',     path: '/classes',     icon: <School         size={iconSize} />, roles: [ROLES.SUPER_ADMIN, ROLES.SCHOOL_ADMIN, ROLES.TEACHER] },
       { label: 'Subjects',    path: '/subjects',    icon: <BookOpen       size={iconSize} />, roles: [ROLES.SUPER_ADMIN, ROLES.SCHOOL_ADMIN, ROLES.TEACHER] },
+      { label: 'Sessions',    path: '/sessions',    icon: <CalendarDays   size={iconSize} />, roles: [ROLES.SUPER_ADMIN, ROLES.SCHOOL_ADMIN] },
+      { label: 'Enrollments', path: '/enrollments', icon: <Users          size={iconSize} />, roles: [ROLES.SUPER_ADMIN, ROLES.SCHOOL_ADMIN] },
       { label: 'Assessments', path: '/assessments', icon: <ClipboardCheck size={iconSize} />, roles: [ROLES.SUPER_ADMIN, ROLES.SCHOOL_ADMIN, ROLES.TEACHER] },
       { label: 'Results',     path: '/results',     icon: <ScrollText     size={iconSize} />, roles: [ROLES.SUPER_ADMIN, ROLES.SCHOOL_ADMIN, ROLES.TEACHER] },
       { label: 'Grade Scales',path: '/grade-scales',icon: <Layers         size={iconSize} />, roles: [ROLES.SUPER_ADMIN, ROLES.SCHOOL_ADMIN] },
@@ -73,7 +75,7 @@ const navGroups: NavGroup[] = [
     heading: 'ACCOUNT',
     items: [
       { label: 'Billing',       path: '/billing',       icon: <CreditCard   size={iconSize} />, roles: [ROLES.SUPER_ADMIN, ROLES.SCHOOL_ADMIN] },
-      { label: 'Subscriptions', path: '/subscriptions', icon: <CalendarDays size={iconSize} />, roles: [ROLES.SUPER_ADMIN, ROLES.SCHOOL_ADMIN] },
+      { label: 'Subscriptions', path: '/subscriptions', icon: <UserCheck    size={iconSize} />, roles: [ROLES.SUPER_ADMIN, ROLES.SCHOOL_ADMIN] },
       { label: 'Settings',      path: '/settings',      icon: <Settings     size={iconSize} />, roles: [ROLES.SUPER_ADMIN, ROLES.SCHOOL_ADMIN] },
     ],
   },

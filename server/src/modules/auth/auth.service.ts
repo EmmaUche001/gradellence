@@ -18,6 +18,7 @@ import { JwtPayload } from '../../common/types/express.types';
 import { InjectQueue } from '@nestjs/bullmq';
 import { Queue } from 'bullmq';
 import { AuditLogsService } from '../audit-logs/audit-logs.service';
+import { GradeScalesService } from '../grade-scales/grade-scales.service';
 
 @Injectable()
 export class AuthService {
@@ -27,6 +28,7 @@ export class AuthService {
     private readonly configService: ConfigService,
     private readonly redisService: RedisService,
     private readonly auditLogsService: AuditLogsService,
+    private readonly gradeScalesService: GradeScalesService,
     @InjectQueue('email') private readonly emailQueue: Queue,
   ) {}
 
@@ -135,9 +137,15 @@ export class AuthService {
       // Non-fatal
     }
 
+    // Seed default grade scales + assessment config for the new school (non-fatal)
     try {
-      const verificationToken = uuidv4();
-      const expiresAt = new Date();
+      await this.gradeScalesService.seedDefaultsForSchool(school.id);
+    } catch (e) {
+      // Non-fatal — school can configure manually if this fails
+    }
+
+    try {
+      const verificationToken = uuidv4();      const expiresAt = new Date();
       expiresAt.setDate(expiresAt.getDate() + 1);
 
       await (this.prisma as any).emailVerification.create({

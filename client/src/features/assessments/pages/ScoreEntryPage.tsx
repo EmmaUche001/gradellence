@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { ClipboardList } from 'lucide-react';
 import apiClient from '../../../services/apiClient';
 import { useToastStore } from '../../../store/toastStore';
+import { useAuthStore } from '../../../store/authStore';
 import { PageHeader } from '../../../components/ui/PageHeader';
 import { Button } from '../../../components/ui/Button';
 import { Select } from '../../../components/ui/Select';
@@ -38,26 +39,28 @@ type ScoreCell = {
 };
 type ScoreGrid = Record<string, Record<string, ScoreCell>>; // [studentId][type]
 
-// ---------- hardcoded assessment type config ----------
+// ---------- assessment type config (fetched from school, fallback to defaults) ----------
 
-const ASSESSMENT_TYPES = [
-  { type: 'CA1', maxScore: 20 },
-  { type: 'CA2', maxScore: 20 },
-  { type: 'EXAM', maxScore: 60 },
+const DEFAULT_ASSESSMENT_TYPES = [
+  { type: 'CA1',  label: 'CA 1', maxScore: 20 },
+  { type: 'CA2',  label: 'CA 2', maxScore: 20 },
+  { type: 'EXAM', label: 'Exam', maxScore: 60 },
 ] as const;
+
+type AssessmentTypeConfig = { type: string; label?: string; maxScore: number };
 
 // ---------- helpers ----------
 
-function computeTotal(row: Record<string, ScoreCell> | undefined): number {
+function computeTotal(row: Record<string, ScoreCell> | undefined, assessmentTypes: AssessmentTypeConfig[]): number {
   if (!row) return 0;
-  return ASSESSMENT_TYPES.reduce((sum, { type }) => {
+  return assessmentTypes.reduce((sum, { type }) => {
     const val = parseFloat(row[type]?.value ?? '');
     return sum + (isNaN(val) ? 0 : val);
   }, 0);
 }
 
 function isCellInvalid(value: string, maxScore: number): boolean {
-  if (value === '') return false; // blank = not entered yet, not invalid
+  if (value === '') return false;
   const n = parseFloat(value);
   return isNaN(n) || n < 0 || n > maxScore;
 }
@@ -67,6 +70,12 @@ function isCellInvalid(value: string, maxScore: number): boolean {
 export function ScoreEntryPage() {
   const navigate = useNavigate();
   const { addToast } = useToastStore();
+  const { user } = useAuthStore();
+
+  // --- assessment type config (dynamic, from school settings) ---
+  const [assessmentTypes, setAssessmentTypes] = useState<AssessmentTypeConfig[]>(
+    DEFAULT_ASSESSMENT_TYPES as unknown as AssessmentTypeConfig[]
+  );
 
   // --- dropdown options ---
   const [classOptions, setClassOptions] = useState<SelectOption[]>([]);
@@ -87,15 +96,24 @@ export function ScoreEntryPage() {
   // --- save state ---
   const [isSaving, setIsSaving] = useState(false);
 
-  // ---- load dropdown options on mount ----
+  // ---- load dropdown options + school assessment config on mount ----
   useEffect(() => {
     setOptionsLoading(true);
     Promise.all([
       apiClient.get('/v1/classes?page=1&limit=100'),
       apiClient.get('/v1/subjects?page=1&limit=100'),
       apiClient.get('/v1/sessions?page=1&limit=100'),
+      user?.schoolId ? apiClient.get(`/v1/schools/${user.schoolId}`) : Promise.resolve(null),
     ])
-      .then(([classRes, subjectRes, sessionRes]) => {
+      .then(([classRes, subjectRes, sessionRes, schoolRes]) => {
+        // Load school assessment config if available
+        if (schoolRes) {
+          const schoolData = schoolRes.data?.data ?? schoolRes.data;
+          const config = schoolData?.assessmentConfig;
+          if (Array.isArray(config) && config.length > 0) {
+            setAssessmentTypes(config);
+          }
+        }
         const classes: SelectOption[] = (classRes.data?.data ?? []).map((c: any) => ({
           value: c.id,
           label: c.name,
@@ -158,7 +176,7 @@ export function ScoreEntryPage() {
       const grid: ScoreGrid = {};
       for (const student of enrolledStudents) {
         grid[student.id] = {};
-        for (const { type } of ASSESSMENT_TYPES) {
+        for (const { type } of assessmentTypes) {
           const existing = rawAssessments.find(
             (a) => a.studentId === student.id && a.type === type
           );
@@ -177,7 +195,7 @@ export function ScoreEntryPage() {
     } finally {
       setGridLoading(false);
     }
-  }, [addToast]);
+  }, [addToast, assessmentTypes]);
 
   useEffect(() => {
     if (selectedClassId && selectedSubjectId && selectedTermId) {
@@ -207,7 +225,7 @@ export function ScoreEntryPage() {
   const handleSave = async () => {
     // Validate all cells before saving
     for (const student of students) {
-      for (const { type, maxScore } of ASSESSMENT_TYPES) {
+      for (const { type, maxScore } of assessmentTypes) {
         const cell = scoreGrid[student.id]?.[type];
         if (cell && isCellInvalid(cell.value, maxScore)) {
           addToast('error', `Invalid score for ${student.firstName} ${student.lastName} — ${type}`);
@@ -218,40 +236,28 @@ export function ScoreEntryPage() {
 
     setIsSaving(true);
     try {
-      // Separate new scores (no assessmentId) from updates (has assessmentId + isDirty)
       const bulkItems: Array<{
-        studentId: string;
-        subjectId: string;
-        classId: string;
-        termId: string;
-        type: string;
-        score: number;
-        maxScore: number;
+        studentId: string; subjectId: string; classId: string;
+        termId: string; type: string; score: number; maxScore: number;
       }> = [];
-
       const updatePromises: Promise<any>[] = [];
 
       for (const student of students) {
-        for (const { type, maxScore } of ASSESSMENT_TYPES) {
+        for (const { type, maxScore } of assessmentTypes) {
           const cell = scoreGrid[student.id]?.[type];
           if (!cell || cell.value === '') continue;
-
           const score = parseFloat(cell.value);
           if (isNaN(score)) continue;
 
           if (!cell.assessmentId) {
-            // New score → bulk create
             bulkItems.push({
               studentId: student.id,
               subjectId: selectedSubjectId,
               classId: selectedClassId,
               termId: selectedTermId,
-              type,
-              score,
-              maxScore,
+              type, score, maxScore,
             });
           } else if (cell.isDirty) {
-            // Existing score changed → individual PUT
             updatePromises.push(
               apiClient.put(`/v1/assessments/${cell.assessmentId}`, { score })
             );
@@ -264,22 +270,13 @@ export function ScoreEntryPage() {
         requests.push(apiClient.post('/v1/assessments/bulk', { assessments: bulkItems }));
       }
 
-      if (requests.length === 0) {
-        addToast('info', 'No changes to save');
-        return;
-      }
+      if (requests.length === 0) { addToast('info', 'No changes to save'); return; }
 
       await Promise.all(requests);
       addToast('success', 'Scores saved successfully');
-
-      // Refresh grid to pick up newly created assessmentIds
       await fetchGridData(selectedClassId, selectedSubjectId, selectedTermId);
     } catch (err: any) {
-      const message =
-        err.response?.data?.error?.message ||
-        err.response?.data?.message ||
-        'Failed to save scores';
-      addToast('error', message);
+      addToast('error', err.response?.data?.error?.message || err.response?.data?.message || 'Failed to save scores');
     } finally {
       setIsSaving(false);
     }
@@ -354,7 +351,7 @@ export function ScoreEntryPage() {
                       <th className="px-5 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">
                         Student
                       </th>
-                      {ASSESSMENT_TYPES.map(({ type, maxScore }) => (
+                      {assessmentTypes.map(({ type, maxScore }) => (
                         <th
                           key={type}
                           className="px-4 py-3 text-center text-xs font-semibold text-gray-500 uppercase tracking-wider"
@@ -373,7 +370,7 @@ export function ScoreEntryPage() {
                   <tbody className="divide-y divide-border">
                     {students.map((student) => {
                       const row = scoreGrid[student.id] ?? {};
-                      const total = computeTotal(row);
+                      const total = computeTotal(row, assessmentTypes);
                       return (
                         <tr key={student.id} className="hover:bg-gray-50 transition-colors">
                           {/* Student name + admission number */}
@@ -385,7 +382,7 @@ export function ScoreEntryPage() {
                           </td>
 
                           {/* Score inputs */}
-                          {ASSESSMENT_TYPES.map(({ type, maxScore }) => {
+                          {assessmentTypes.map(({ type, maxScore }) => {
                             const cell = row[type] ?? { value: '', isDirty: false };
                             const invalid = isCellInvalid(cell.value, maxScore);
                             return (
@@ -426,7 +423,9 @@ export function ScoreEntryPage() {
                             <span className="text-sm font-semibold text-gray-900 tabular-nums">
                               {total}
                             </span>
-                            <span className="text-xs text-gray-400"> /100</span>
+                            <span className="text-xs text-gray-400">
+                              {' '}/ {assessmentTypes.reduce((s, t) => s + t.maxScore, 0)}
+                            </span>
                           </td>
                         </tr>
                       );

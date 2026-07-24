@@ -92,16 +92,15 @@ export function AnalyticsDashboardPage() {
       } catch (e: any) { addToast('error', e.response?.data?.message || 'Failed to load overview'); }
       finally { setOvLoading(false); }
 
-      // Sessions → flatten terms
+      // Sessions → flatten terms (parallel fetch, not serial)
       try {
         const sessRes = await sessionService.getAll(1, 100);
         const sessList = sessRes.data || [];
         setSessions(sessList);
-        const flat: Term[] = [];
-        for (const s of sessList) {
-          const tr = await sessionService.getTerms(s.id);
-          flat.push(...(tr.data || []));
-        }
+        const termResults = await Promise.all(
+          sessList.map(s => sessionService.getTerms(s.id).then(r => r.data || []).catch(() => []))
+        );
+        const flat: Term[] = termResults.flat();
         setAllTerms(flat);
         const current = flat.find(t => t.isCurrent);
         if (current) setSelectedTermId(current.id);

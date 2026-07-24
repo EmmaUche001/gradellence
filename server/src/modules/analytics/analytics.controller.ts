@@ -19,7 +19,6 @@ export class AnalyticsController {
 
   @Get('overview')
   @Roles(ROLES.SCHOOL_ADMIN, ROLES.TEACHER)
-  @RequiresFeature('ANALYTICS')
   @ApiOperation({ summary: 'Get school overview stats' })
   getOverview(@CurrentUser() user: AuthenticatedUser) {
     return this.analyticsService.getOverview(user.schoolId);
@@ -57,10 +56,7 @@ export class AnalyticsController {
 
   @Get('grade-distribution')
   @Roles(ROLES.SCHOOL_ADMIN, ROLES.TEACHER)
-  @ApiOperation({
-    summary:
-      'Get grade band distribution (Excellent/Good/Average/Needs Support) for the donut chart',
-  })
+  @ApiOperation({ summary: 'Get grade band distribution for the donut chart' })
   getGradeDistribution(@CurrentUser() user: AuthenticatedUser, @Query('termId') termId?: string) {
     return this.analyticsService.getGradeDistribution(user.schoolId, termId);
   }

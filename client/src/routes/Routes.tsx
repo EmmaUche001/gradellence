@@ -63,6 +63,7 @@ const routes = [
   { path: 'dashboard', element: <DashboardPage />, index: true },
   { path: 'students', element: <StudentsListPage /> },
   { path: 'students/new', element: <StudentFormPage /> },
+  { path: 'students/import', element: <StudentImportPage /> },
   { path: 'students/:id/edit', element: <StudentFormPage /> },
   { path: 'teachers', element: <TeachersListPage /> },
   { path: 'teachers/new', element: <TeacherFormPage /> },
@@ -151,7 +152,6 @@ export function Routes() {
       </Route>
 
       {/* Import Routes */}
-      <Route path="/students/import" element={<StudentImportPage />} />
       <Route path="/assessments/import" element={<ScoreImportPage />} />
 
       {/* Super Admin Routes */}

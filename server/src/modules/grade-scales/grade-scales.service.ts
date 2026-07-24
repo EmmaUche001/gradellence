@@ -200,4 +200,59 @@ export class GradeScalesService {
       data: gradeScale,
     };
   }
+
+  // ── Default seeding on school onboarding ─────────────────────────────────
+
+  /** Nigerian WAEC 9-point grade scale — seeded once per school on registration */
+  static readonly DEFAULT_GRADE_SCALES = [
+    { grade: 'A1', minScore: 75, maxScore: 100, remark: 'Distinction', points: 5.0 },
+    { grade: 'B2', minScore: 70, maxScore: 74,  remark: 'Very Good',   points: 4.0 },
+    { grade: 'B3', minScore: 65, maxScore: 69,  remark: 'Good',        points: 3.5 },
+    { grade: 'C4', minScore: 60, maxScore: 64,  remark: 'Credit',      points: 3.0 },
+    { grade: 'C5', minScore: 55, maxScore: 59,  remark: 'Credit',      points: 2.5 },
+    { grade: 'C6', minScore: 50, maxScore: 54,  remark: 'Credit',      points: 2.0 },
+    { grade: 'D7', minScore: 45, maxScore: 49,  remark: 'Pass',        points: 1.5 },
+    { grade: 'E8', minScore: 40, maxScore: 44,  remark: 'Pass',        points: 1.0 },
+    { grade: 'F9', minScore: 0,  maxScore: 39,  remark: 'Fail',        points: 0.0 },
+  ] as const;
+
+  /** Default assessment component weights per term */
+  static readonly DEFAULT_ASSESSMENT_CONFIG = [
+    { type: 'CA1',  label: 'Continuous Assessment 1', maxScore: 20, weight: 0.20 },
+    { type: 'CA2',  label: 'Continuous Assessment 2', maxScore: 20, weight: 0.20 },
+    { type: 'EXAM', label: 'Terminal Examination',    maxScore: 60, weight: 0.60 },
+  ] as const;
+
+  async seedDefaultsForSchool(schoolId: string): Promise<void> {
+    // 1. Grade scales — only insert if none exist yet for this school
+    const existing = await this.prisma.gradeScale.count({ where: { schoolId } });
+    if (existing === 0) {
+      await this.prisma.gradeScale.createMany({
+        data: GradeScalesService.DEFAULT_GRADE_SCALES.map(g => ({
+          schoolId,
+          grade:    g.grade,
+          minScore: g.minScore,
+          maxScore: g.maxScore,
+          remark:   g.remark,
+          points:   g.points,
+          isActive: true,
+        })),
+        skipDuplicates: true,
+      });
+    }
+
+    // 2. Assessment config — store on school record if not already set
+    const school = await this.prisma.school.findUnique({
+      where: { id: schoolId },
+      select: { assessmentConfig: true },
+    });
+    if (!school?.assessmentConfig) {
+      await this.prisma.school.update({
+        where: { id: schoolId },
+        data: {
+          assessmentConfig: GradeScalesService.DEFAULT_ASSESSMENT_CONFIG as any,
+        },
+      });
+    }
+  }
 }

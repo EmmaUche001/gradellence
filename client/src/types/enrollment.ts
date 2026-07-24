@@ -4,8 +4,7 @@ export interface Enrollment {
   studentId: string;
   classId: string;
   termId: string;
-  enrollmentDate: string;
-  isActive: boolean;
+  status: string;        // ACTIVE, INACTIVE etc.
   createdAt: string;
   updatedAt: string;
   student?: {
@@ -22,7 +21,7 @@ export interface Enrollment {
   term?: {
     id: string;
     name: string;
-    session: {
+    session?: {
       name: string;
     };
   };
@@ -32,13 +31,12 @@ export interface CreateEnrollmentData {
   studentId: string;
   classId: string;
   termId: string;
-  enrollmentDate?: string;
 }
 
 export interface UpdateEnrollmentData {
   classId?: string;
   termId?: string;
-  isActive?: boolean;
+  status?: string;
 }
 
 export interface BulkEnrollmentData {

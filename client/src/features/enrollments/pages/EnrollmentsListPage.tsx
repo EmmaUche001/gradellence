@@ -108,10 +108,10 @@ export function EnrollmentsListPage() {
                     </td>
                     <td className="px-5 py-3.5 text-sm text-gray-600">{e.term?.name || '—'}</td>
                     <td className="px-5 py-3.5 text-sm text-gray-500">
-                      {new Date(e.enrollmentDate).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' })}
+                      {new Date(e.createdAt).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' })}
                     </td>
                     <td className="px-5 py-3.5">
-                      <Badge variant={e.isActive ? 'success' : 'danger'}>{e.isActive ? 'Active' : 'Inactive'}</Badge>
+                      <Badge variant={e.status === 'ACTIVE' ? 'success' : 'danger'}>{e.status ?? 'ACTIVE'}</Badge>
                     </td>
                     <td className="px-5 py-3.5 text-right">
                       <button onClick={() => setDeleteTarget(e)} className="text-sm font-medium text-danger-600 hover:text-danger-700">Remove</button>

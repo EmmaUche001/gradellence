@@ -21,6 +21,7 @@ export interface CreateUserData {
   lastName: string;
   phone?: string;
   roleIds?: string[];
+  schoolId?: string;
 }
 
 export interface UpdateUserData {

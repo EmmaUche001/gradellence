@@ -9,6 +9,7 @@ import { JwtStrategy } from './strategies/jwt.strategy';
 import { PrismaModule } from '../../database/prisma.module';
 import { RedisModule } from '../../common/redis/redis.module';
 import { AuditLogsModule } from '../audit-logs/audit-logs.module';
+import { GradeScalesModule } from '../grade-scales/grade-scales.module';
 import { RateLimitGuard } from '../../common/throttler/throttler.guard';
 
 @Module({
@@ -16,6 +17,7 @@ import { RateLimitGuard } from '../../common/throttler/throttler.guard';
     PrismaModule,
     RedisModule,
     AuditLogsModule,
+    GradeScalesModule,
     PassportModule.register({ defaultStrategy: 'jwt' }),
     JwtModule.registerAsync({
       inject: [ConfigService],

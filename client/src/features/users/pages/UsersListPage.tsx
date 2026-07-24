@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
-import { Users, AlertCircle, CheckCircle2, XCircle } from 'lucide-react';
+import { Users, AlertCircle, CheckCircle2, XCircle, Plus, Mail } from 'lucide-react';
 import { userService } from '../../../services/userService';
 import { roleService } from '../../../services/roleService';
 import { User } from '../../../types/user';
@@ -9,13 +9,16 @@ import { PageHeader } from '../../../components/ui/PageHeader';
 import { Button } from '../../../components/ui/Button';
 import { Badge } from '../../../components/ui/Badge';
 import { Avatar } from '../../../components/ui/Avatar';
+import { Input } from '../../../components/ui/Input';
 import { EmptyState } from '../../../components/ui/EmptyState';
 import { SkeletonTable } from '../../../components/ui/SkeletonLoader';
 import { ConfirmDialog } from '../../../components/ui/ConfirmDialog';
 import { Modal } from '../../../components/ui/Modal';
+import { useAuthStore } from '../../../store/authStore';
 
 export function UsersListPage() {
   const { addToast } = useToastStore();
+  const { user: currentUser } = useAuthStore();
   const [users, setUsers]           = useState<User[]>([]);
   const [loading, setLoading]       = useState(true);
   const [error, setError]           = useState<string | null>(null);
@@ -31,6 +34,15 @@ export function UsersListPage() {
   const [selectedRoleIds, setSelectedRoleIds]   = useState<string[]>([]);
   const [savingRoles, setSavingRoles]           = useState(false);
   const [rolesLoading, setRolesLoading]         = useState(false);
+
+  // Invite user modal
+  const [showInvite, setShowInvite]   = useState(false);
+  const [inviteForm, setInviteForm]   = useState({
+    firstName: '', lastName: '', email: '', password: '', phone: '',
+  });
+  const [inviteRoleIds, setInviteRoleIds] = useState<string[]>([]);
+  const [inviteRoles, setInviteRoles]     = useState<Role[]>([]);
+  const [inviting, setInviting]           = useState(false);
 
   const fetchUsers = useCallback(async () => {
     setLoading(true); setError(null);
@@ -65,13 +77,49 @@ export function UsersListPage() {
 
   const openRolesModal = async (user: User) => {
     setManageUser(user); setRolesLoading(true);
-    setSelectedRoleIds(user.roles?.map(r => r.roleId) || []);
+    // roles from server is string[] (role names), look up IDs from the roles list
     try {
-      const [rolesRes, userRolesRes] = await Promise.all([roleService.getAll(), roleService.getUserRoles(user.id)]);
-      setRoles(rolesRes.data || []);
-      setSelectedRoleIds(userRolesRes.data?.roleIds || []);
+      const [rolesRes, userRolesRes] = await Promise.all([
+        roleService.getAll(),
+        roleService.getUserRoles(user.id),
+      ]);
+      const allRoles = rolesRes.data || [];
+      setRoles(allRoles);
+      // userRolesRes.data contains { roles: [...] } with role objects
+      const userRoles = userRolesRes.data?.roles ?? [];
+      setSelectedRoleIds(userRoles.map((r: any) => r.id ?? r.roleId));
     } catch (err: any) { addToast('error', err.response?.data?.message || 'Failed to load roles'); }
     finally { setRolesLoading(false); }
+  };
+
+  const openInviteModal = async () => {
+    setShowInvite(true);
+    setInviteForm({ firstName: '', lastName: '', email: '', password: '', phone: '' });
+    setInviteRoleIds([]);
+    try {
+      const r = await roleService.getAll();
+      setInviteRoles(r.data || []);
+    } catch { /* non-fatal */ }
+  };
+
+  const handleInvite = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!inviteForm.firstName || !inviteForm.lastName || !inviteForm.email || !inviteForm.password) {
+      addToast('error', 'First name, last name, email and password are required'); return;
+    }
+    setInviting(true);
+    try {
+      await userService.create({
+        ...inviteForm,
+        schoolId: currentUser?.schoolId,
+        roleIds: inviteRoleIds,
+      });
+      addToast('success', `User "${inviteForm.firstName} ${inviteForm.lastName}" created`);
+      setShowInvite(false);
+      fetchUsers();
+    } catch (err: any) {
+      addToast('error', err.response?.data?.message || 'Failed to create user');
+    } finally { setInviting(false); }
   };
 
   const saveRoles = async () => {
@@ -90,7 +138,13 @@ export function UsersListPage() {
 
   return (
     <div className="space-y-6">
-      <PageHeader title="Staff Users" description="Manage staff accounts within your school" />
+      <PageHeader title="Staff Users" description="Manage staff accounts within your school"
+        actions={
+          <Button variant="primary" size="sm" onClick={openInviteModal}>
+            <Plus size={15} /> Add User
+          </Button>
+        }
+      />
 
       {error && (
         <div className="flex items-start gap-3 px-4 py-3 rounded-xl bg-danger-50 border border-danger-100">
@@ -126,8 +180,11 @@ export function UsersListPage() {
                     <td className="px-5 py-3.5 text-sm text-gray-600">{user.email}</td>
                     <td className="px-5 py-3.5">
                       <div className="flex flex-wrap gap-1">
-                        {user.roles && user.roles.length > 0
-                          ? user.roles.map(r => <Badge key={r.roleId} variant="primary">{r.role?.name ?? r.roleId}</Badge>)
+                        {Array.isArray(user.roles) && user.roles.length > 0
+                          ? (user.roles as any[]).map((r, i) => {
+                              const name = typeof r === 'string' ? r : (r.role?.name ?? r.roleId ?? '?');
+                              return <Badge key={i} variant="primary">{name}</Badge>;
+                            })
                           : <span className="text-xs text-gray-400">No roles</span>}
                       </div>
                     </td>
@@ -212,6 +269,61 @@ export function UsersListPage() {
         title="Delete user?" loading={deleting}
         message={`"${deleteTarget?.firstName} ${deleteTarget?.lastName}" will be permanently removed from the system.`}
         confirmLabel="Delete" />
+
+      {/* Add User Modal */}
+      <Modal
+        isOpen={showInvite}
+        onClose={() => setShowInvite(false)}
+        title="Add Staff User"
+        description="Create a new staff account. They can log in immediately with these credentials."
+        footer={
+          <>
+            <Button variant="ghost" onClick={() => setShowInvite(false)} disabled={inviting}>Cancel</Button>
+            <Button variant="primary" onClick={handleInvite as any} loading={inviting}>
+              <Mail size={14} /> Create User
+            </Button>
+          </>
+        }
+      >
+        <form onSubmit={handleInvite} className="space-y-4">
+          <div className="grid grid-cols-2 gap-3">
+            <Input id="inv-first" label="First Name *" value={inviteForm.firstName}
+              onChange={e => setInviteForm(f => ({ ...f, firstName: e.target.value }))}
+              placeholder="John" required />
+            <Input id="inv-last" label="Last Name *" value={inviteForm.lastName}
+              onChange={e => setInviteForm(f => ({ ...f, lastName: e.target.value }))}
+              placeholder="Doe" required />
+          </div>
+          <Input id="inv-email" type="email" label="Email *" value={inviteForm.email}
+            onChange={e => setInviteForm(f => ({ ...f, email: e.target.value }))}
+            placeholder="john@school.edu" required />
+          <Input id="inv-pass" type="password" label="Temporary Password *" value={inviteForm.password}
+            onChange={e => setInviteForm(f => ({ ...f, password: e.target.value }))}
+            placeholder="Min. 8 characters" required
+            helperText="The user should change this on first login" />
+          <Input id="inv-phone" label="Phone (Optional)" value={inviteForm.phone}
+            onChange={e => setInviteForm(f => ({ ...f, phone: e.target.value }))}
+            placeholder="+234 800 000 0000" />
+          {inviteRoles.length > 0 && (
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">Roles</label>
+              <div className="space-y-1.5 max-h-40 overflow-y-auto border border-border rounded-xl p-3">
+                {inviteRoles.map(role => (
+                  <label key={role.id} className="flex items-center gap-2.5 py-1 cursor-pointer">
+                    <input type="checkbox"
+                      checked={inviteRoleIds.includes(role.id)}
+                      onChange={() => setInviteRoleIds(prev =>
+                        prev.includes(role.id) ? prev.filter(x => x !== role.id) : [...prev, role.id]
+                      )}
+                      className="w-4 h-4 rounded border-border text-primary-600 focus:ring-primary-500" />
+                    <span className="text-sm text-gray-700">{role.name}</span>
+                  </label>
+                ))}
+              </div>
+            </div>
+          )}
+        </form>
+      </Modal>
     </div>
   );
 }

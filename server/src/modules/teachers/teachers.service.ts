@@ -5,6 +5,7 @@ import { UpdateTeacherDto } from './dto/update-teacher.dto';
 import { AssignTeacherDto } from './dto/assign-teacher.dto';
 import { AuthenticatedUser } from '../../common/types/express.types';
 import { enforceEntityLimit } from '../../common/helpers/trial-limits.helper';
+import { NotificationsService } from '../notifications/notifications.service';
 import * as crypto from 'crypto';
 import * as bcrypt from 'bcryptjs';
 import { InjectQueue } from '@nestjs/bullmq';
@@ -14,6 +15,7 @@ import { Queue } from 'bullmq';
 export class TeachersService {
   constructor(
     private readonly prisma: PrismaService,
+    private readonly notificationsService: NotificationsService,
     @InjectQueue('email') private readonly emailQueue: Queue,
   ) {}
 
@@ -57,10 +59,11 @@ export class TeachersService {
       },
     });
 
-    // Provision login account for teacher (non-fatal)
-    (async () => {
+    // Provision login account for teacher and capture temp password for UI display
+    let tempPasswordForAdmin: string | null = null;
+
+    if (dto.email) {
       try {
-        if (!dto.email) return;
         // Generate temporary password (12 chars, alphanumeric)
         let tempPassword = crypto
           .randomBytes(9)
@@ -68,7 +71,6 @@ export class TeachersService {
           .replace(/[^a-zA-Z0-9]/g, '')
           .slice(0, 12);
         if (tempPassword.length < 12) {
-          // fallback to hex if base64 trimmed short
           tempPassword = crypto.randomBytes(6).toString('hex').slice(0, 12);
         }
         const passwordHash = await bcrypt.hash(tempPassword, 12);
@@ -87,9 +89,24 @@ export class TeachersService {
           });
         }
 
-        // Create user and link role
-        try {
-          const user = await this.prisma.user.create({
+        // Check if user with this email already exists
+        let user = await this.prisma.user.findUnique({ where: { email: dto.email } });
+
+        if (user) {
+          // Reset their password so the admin can share fresh credentials
+          user = await this.prisma.user.update({
+            where: { id: user.id },
+            data: { passwordHash, isActive: true },
+          });
+
+          // Unlink this user from any other (soft-deleted) teacher records to avoid unique constraint
+          await this.prisma.teacher.updateMany({
+            where: { userId: user.id, schoolId: teacher.schoolId, id: { not: teacher.id } },
+            data: { userId: null } as any,
+          });
+        } else {
+          // Create fresh user account
+          user = await this.prisma.user.create({
             data: {
               schoolId: teacher.schoolId,
               email: dto.email,
@@ -99,48 +116,41 @@ export class TeachersService {
               roles: { create: { roleId: teacherRole.id } },
             },
           });
-
-          // Link user back to teacher
-          await this.prisma.teacher.update({
-            where: { id: teacher.id },
-            // Cast to any to avoid type mismatch until Prisma client is regenerated after schema changes
-            data: { userId: user.id } as any,
-          });
-
-          // Queue credentials email
-          try {
-            await this.emailQueue.add('send', {
-              to: dto.email,
-              subject: 'Your Teacher Account Credentials',
-              template: 'teacher-credentials',
-              data: {
-                firstName: dto.firstName,
-                email: dto.email,
-                temporaryPassword: tempPassword,
-                loginUrl: process.env.FRONTEND_URL || '',
-              },
-            });
-          } catch (e) {
-            // Non-fatal: log and continue
-            // eslint-disable-next-line no-console
-            console.error('Failed to queue teacher credentials email:', e);
-          }
-        } catch (e) {
-          // Non-fatal: user creation failed (e.g., duplicate email). Log and continue.
-          // eslint-disable-next-line no-console
-          console.error('Failed to provision teacher user account:', e);
         }
+
+        // Link user back to teacher
+        await this.prisma.teacher.update({
+          where: { id: teacher.id },
+          data: { userId: user.id } as any,
+        });
+
+        // Always expose temp password to admin
+        tempPasswordForAdmin = tempPassword;
+
+        // Queue credentials email (non-fatal)
+        this.emailQueue.add('send', {
+          to: dto.email,
+          subject: 'Your Teacher Account Credentials',
+          template: 'teacher-credentials',
+          data: {
+            firstName: dto.firstName,
+            email: dto.email,
+            temporaryPassword: tempPassword,
+            loginUrl: process.env.FRONTEND_URL || '',
+          },
+        }).catch(() => {});
+
       } catch (e) {
-        // Catch-all for provisioning errors; do not block teacher creation.
         // eslint-disable-next-line no-console
         console.error('Teacher provisioning error:', e);
       }
-    })();
+    }
 
     return {
       success: true,
       message: 'Teacher created successfully',
       data: teacher,
+      ...(tempPasswordForAdmin ? { temporaryPassword: tempPasswordForAdmin } : {}),
     };
   }
 
@@ -256,14 +266,16 @@ export class TeachersService {
       throw new NotFoundException('Teacher not found');
     }
 
-    // Check if teacher is assigned as class teacher
-    const classCount = await this.prisma.class.count({
-      where: { classTeacherId: id, deletedAt: null },
+    // Auto-unassign from any classes where this teacher is the class teacher
+    await this.prisma.class.updateMany({
+      where: { classTeacherId: id, schoolId: currentUser.schoolId, deletedAt: null },
+      data: { classTeacherId: null },
     });
 
-    if (classCount > 0) {
-      throw new ConflictException('Cannot delete teacher assigned as class teacher');
-    }
+    // Remove all subject assignments for this teacher
+    await this.prisma.teacherSubject.deleteMany({
+      where: { teacherId: id },
+    });
 
     // Soft delete
     await this.prisma.teacher.update({
@@ -325,6 +337,18 @@ export class TeachersService {
         classId: dto.classId,
       },
     });
+
+    // Notify the teacher if they have a linked user account (non-fatal)
+    if (teacher.userId) {
+      this.notificationsService.create({
+        userId: teacher.userId,
+        schoolId: currentUser.schoolId,
+        type: 'ASSIGNMENT',
+        title: 'New Subject Assignment',
+        body: `You have been assigned to teach ${subject.name} for ${classEntity.name}.`,
+        link: '/teachers/me',
+      }).catch(() => {});
+    }
 
     return {
       success: true,
@@ -412,6 +436,18 @@ export class TeachersService {
       created.push(classSubject.subjectId);
     }
 
+    // Notify the teacher if they have a linked user account (non-fatal)
+    if (teacher.userId) {
+      this.notificationsService.create({
+        userId: teacher.userId,
+        schoolId: currentUser.schoolId,
+        type: 'ASSIGNMENT',
+        title: 'Class Teacher Appointment',
+        body: `You have been appointed as class teacher for ${cls.name}.`,
+        link: '/teachers/me',
+      }).catch(() => {});
+    }
+
     return {
       success: true,
       message: `Teacher assigned as class teacher. ${created.length} subject assignment(s) created automatically.`,
@@ -475,14 +511,12 @@ export class TeachersService {
     const classIds = [...new Set(teacher.subjectAssignments.map((a: any) => a.classId))];
 
     // Assessment stats for this teacher's classes
-    const [myAssessments, pendingAssessments] = await Promise.all([
+    const [myAssessments] = await Promise.all([
       this.prisma.assessment.count({
         where: { schoolId: currentUser.schoolId, teacherId: teacher.id },
       }),
-      this.prisma.assessment.count({
-        where: { schoolId: currentUser.schoolId, teacherId: teacher.id, isPublished: false } as any,
-      }),
     ]);
+    const pendingAssessments = 0; // assessments don't have published state — use results for that
 
     // Student count across assigned classes (current enrollments)
     const studentCount =

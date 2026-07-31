@@ -87,21 +87,35 @@ export class SubjectsService {
   async findAll(currentUser: AuthenticatedUser, page: number, limit: number) {
     const skip = (page - 1) * limit;
 
+    let subjectWhere: any = { schoolId: currentUser.schoolId, deletedAt: null };
+
+    // Teachers only see subjects they are assigned to teach
+    if (currentUser.roles.includes('TEACHER') && !currentUser.roles.includes('SCHOOL_ADMIN') && !currentUser.roles.includes('SUPER_ADMIN')) {
+      const teacher = await this.prisma.teacher.findFirst({
+        where: { userId: currentUser.id, schoolId: currentUser.schoolId, deletedAt: null },
+        include: { subjectAssignments: { select: { subjectId: true } } },
+      });
+      if (teacher) {
+        const subjectIds = [...new Set(teacher.subjectAssignments.map(a => a.subjectId))];
+        if (subjectIds.length > 0) {
+          subjectWhere.id = { in: subjectIds };
+        } else {
+          return { success: true, message: 'Subjects retrieved successfully', data: [], meta: { page, limit, total: 0, totalPages: 0 } };
+        }
+      }
+    }
+
     const [subjects, total] = await Promise.all([
       this.prisma.subject.findMany({
-        where: { schoolId: currentUser.schoolId, deletedAt: null },
+        where: subjectWhere,
         skip,
         take: limit,
         orderBy: { name: 'asc' },
         include: {
-          _count: {
-            select: { classes: true },
-          },
+          _count: { select: { classes: true } },
         },
       }),
-      this.prisma.subject.count({
-        where: { schoolId: currentUser.schoolId, deletedAt: null },
-      }),
+      this.prisma.subject.count({ where: subjectWhere }),
     ]);
 
     return {

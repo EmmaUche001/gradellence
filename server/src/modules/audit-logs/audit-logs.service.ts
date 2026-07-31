@@ -22,13 +22,14 @@ export class AuditLogsService {
 
     const where: any = {};
 
-    // SUPER_ADMIN sees logs across every school. Every other role is scoped
-    // to logs whose actor belongs to their own school — this MUST stay a
-    // structural filter on the query, not an afterthought, or one school's
-    // admin can read another school's entire audit trail (login activity,
-    // score changes, role changes, etc).
+    // SUPER_ADMIN sees logs across every school. SCHOOL_ADMIN sees all logs
+    // within their school. TEACHER only sees their own actions.
     if (!currentUser.roles.includes(ROLES.SUPER_ADMIN)) {
       where.actor = { schoolId: currentUser.schoolId };
+      // Teachers can only see their own audit trail
+      if (currentUser.roles.includes('TEACHER') && !currentUser.roles.includes(ROLES.SCHOOL_ADMIN)) {
+        where.actorId = currentUser.id;
+      }
     }
 
     if (actorId) where.actorId = actorId;

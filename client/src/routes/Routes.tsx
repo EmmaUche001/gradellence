@@ -82,6 +82,7 @@ const routes = [
   { path: 'enrollments/bulk', element: <BulkEnrollmentPage /> },
   { path: 'assessments', element: <AssessmentsListPage /> },
   { path: 'assessments/new', element: <AssessmentFormPage /> },
+  { path: 'assessments/import', element: <ScoreImportPage /> },
   { path: 'assessments/:id/edit', element: <AssessmentFormPage /> },
   { path: 'results', element: <ResultsListPage /> },
   { path: 'results/broadsheet', element: <BroadsheetPage /> },
@@ -152,7 +153,6 @@ export function Routes() {
       </Route>
 
       {/* Import Routes */}
-      <Route path="/assessments/import" element={<ScoreImportPage />} />
 
       {/* Super Admin Routes */}
       <Route element={<SuperAdminGuard />}>

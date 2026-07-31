@@ -91,6 +91,23 @@ export class StudentsService {
 
     const where: any = { schoolId: currentUser.schoolId, deletedAt: null };
 
+    // Teachers only see students enrolled in their assigned classes
+    if (currentUser.roles.includes('TEACHER') && !currentUser.roles.includes('SCHOOL_ADMIN') && !currentUser.roles.includes('SUPER_ADMIN')) {
+      const teacher = await this.prisma.teacher.findFirst({
+        where: { userId: currentUser.id, schoolId: currentUser.schoolId, deletedAt: null },
+        include: { subjectAssignments: { select: { classId: true } } },
+      });
+      if (teacher) {
+        const classIds = [...new Set(teacher.subjectAssignments.map(a => a.classId))];
+        if (classIds.length > 0) {
+          where.enrollments = { some: { classId: { in: classIds } } };
+        } else {
+          // Teacher has no assignments — return empty
+          return { success: true, message: 'Students retrieved successfully', data: [], meta: { page, limit, total: 0, totalPages: 0 } };
+        }
+      }
+    }
+
     if (search) {
       where.OR = [
         { firstName: { contains: search, mode: 'insensitive' } },

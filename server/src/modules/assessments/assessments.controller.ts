@@ -8,10 +8,13 @@ import {
   Param,
   Query,
   UseGuards,
+  UseInterceptors,
+  UploadedFile,
   Request,
   ParseIntPipe,
   DefaultValuePipe,
 } from '@nestjs/common';
+import { FileInterceptor } from '@nestjs/platform-express';
 import {
   ApiTags,
   ApiOperation,
@@ -20,7 +23,6 @@ import {
   ApiQuery,
   ApiResponse,
 } from '@nestjs/swagger';
-import { FileInterceptor } from '@nestjs/platform-express';
 import { AssessmentsService } from './assessments.service';
 import { CreateAssessmentDto } from './dto/create-assessment.dto';
 import { UpdateAssessmentDto } from './dto/update-assessment.dto';
@@ -157,12 +159,30 @@ export class AssessmentsController {
   @Post('import')
   @Roles('SCHOOL_ADMIN', 'TEACHER')
   @RateLimit(RATE_LIMIT_PRESETS.BULK)
+  @UseInterceptors(FileInterceptor('csv'))
   @ApiConsumes('multipart/form-data')
   @ApiOperation({ summary: 'Bulk import assessment scores from CSV' })
   @ApiResponse({ status: 200, description: 'Import result' })
-  async importAssessments(@Request() req: AuthenticatedRequest, @Body() file: any) {
-    const csvContent = file?.csv || '';
+  async importAssessments(
+    @Request() req: AuthenticatedRequest,
+    @UploadedFile() file: { buffer: Buffer; originalname: string; mimetype: string },
+  ) {
+    if (!file?.buffer) {
+      return { success: false, error: { message: 'No CSV file uploaded' } };
+    }
+    const csvContent = file.buffer.toString('utf-8');
     return this.assessmentsService.importCsv(req.user.schoolId, csvContent);
+  }
+
+  @Post(':id/publish')
+  @Roles('SCHOOL_ADMIN', 'TEACHER')
+  @RateLimit(RATE_LIMIT_PRESETS.WRITE)
+  @ApiOperation({ summary: 'Publish a single assessment (marks scores as final)' })
+  @ApiResponse({ status: 200, description: 'Assessment published' })
+  publishAssessment(@Param('id') id: string, @CurrentUser() user: AuthenticatedUser) {
+    // Assessment scores are locked when results are computed and published via /results/publish
+    // Individual assessment publish is not supported — redirect to broadsheet workflow
+    return { success: false, message: 'Use the Broadsheet page to compute and publish results.' };
   }
 
 }

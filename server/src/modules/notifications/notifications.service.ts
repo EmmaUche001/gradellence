@@ -1,87 +1,119 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../../database/prisma.service';
-import { RedisService } from '../../common/redis/redis.service';
-import { InjectQueue } from '@nestjs/bullmq';
-import { Queue } from 'bullmq';
 
-const REDIS_PREFS_KEY = (userId: string) => `gradellence:notifications:prefs:${userId}`;
-
-const DEFAULT_PREFERENCES = {
-  RESULT_PUBLISHED: true,
-  NEW_ASSESSMENT: true,
-  ACCOUNT_ACTIVITY: true,
-};
-
-type NotificationType = 'RESULT_PUBLISHED' | 'NEW_ASSESSMENT' | 'ACCOUNT_ACTIVITY';
+export type NotificationType =
+  | 'RESULT_PUBLISHED'
+  | 'ASSIGNMENT'
+  | 'ANNOUNCEMENT'
+  | 'ROLE_CHANGED'
+  | 'SYSTEM';
 
 @Injectable()
 export class NotificationsService {
-  constructor(
-    private readonly prisma: PrismaService,
-    private readonly redisService: RedisService,
-    @InjectQueue('email') private readonly emailQueue: Queue,
-  ) {}
+  constructor(private readonly prisma: PrismaService) {}
 
-  async sendNotification(userId: string, type: NotificationType, data: Record<string, any>) {
-    const preferences = await this.getPreferences(userId);
-    if (!preferences[type]) {
-      return { sent: false, reason: 'disabled_by_preference' };
-    }
+  // ── Create a single notification ────────────────────────────────────────
+  async create(params: {
+    userId: string;
+    schoolId: string;
+    type: NotificationType;
+    title: string;
+    body: string;
+    link?: string;
+  }) {
+    return this.prisma.notification.create({ data: params });
+  }
 
-    const user = await this.prisma.user.findFirst({
-      where: { id: userId },
-      select: { email: true, firstName: true, lastName: true },
+  // ── Create notifications for multiple users at once ──────────────────────
+  async createMany(params: {
+    userIds: string[];
+    schoolId: string;
+    type: NotificationType;
+    title: string;
+    body: string;
+    link?: string;
+  }) {
+    const { userIds, ...rest } = params;
+    if (userIds.length === 0) return;
+    await this.prisma.notification.createMany({
+      data: userIds.map(userId => ({ userId, ...rest })),
+      skipDuplicates: true,
     });
+  }
 
-    if (!user) {
-      throw new NotFoundException('User not found');
-    }
-
-    let subject = 'Notification';
-    let template = 'notification';
-
-    if (type === 'RESULT_PUBLISHED') {
-      subject = 'Results have been published';
-      template = 'result-published';
-    } else if (type === 'NEW_ASSESSMENT') {
-      subject = 'New assessment available';
-      template = 'new-assessment';
-    } else if (type === 'ACCOUNT_ACTIVITY') {
-      subject = 'Account activity notification';
-      template = 'account-activity';
-    }
-
-    await this.emailQueue.add('send', {
-      to: user.email,
-      subject,
-      template,
-      data: {
-        firstName: user.firstName,
-        lastName: user.lastName,
-        ...data,
+  // ── Notify all active users in a school ───────────────────────────────────
+  async notifySchool(params: {
+    schoolId: string;
+    type: NotificationType;
+    title: string;
+    body: string;
+    link?: string;
+    excludeUserId?: string;
+  }) {
+    const { schoolId, excludeUserId, ...notifData } = params;
+    const users = await this.prisma.user.findMany({
+      where: {
+        schoolId,
+        deletedAt: null,
+        isActive: true,
+        ...(excludeUserId ? { id: { not: excludeUserId } } : {}),
       },
+      select: { id: true },
     });
-
-    return { sent: true };
+    const userIds = users.map(u => u.id);
+    if (userIds.length === 0) return;
+    await this.prisma.notification.createMany({
+      data: userIds.map(userId => ({ userId, schoolId, ...notifData })),
+      skipDuplicates: true,
+    });
   }
 
-  async getPreferences(userId: string) {
-    const raw = await this.redisService.get(REDIS_PREFS_KEY(userId));
-    if (!raw) {
-      return { ...DEFAULT_PREFERENCES };
-    }
-    try {
-      const parsed = JSON.parse(raw);
-      return { ...DEFAULT_PREFERENCES, ...parsed };
-    } catch {
-      return { ...DEFAULT_PREFERENCES };
-    }
+  // ── Get inbox for a user ────────────────────────────────────────────────
+  async getInbox(userId: string, page = 1, limit = 20) {
+    const skip = (page - 1) * limit;
+    const [notifications, total] = await Promise.all([
+      this.prisma.notification.findMany({
+        where: { userId },
+        orderBy: { createdAt: 'desc' },
+        skip,
+        take: limit,
+      }),
+      this.prisma.notification.count({ where: { userId } }),
+    ]);
+    return {
+      success: true,
+      data: notifications,
+      meta: { page, limit, total, totalPages: Math.ceil(total / limit) },
+    };
   }
 
-  async updatePreferences(userId: string, dto: Partial<Record<NotificationType, boolean>>) {
-    const current = await this.getPreferences(userId);
-    const updated = { ...current, ...dto };
-    await this.redisService.set(REDIS_PREFS_KEY(userId), JSON.stringify(updated));
-    return updated;
+  // ── Unread count ────────────────────────────────────────────────────────
+  async getUnreadCount(userId: string) {
+    const count = await this.prisma.notification.count({
+      where: { userId, isRead: false },
+    });
+    return { success: true, data: { count } };
+  }
+
+  // ── Mark single notification as read ────────────────────────────────────
+  async markRead(userId: string, notificationId: string) {
+    const notif = await this.prisma.notification.findFirst({
+      where: { id: notificationId, userId },
+    });
+    if (!notif) throw new NotFoundException('Notification not found');
+    await this.prisma.notification.update({
+      where: { id: notificationId },
+      data: { isRead: true },
+    });
+    return { success: true, message: 'Marked as read' };
+  }
+
+  // ── Mark all as read ────────────────────────────────────────────────────
+  async markAllRead(userId: string) {
+    await this.prisma.notification.updateMany({
+      where: { userId, isRead: false },
+      data: { isRead: true },
+    });
+    return { success: true, message: 'All notifications marked as read' };
   }
 }

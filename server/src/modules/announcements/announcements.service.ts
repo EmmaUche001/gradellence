@@ -3,10 +3,14 @@ import { PrismaService } from '../../database/prisma.service';
 import { CreateAnnouncementDto } from './dto/create-announcement.dto';
 import { UpdateAnnouncementDto } from './dto/update-announcement.dto';
 import { AuthenticatedUser } from '../../common/types/express.types';
+import { NotificationsService } from '../notifications/notifications.service';
 
 @Injectable()
 export class AnnouncementsService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly notificationsService: NotificationsService,
+  ) {}
 
   async create(dto: CreateAnnouncementDto, currentUser: AuthenticatedUser) {
     const announcement = await this.prisma.announcement.create({
@@ -21,6 +25,16 @@ export class AnnouncementsService {
         author: { select: { id: true, firstName: true, lastName: true } },
       },
     });
+
+    // Notify all school users (non-fatal)
+    this.notificationsService.notifySchool({
+      schoolId: currentUser.schoolId,
+      type: 'ANNOUNCEMENT',
+      title: `📢 ${announcement.title}`,
+      body: announcement.body ?? announcement.title,
+      link: '/announcements',
+      excludeUserId: currentUser.id,
+    }).catch(() => {});
 
     return {
       success: true,

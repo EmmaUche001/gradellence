@@ -10,6 +10,7 @@ import { PublishResultDto } from './dto/publish-result.dto';
 import { AuthenticatedUser } from '../../common/types/express.types';
 import { PdfService } from '../../common/pdf/pdf.service';
 import { AuditLogsService } from '../audit-logs/audit-logs.service';
+import { NotificationsService } from '../notifications/notifications.service';
 import { resolveGrade, assignPositions, calculateGPA, GradeScaleEntry } from './grading.util';
 import { DomainEventsService, DOMAIN_EVENTS } from '../../common/events/domain-events.service';
 
@@ -19,6 +20,7 @@ export class ResultsService {
     private readonly prisma: PrismaService,
     private readonly auditLogsService: AuditLogsService,
     private readonly domainEvents: DomainEventsService,
+    private readonly notificationsService: NotificationsService,
     @Optional() private readonly pdfService?: PdfService,
   ) {}
 
@@ -273,12 +275,20 @@ export class ResultsService {
       publishedBy: currentUser.id,
     });
 
+    // Notify all school users (non-fatal)
+    this.notificationsService.notifySchool({
+      schoolId: currentUser.schoolId,
+      type: 'RESULT_PUBLISHED',
+      title: 'Results Published',
+      body: `${classEntity.name} results for ${term.name} have been published.`,
+      link: '/results',
+      excludeUserId: currentUser.id,
+    }).catch(() => {});
+
     return {
       success: true,
       message: 'Results published successfully',
-      data: {
-        publishedCount: updateResult.count,
-      },
+      data: { publishedCount: updateResult.count },
     };
   }
 
@@ -352,6 +362,22 @@ export class ResultsService {
     const where: any = {
       schoolId: currentUser.schoolId,
     };
+
+    // Teachers only see results for their assigned subjects
+    if (currentUser.roles.includes('TEACHER') && !currentUser.roles.includes('SCHOOL_ADMIN') && !currentUser.roles.includes('SUPER_ADMIN')) {
+      const teacher = await this.prisma.teacher.findFirst({
+        where: { userId: currentUser.id, schoolId: currentUser.schoolId, deletedAt: null },
+        include: { subjectAssignments: { select: { subjectId: true } } },
+      });
+      if (teacher) {
+        const subjectIds = [...new Set(teacher.subjectAssignments.map(a => a.subjectId))];
+        if (subjectIds.length > 0) {
+          where.subjectId = { in: subjectIds };
+        } else {
+          return { success: true, message: 'Results retrieved successfully', data: [], meta: { page, limit, total: 0, totalPages: 0 } };
+        }
+      }
+    }
 
     if (studentId) where.studentId = studentId;
     if (subjectId) where.subjectId = subjectId;

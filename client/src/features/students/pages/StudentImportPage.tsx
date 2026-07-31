@@ -21,9 +21,9 @@ interface ImportResult {
 }
 
 // CSV template content
-const CSV_TEMPLATE = `firstName,lastName,admissionNumber,dateOfBirth,gender,address,phone,email
-John,Doe,STU001,2005-03-15,Male,123 School Road,08012345678,john@example.com
-Jane,Smith,STU002,2006-07-22,Female,456 Main Street,08087654321,
+const CSV_TEMPLATE = `firstName,lastName,admissionNumber,dateOfBirth,gender,address,phone,email,parentName,parentPhone,parentEmail
+John,Doe,STU001,2005-03-15,Male,123 School Road,08012345678,john@example.com,Mr. Samuel Doe,08012345679,samueldoe@example.com
+Jane,Smith,,2006-07-22,Female,456 Main Street,08087654321,,,
 `;
 
 function downloadTemplate() {
@@ -106,8 +106,9 @@ export function StudentImportPage() {
         <div className="flex-1 min-w-0">
           <p className="text-sm font-semibold text-info-900">Use the official template</p>
           <p className="text-xs text-info-700 mt-0.5">
-            Required columns: <code className="font-mono bg-info-100 px-1 rounded">firstName, lastName, admissionNumber</code>.
-            Optional: <code className="font-mono bg-info-100 px-1 rounded">dateOfBirth, gender, address, phone, email</code>
+            Required columns: <code className="font-mono bg-info-100 px-1 rounded">firstName, lastName</code>.
+            Optional: <code className="font-mono bg-info-100 px-1 rounded">admissionNumber, dateOfBirth, gender, address, phone, email, parentName, parentPhone, parentEmail</code>.
+            Column names are flexible — "First Name", "first_name" and "FIRSTNAME" are all accepted.
           </p>
         </div>
         <Button variant="secondary" size="sm" onClick={downloadTemplate} className="shrink-0">

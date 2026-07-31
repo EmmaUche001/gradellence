@@ -12,11 +12,14 @@ import { AuthenticatedUser } from '../../common/types/express.types';
 import { ROLES } from '../../common/constants/roles.constants';
 import { AuditLogsService } from '../audit-logs/audit-logs.service';
 
+import { NotificationsService } from '../notifications/notifications.service';
+
 @Injectable()
 export class UsersService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly auditLogsService: AuditLogsService,
+    private readonly notificationsService: NotificationsService,
   ) {}
 
   async create(dto: CreateUserDto, currentUser: AuthenticatedUser) {
@@ -87,7 +90,14 @@ export class UsersService {
     const where: any = { deletedAt: null };
 
     if (currentUser.roles.includes(ROLES.SCHOOL_ADMIN)) {
+      // School admins only see users from their own school
+      // and never see SUPER_ADMIN accounts
       where.schoolId = currentUser.schoolId;
+      where.roles = {
+        none: {
+          role: { name: ROLES.SUPER_ADMIN },
+        },
+      };
     }
 
     const [users, total] = await Promise.all([
@@ -270,6 +280,16 @@ export class UsersService {
             userAgent,
           )
           .catch(() => {});
+
+        // Notify the affected user (non-fatal)
+        this.notificationsService.create({
+          userId: id,
+          schoolId: updatedUser.schoolId,
+          type: 'ROLE_CHANGED',
+          title: 'Your roles have been updated',
+          body: `Your account permissions were updated by an administrator.`,
+          link: '/dashboard',
+        }).catch(() => {});
       }
     }
 

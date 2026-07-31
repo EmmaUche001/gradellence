@@ -1,6 +1,7 @@
 import { Module } from '@nestjs/common';
 import { ConfigModule, ConfigService } from '@nestjs/config';
 import { APP_GUARD, APP_INTERCEPTOR } from '@nestjs/core';
+import { ScheduleModule } from '@nestjs/schedule';
 import { PrismaModule } from './database/prisma.module';
 import { RedisModule } from './common/redis/redis.module';
 import { AuthModule } from './modules/auth/auth.module';
@@ -60,6 +61,9 @@ import { DomainEventsModule } from './common/events/domain-events.module';
 
     // Job processing
     BullMQModule,
+
+    // Scheduled tasks (term auto-advance etc.)
+    ScheduleModule.forRoot(),
 
     // Feature modules
     AuthModule,

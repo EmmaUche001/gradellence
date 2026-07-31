@@ -227,6 +227,23 @@ export class AssessmentsService {
       schoolId: currentUser.schoolId,
     };
 
+    // Teachers only see assessments for their assigned subjects
+    if (currentUser.roles.includes('TEACHER') && !currentUser.roles.includes('SCHOOL_ADMIN') && !currentUser.roles.includes('SUPER_ADMIN')) {
+      const teacher = await this.prisma.teacher.findFirst({
+        where: { userId: currentUser.id, schoolId: currentUser.schoolId, deletedAt: null },
+        include: { subjectAssignments: { select: { subjectId: true, classId: true } } },
+      });
+      if (teacher) {
+        const subjectIds = [...new Set(teacher.subjectAssignments.map(a => a.subjectId))];
+        if (subjectIds.length > 0) {
+          where.subjectId = { in: subjectIds };
+          where.teacherId = teacher.id;
+        } else {
+          return { success: true, message: 'Assessments retrieved successfully', data: [], meta: { page, limit, total: 0, totalPages: 0 } };
+        }
+      }
+    }
+
     if (studentId) where.studentId = studentId;
     if (subjectId) where.subjectId = subjectId;
     if (termId) where.termId = termId;

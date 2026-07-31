@@ -16,7 +16,7 @@ export class AuditLogsController {
   constructor(private readonly auditLogsService: AuditLogsService) {}
 
   @Get()
-  @Roles('SUPER_ADMIN', 'SCHOOL_ADMIN')
+  @Roles('SUPER_ADMIN', 'SCHOOL_ADMIN', 'TEACHER')
   @ApiOperation({ summary: 'Get all audit logs with pagination and filters' })
   findAll(
     @CurrentUser() user: AuthenticatedUser,

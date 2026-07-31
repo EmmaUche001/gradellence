@@ -10,7 +10,9 @@ import {
 import { analyticsService } from '../../../services/analyticsService';
 import { sessionService } from '../../../services/sessionService';
 import { classService } from '../../../services/classService';
+import { teacherService } from '../../../services/teacherService';
 import { useToastStore } from '../../../store/toastStore';
+import { useAuthStore } from '../../../store/authStore';
 import type { OverviewData, ResultStatsData, ClassRankingItem } from '../../../services/analyticsService';
 import type { Session, Term } from '../../../types/session';
 import type { Class } from '../../../types/class';
@@ -61,10 +63,15 @@ function PositionCell({ pos }: { pos: number }) {
 // ── Main component ───────────────────────────────────────────────────────────
 export function AnalyticsDashboardPage() {
   const { addToast } = useToastStore();
+  const { user }     = useAuthStore();
+  const isTeacher    = user?.roles?.includes('TEACHER') && !user.roles.includes('SCHOOL_ADMIN') && !user.roles.includes('SUPER_ADMIN');
 
   // ── Overview ─────────────────────────────────────────────────────────────
   const [overview, setOverview]           = useState<OverviewData | null>(null);
   const [overviewLoading, setOvLoading]   = useState(true);
+
+  // ── Teacher profile (for teacher-specific KPIs) ──────────────────────────
+  const [teacherProfile, setTeacherProfile] = useState<any>(null);
 
   // ── Sessions / terms (shared dropdowns) ─────────────────────────────────
   const [sessions, setSessions]           = useState<Session[]>([]);
@@ -91,6 +98,14 @@ export function AnalyticsDashboardPage() {
         setOverview(res.data || null);
       } catch (e: any) { addToast('error', e.response?.data?.message || 'Failed to load overview'); }
       finally { setOvLoading(false); }
+
+      // Teacher profile (only for teacher role)
+      if (isTeacher) {
+        try {
+          const res = await teacherService.getMyProfile();
+          setTeacherProfile(res.data);
+        } catch { /* silent */ }
+      }
 
       // Sessions → flatten terms (parallel fetch, not serial)
       try {
@@ -163,13 +178,32 @@ export function AnalyticsDashboardPage() {
 
       {/* ── Section 1: Overview KPI Cards ──────────────────────────────── */}
       <section>
-        <h2 className="text-section-title text-gray-900 mb-4">School Overview</h2>
+        <h2 className="text-section-title text-gray-900 mb-4">
+          {isTeacher ? 'My Teaching Overview' : 'School Overview'}
+        </h2>
 
         {overviewLoading ? (
           <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
             {Array.from({ length: 4 }).map((_, i) => <SkeletonKpiCard key={i} />)}
           </div>
+        ) : isTeacher ? (
+          /* ── Teacher KPIs ── */
+          <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+            <KpiCard title="My Classes"
+              value={teacherProfile?.stats?.classCount ?? 0}
+              icon={<School size={20} className="text-primary-600" />} iconColor="bg-primary-50 text-primary-600" />
+            <KpiCard title="My Students"
+              value={(teacherProfile?.stats?.studentCount ?? 0).toLocaleString()}
+              icon={<GraduationCap size={20} className="text-success-600" />} iconColor="bg-success-50 text-success-600" />
+            <KpiCard title="Subjects Assigned"
+              value={(teacherProfile?.teacher?.subjectAssignments?.length ?? 0)}
+              icon={<BookOpen size={20} className="text-info-600" />} iconColor="bg-info-50 text-info-600" />
+            <KpiCard title="Total Assessments"
+              value={teacherProfile?.stats?.totalAssessments ?? 0}
+              icon={<BarChart3 size={20} className="text-warning-600" />} iconColor="bg-warning-50 text-warning-600" />
+          </div>
         ) : overview ? (
+          /* ── School Admin KPIs ── */
           <>
             <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
               <KpiCard title="Total Students" value={(overview.totalStudents ?? 0).toLocaleString()}

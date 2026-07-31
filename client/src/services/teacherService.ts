@@ -24,7 +24,7 @@ export const teacherService = {
     return data;
   },
 
-  async create(dto: CreateTeacherData): Promise<ApiResponse<Teacher>> {
+  async create(dto: CreateTeacherData): Promise<ApiResponse<Teacher> & { temporaryPassword?: string }> {
     const { data } = await apiClient.post(BASE, dto);
     return data;
   },

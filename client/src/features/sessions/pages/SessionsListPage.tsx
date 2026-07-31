@@ -29,9 +29,16 @@ export function SessionsListPage() {
       const res = await sessionService.getAll(page, 20);
       setSessions(res.data);
       if (res.meta) setTotalPages(res.meta.totalPages);
+      // Auto-expand the current session and pre-load its terms
+      const current = res.data.find(s => s.isCurrent);
+      if (current && !expandedId) {
+        setExpandedId(current.id);
+        const detail = await sessionService.getById(current.id);
+        setSessionTerms(prev => ({ ...prev, [current.id]: detail.data.terms || [] }));
+      }
     } catch (err: any) { setError(err.response?.data?.message || 'Failed to load sessions'); }
     finally { setIsLoading(false); }
-  }, [page]);
+  }, [page]); // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => { fetch(); }, [fetch]);
 
@@ -102,9 +109,21 @@ export function SessionsListPage() {
                   <>
                     <tr key={s.id} className="hover:bg-gray-50 transition-colors">
                       {/* Expand toggle */}
-                      <td className="pl-4 pr-2 py-3.5 w-8">
-                        <button onClick={() => handleToggleTerms(s.id)} className="p-1 rounded text-gray-400 hover:text-gray-600 hover:bg-gray-100">
-                          {expandedId === s.id ? <ChevronDown size={16} /> : <ChevronRight size={16} />}
+                      <td className="pl-4 pr-2 py-3.5 w-28">
+                        <button
+                          onClick={() => handleToggleTerms(s.id)}
+                          className={[
+                            'inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-semibold transition-all duration-150',
+                            expandedId === s.id
+                              ? 'bg-primary-600 text-white shadow-sm'
+                              : 'bg-primary-50 text-primary-700 hover:bg-primary-100 border border-primary-200',
+                          ].join(' ')}
+                          title={expandedId === s.id ? 'Collapse terms' : 'View & manage terms'}
+                        >
+                          {expandedId === s.id
+                            ? <ChevronDown size={12} />
+                            : <ChevronRight size={12} />}
+                          Terms
                         </button>
                       </td>
                       <td className="px-5 py-3.5 text-sm font-semibold text-gray-900">{s.name}</td>

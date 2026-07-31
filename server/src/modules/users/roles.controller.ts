@@ -75,9 +75,15 @@ export class RolesController {
   @Roles(ROLES.SUPER_ADMIN, ROLES.SCHOOL_ADMIN)
   @ApiOperation({ summary: 'Get all roles for this school' })
   async findAll(@Request() req: AuthenticatedRequest) {
-    const where = req.user.roles?.includes(ROLES.SUPER_ADMIN)
+    const isSuperAdmin = req.user.roles?.includes(ROLES.SUPER_ADMIN);
+
+    const where = isSuperAdmin
       ? {}
-      : { OR: [{ schoolId: req.user.schoolId }, { schoolId: null }] };
+      : {
+          // School-scoped roles only — exclude global SUPER_ADMIN role
+          schoolId: req.user.schoolId,
+          NOT: { name: ROLES.SUPER_ADMIN },
+        };
 
     const roles = await this.prisma.role.findMany({
       where,

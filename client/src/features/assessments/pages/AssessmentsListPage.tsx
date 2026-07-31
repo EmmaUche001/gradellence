@@ -28,9 +28,7 @@ export function AssessmentsListPage() {
   const [total, setTotal]             = useState(0);
 
   // Confirm dialogs
-  const [publishTarget, setPublishTarget] = useState<Assessment | null>(null);
   const [deleteTarget, setDeleteTarget]   = useState<Assessment | null>(null);
-  const [publishing, setPublishing]       = useState(false);
   const [deleting, setDeleting]           = useState(false);
 
   const fetchAssessments = useCallback(async () => {
@@ -45,19 +43,6 @@ export function AssessmentsListPage() {
   }, [page]);
 
   useEffect(() => { fetchAssessments(); }, [fetchAssessments]);
-
-  const confirmPublish = async () => {
-    if (!publishTarget) return;
-    setPublishing(true);
-    try {
-      await assessmentService.publish(publishTarget.id);
-      setPublishTarget(null);
-      fetchAssessments();
-    } catch (err: any) {
-      setError(err.response?.data?.message || 'Failed to publish');
-      setPublishTarget(null);
-    } finally { setPublishing(false); }
-  };
 
   const confirmDelete = async () => {
     if (!deleteTarget) return;
@@ -125,7 +110,7 @@ export function AssessmentsListPage() {
             <table className="w-full">
               <thead>
                 <tr className="bg-gray-50 border-b border-border">
-                  {['Student', 'Subject', 'Type', 'Score', 'Term', 'Status', ''].map(h => (
+                  {['Student', 'Subject', 'Type', 'Score', 'Term', ''].map(h => (
                     <th key={h} className="px-5 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider last:text-right">{h}</th>
                   ))}
                 </tr>
@@ -147,17 +132,9 @@ export function AssessmentsListPage() {
                       {a.score} <span className="text-gray-400 font-normal">/ {a.maxScore}</span>
                     </td>
                     <td className="px-5 py-3.5 text-sm text-gray-600">{a.term?.name || '—'}</td>
-                    <td className="px-5 py-3.5">
-                      <Badge variant={a.isPublished ? 'success' : 'gray'}>
-                        {a.isPublished ? 'Published' : 'Draft'}
-                      </Badge>
-                    </td>
                     <td className="px-5 py-3.5 text-right">
                       <div className="flex items-center justify-end gap-3">
                         <button onClick={() => navigate(`/assessments/${a.id}/edit`)} className="text-sm font-medium text-primary-600 hover:text-primary-700">Edit</button>
-                        {!a.isPublished && (
-                          <button onClick={() => setPublishTarget(a)} className="text-sm font-medium text-success-600 hover:text-success-700">Publish</button>
-                        )}
                         <button onClick={() => setDeleteTarget(a)} className="text-sm font-medium text-danger-600 hover:text-danger-700">Delete</button>
                       </div>
                     </td>
@@ -179,18 +156,6 @@ export function AssessmentsListPage() {
           </div>
         )}
       </div>
-
-      {/* Publish confirm */}
-      <ConfirmDialog
-        isOpen={!!publishTarget}
-        onClose={() => setPublishTarget(null)}
-        onConfirm={confirmPublish}
-        variant="primary"
-        title="Publish assessment?"
-        message="This will lock the scores and make the assessment visible. This action cannot be undone."
-        confirmLabel="Publish"
-        loading={publishing}
-      />
 
       {/* Delete confirm */}
       <ConfirmDialog

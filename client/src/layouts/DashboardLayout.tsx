@@ -3,7 +3,7 @@ import { Outlet, Link, useLocation, useNavigate } from 'react-router-dom';
 import {
   LayoutDashboard, Users, GraduationCap, BookOpen, School,
   ClipboardCheck, BarChart3, Shield, Settings, CreditCard,
-  Bell, ChevronDown, LogOut, Menu,
+  ChevronDown, LogOut, Menu,
   BookMarked, CalendarDays, ScrollText, Layers, Megaphone,
   KeyRound, UserCheck,
 } from 'lucide-react';
@@ -12,6 +12,7 @@ import { ToastContainer } from '../components/ui/Toast';
 import { Avatar } from '../components/ui/Avatar';
 import { ChangePasswordModal } from '../components/ui/ChangePasswordModal';
 import { GlobalSearch } from '../components/ui/GlobalSearch';
+import { NotificationDropdown } from '../components/ui/NotificationDropdown';
 import { subscriptionService } from '../services/subscriptionService';
 
 const ROLES = {
@@ -55,7 +56,7 @@ const navGroups: NavGroup[] = [
       { label: 'Classes',     path: '/classes',     icon: <School         size={iconSize} />, roles: [ROLES.SUPER_ADMIN, ROLES.SCHOOL_ADMIN, ROLES.TEACHER] },
       { label: 'Subjects',    path: '/subjects',    icon: <BookOpen       size={iconSize} />, roles: [ROLES.SUPER_ADMIN, ROLES.SCHOOL_ADMIN, ROLES.TEACHER] },
       { label: 'Sessions',    path: '/sessions',    icon: <CalendarDays   size={iconSize} />, roles: [ROLES.SUPER_ADMIN, ROLES.SCHOOL_ADMIN] },
-      { label: 'Enrollments', path: '/enrollments', icon: <Users          size={iconSize} />, roles: [ROLES.SUPER_ADMIN, ROLES.SCHOOL_ADMIN] },
+      { label: 'Enrollments', path: '/enrollments', icon: <UserCheck      size={iconSize} />, roles: [ROLES.SUPER_ADMIN, ROLES.SCHOOL_ADMIN] },
       { label: 'Assessments', path: '/assessments', icon: <ClipboardCheck size={iconSize} />, roles: [ROLES.SUPER_ADMIN, ROLES.SCHOOL_ADMIN, ROLES.TEACHER] },
       { label: 'Results',     path: '/results',     icon: <ScrollText     size={iconSize} />, roles: [ROLES.SUPER_ADMIN, ROLES.SCHOOL_ADMIN, ROLES.TEACHER] },
       { label: 'Grade Scales',path: '/grade-scales',icon: <Layers         size={iconSize} />, roles: [ROLES.SUPER_ADMIN, ROLES.SCHOOL_ADMIN] },
@@ -109,11 +110,15 @@ export function DashboardLayout() {
   }, []);
 
   useEffect(() => {
-    subscriptionService.getMyPlan()
-      .then(r => {
-        if (r.data) setPlanName(r.data.plan?.name ?? null);
-      })
-      .catch(() => {});
+    // Only fetch plan for SCHOOL_ADMIN — teachers don't have their own plan
+    const isAdmin = userRoles.includes('SCHOOL_ADMIN') || userRoles.includes('SUPER_ADMIN');
+    if (isAdmin) {
+      subscriptionService.getMyPlan()
+        .then(r => {
+          if (r.data) setPlanName(r.data.plan?.name ?? null);
+        })
+        .catch(() => {});
+    }
 
     // Fetch school name
     if (user?.schoolId) {
@@ -224,14 +229,14 @@ export function DashboardLayout() {
       )}
 
       {/* Nav */}
-      <nav className="flex-1 overflow-y-auto py-3 px-3 space-y-1">
+      <nav className="flex-1 overflow-y-auto py-3 px-3 space-y-1 scrollbar-thin scrollbar-track-transparent scrollbar-thumb-gray-200">
         {navGroups.map((group) => {
           const visible = group.items.filter((item) =>
             item.roles.some((r) => userRoles.includes(r))
           );
           if (visible.length === 0) return null;
           return (
-            <div key={group.heading} className="mb-2">
+            <div key={group.heading} className="mb-1">
               {!collapsed && (
                 <p className="px-3 mb-1 text-[10px] font-semibold text-gray-400 uppercase tracking-widest">
                   {group.heading}
@@ -246,7 +251,7 @@ export function DashboardLayout() {
                     title={collapsed ? item.label : undefined}
                     onClick={() => setMobileOpen(false)}
                     className={[
-                      'flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-all duration-150',
+                      'flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium transition-all duration-150',
                       collapsed ? 'justify-center' : '',
                       active
                         ? 'bg-primary-50 text-primary-700'
@@ -337,9 +342,7 @@ export function DashboardLayout() {
 
           <div className="ml-auto flex items-center gap-2">
             {/* Notifications */}
-            <button className="relative p-2 rounded-lg text-gray-500 hover:bg-gray-100 transition-colors" aria-label="Notifications">
-              <Bell size={20} />
-            </button>
+            <NotificationDropdown />
 
             {/* Help */}
             <button className="p-2 rounded-lg text-gray-500 hover:bg-gray-100 transition-colors" aria-label="Help">

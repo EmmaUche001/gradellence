@@ -8,6 +8,8 @@ import {
   Param,
   Delete,
   UseGuards,
+  UseInterceptors,
+  UploadedFile,
   Query,
   Request,
   DefaultValuePipe,
@@ -140,12 +142,19 @@ export class StudentsController {
   @Post('import')
   @Roles(ROLES.SUPER_ADMIN, ROLES.SCHOOL_ADMIN)
   @RateLimit(RATE_LIMIT_PRESETS.WRITE)
+  @UseInterceptors(FileInterceptor('csv'))
   @ApiConsumes('multipart/form-data')
   @ApiOperation({ summary: 'Bulk import students from CSV' })
   @ApiResponse({ status: 200, description: 'Import result' })
   @UseGuards(JwtAuthGuard, RolesGuard, TenantGuard)
-  async importStudents(@Request() req: AuthenticatedRequest, @Body() file: any) {
-    const csvContent = file?.csv || '';
+  async importStudents(
+    @Request() req: AuthenticatedRequest,
+    @UploadedFile() file: { buffer: Buffer; originalname: string; mimetype: string },
+  ) {
+    if (!file?.buffer) {
+      return { success: false, error: { message: 'No CSV file uploaded' } };
+    }
+    const csvContent = file.buffer.toString('utf-8');
     return this.studentsService.importCsv(req.user.schoolId, csvContent);
   }
 }

@@ -86,6 +86,30 @@ export class ClassesService {
       where.level = level;
     }
 
+    // Teachers only see classes they are assigned to
+    const isTeacherOnly = currentUser.roles.includes('TEACHER') &&
+      !currentUser.roles.includes('SCHOOL_ADMIN') &&
+      !currentUser.roles.includes('SUPER_ADMIN');
+
+    if (isTeacherOnly) {
+      const teacher = await this.prisma.teacher.findFirst({
+        where: { userId: currentUser.id, schoolId: currentUser.schoolId, deletedAt: null },
+        include: { subjectAssignments: { select: { classId: true } }, classTeacher: { select: { id: true } } },
+      });
+      if (teacher) {
+        const assignedClassIds = [
+          ...teacher.subjectAssignments.map(a => a.classId),
+          ...(teacher.classTeacher ? teacher.classTeacher.map(c => c.id) : []),
+        ];
+        const uniqueClassIds = [...new Set(assignedClassIds)];
+        if (uniqueClassIds.length > 0) {
+          where.id = { in: uniqueClassIds };
+        } else {
+          return { success: true, message: 'Classes retrieved successfully', data: [], meta: { page, limit, total: 0, totalPages: 0 } };
+        }
+      }
+    }
+
     const [classes, total] = await Promise.all([
       this.prisma.class.findMany({
         where,

@@ -116,7 +116,8 @@ const StudentAnalyticsPage: React.FC = () => {
                     <Tooltip content={<ChartTooltip />} />
                     <Line type="monotone" dataKey="avg" name="Average"
                       stroke={chartColors.primary} strokeWidth={2.5}
-                      dot={{ r: 4, fill: chartColors.primary, strokeWidth: 0 }} activeDot={{ r: 6 }} />
+                      dot={{ r: 4, fill: chartColors.primary, strokeWidth: 0 }} activeDot={{ r: 6 }}
+                      animationDuration={1200} animationEasing="ease-out" />
                   </LineChart>
                 </ResponsiveContainer>
               </Card>

@@ -1,4 +1,4 @@
-import apiClient, { ApiResponse} from './apiClient';
+import apiClient, { ApiResponse } from './apiClient';
 import {
   Result,
   ComputeResultData,
@@ -52,12 +52,18 @@ export const resultService = {
   },
 
   async getClassResults(classId: string, termId: string): Promise<ApiResponse<any>> {
-    const { data } = await apiClient.get(`${BASE}/class/${classId}/term/${termId}`);
+    const { data } = await apiClient.get(`${BASE}/class/${classId}/${termId}`);
     return data;
   },
 
   async getBroadsheet(classId: string, termId: string): Promise<ApiResponse<BroadsheetData>> {
-    const { data } = await apiClient.get(`${BASE}/broadsheet/${classId}/term/${termId}`);
+    const { data } = await apiClient.get(`${BASE}/broadsheet/${classId}/${termId}`);
     return data;
+  },
+
+  async downloadClassReportCards(classId: string, termId: string) {
+    return apiClient.get(`${BASE}/report-cards/class/${classId}/${termId}`, {
+      responseType: 'blob',
+    });
   },
 };

@@ -1,4 +1,4 @@
-import { Injectable, Logger } from '@nestjs/common';
+import { Injectable, Logger, BadRequestException } from '@nestjs/common';
 import PDFDocument from 'pdfkit';
 import { PrismaService } from '../../database/prisma.service';
 import {
@@ -9,6 +9,35 @@ import {
   calculateCumulativeGPA,
 } from '../../modules/results/grading.util';
 import { VerifyService } from '../verify/verify.service';
+import { getTemplate } from './templates';
+import {
+  ReportCardData,
+  ReportCardBranding,
+  ReportCardResultRow,
+  asStringArray,
+} from './templates/report-card.types';
+
+const DEFAULT_BRANDING: ReportCardBranding = {
+  template: 'classic',
+  accentColor: '#1a56db',
+  motto: null,
+  principalName: null,
+  principalSignature: null,
+  schoolStamp: null,
+  showRanking: true,
+  showCumulative: true,
+  showAffective: false,
+  showPsychomotor: false,
+  showTeacherRemark: true,
+  showPrincipalRemark: true,
+  showResumptionDate: true,
+  showStamp: true,
+  showPoweredBy: true,
+  affectiveTraits: ['Punctuality', 'Neatness', 'Honesty', 'Cooperation', 'Attentiveness', 'Perseverance'],
+  psychomotorTraits: ['Drawing', 'Sports', 'Handwriting', 'Musical Skills'],
+  footerText: null,
+  nextTermDate: null,
+};
 
 @Injectable()
 export class PdfService {
@@ -164,13 +193,48 @@ export class PdfService {
     }
   }
 
+  private async getBranding(schoolId: string): Promise<ReportCardBranding> {
+    try {
+      const cfg = await (this.prisma as any).reportCardConfig?.findUnique?.({
+        where: { schoolId },
+      });
+      if (!cfg) return { ...DEFAULT_BRANDING };
+      return {
+        ...DEFAULT_BRANDING,
+        template: cfg.template ?? DEFAULT_BRANDING.template,
+        accentColor: cfg.accentColor ?? DEFAULT_BRANDING.accentColor,
+        motto: cfg.motto ?? null,
+        principalName: cfg.principalName ?? null,
+        principalSignature: cfg.principalSignature ?? null,
+        schoolStamp: cfg.schoolStamp ?? null,
+        showRanking: cfg.showRanking ?? true,
+        showCumulative: cfg.showCumulative ?? true,
+        showAffective: cfg.showAffective ?? false,
+        showPsychomotor: cfg.showPsychomotor ?? false,
+        showTeacherRemark: cfg.showTeacherRemark ?? true,
+        showPrincipalRemark: cfg.showPrincipalRemark ?? true,
+        showResumptionDate: cfg.showResumptionDate ?? true,
+        showStamp: cfg.showStamp ?? true,
+        showPoweredBy: cfg.showPoweredBy ?? true,
+        affectiveTraits: asStringArray(cfg.affectiveTraits, DEFAULT_BRANDING.affectiveTraits),
+        psychomotorTraits: asStringArray(cfg.psychomotorTraits, DEFAULT_BRANDING.psychomotorTraits),
+        footerText: cfg.footerText ?? null,
+        nextTermDate: cfg.nextTermDate
+          ? new Date(cfg.nextTermDate).toLocaleDateString()
+          : null,
+      };
+    } catch {
+      return { ...DEFAULT_BRANDING };
+    }
+  }
+
   async generateReportCard(studentId: string, termId: string, schoolId: string): Promise<Buffer> {
     const student = await this.prisma.student.findFirst({
       where: { id: studentId, schoolId },
       include: {
         school: true,
         results: {
-          where: { termId },
+          where: { termId, isPublished: true },
           select: {
             id: true,
             totalScore: true,
@@ -179,7 +243,7 @@ export class PdfService {
             points: true,
             isPass: true,
             subject: true,
-            term: true,
+            term: { include: { session: true } },
           },
         },
         enrollments: {
@@ -193,9 +257,73 @@ export class PdfService {
       throw new Error('Student not found');
     }
 
+    // Per BATCH2 spec: require published results before generating a report card
+    if (student.results.length === 0) {
+      throw new BadRequestException('Results have not been published for this student and term');
+    }
+
     const className = student.enrollments[0]?.class?.name || 'N/A';
+    const classId = student.enrollments[0]?.class?.id;
     const termName = student.results[0]?.term?.name || 'N/A';
+    const sessionName = (student.results[0]?.term as any)?.session?.name || '';
     const gradeScales = await this.getActiveGradeScales(schoolId);
+    const branding = await this.getBranding(schoolId);
+
+    // Build result rows
+    const rows: ReportCardResultRow[] = [];
+    let totalScore = 0;
+    const resultsForGPA: { points: number | null }[] = [];
+    for (const result of student.results) {
+      const resolved =
+        result.grade !== null
+          ? { grade: result.grade, remark: result.remark, points: result.points }
+          : resolveGrade(result.totalScore, gradeScales);
+      totalScore += result.totalScore;
+      resultsForGPA.push({ points: resolved.points });
+      rows.push({
+        subjectName: result.subject.name,
+        totalScore: result.totalScore,
+        grade: resolved.grade,
+        remark: resolved.remark,
+        points: resolved.points,
+      });
+    }
+    const subjectCount = rows.length;
+    const average = subjectCount > 0 ? totalScore / subjectCount : 0;
+    const gpa = calculateGPA(resultsForGPA);
+    const overallGrade = resolveGrade(average, gradeScales).grade;
+
+    // Class ranking
+    let position: number | null = null;
+    let classSize: number | null = null;
+    if (classId) {
+      const classmates = await this.prisma.enrollment.findMany({
+        where: { classId, termId },
+        include: { student: { include: { results: { where: { termId } } } } },
+      });
+      const totals = classmates.map((e) => {
+        const t = e.student.results.reduce((s, r) => s + r.totalScore, 0);
+        const c = e.student.results.length;
+        return { studentId: e.studentId, totalScore: c > 0 ? t / c : 0 };
+      });
+      classSize = totals.length;
+      const ranked = assignPositions(totals);
+      const me = ranked.find((r) => (r as any).studentId === studentId);
+      position = me ? (me as any).position ?? null : null;
+    }
+
+    // Cumulative GPA across all terms
+    const allResults = await this.prisma.result.findMany({
+      where: { studentId, schoolId },
+      select: { points: true, termId: true },
+    });
+    const byTerm = new Map<string, { points: number | null }[]>();
+    for (const r of allResults) {
+      if (!byTerm.has(r.termId)) byTerm.set(r.termId, []);
+      byTerm.get(r.termId)!.push({ points: r.points });
+    }
+    const termsArray = Array.from(byTerm.values()).map((results) => ({ results }));
+    const cumulativeGpa = termsArray.length ? calculateCumulativeGPA(termsArray) : null;
 
     const studentName = `${student.firstName} ${student.lastName}`;
     const { qrDataUrl } = await this.verifyService.createVerification({
@@ -207,85 +335,182 @@ export class PdfService {
       termId,
     });
 
+    const data: ReportCardData = {
+      school: {
+        name: student.school.name,
+        logo: (student.school as any).logo ?? null,
+        address: (student.school as any).address ?? null,
+        phone: (student.school as any).phone ?? null,
+        email: (student.school as any).email ?? null,
+        signatureUrl: (student.school as any).signatureUrl ?? null,
+      },
+      student: {
+        firstName: student.firstName,
+        lastName: student.lastName,
+        admissionNumber: student.admissionNumber,
+      },
+      className,
+      termName,
+      sessionName,
+      results: rows,
+      summary: {
+        subjectCount,
+        totalScore,
+        average,
+        gpa,
+        overallGrade,
+        position,
+        classSize,
+        cumulativeGpa,
+      },
+      branding,
+      gradeScales,
+      qrDataUrl,
+    };
+
+    const template = getTemplate(branding.template);
+
     return new Promise((resolve, reject) => {
       const doc = new PDFDocument({ size: 'A4', margin: 50 });
       const chunks: Buffer[] = [];
-
       doc.on('data', (chunk: Buffer) => chunks.push(chunk));
       doc.on('end', () => resolve(Buffer.concat(chunks)));
       doc.on('error', reject);
 
       this.addWatermark(doc);
 
-      this.addSchoolBranding(doc, student.school, 50).then(() => {
-        doc.fontSize(12).font('Helvetica-Bold').text('STUDENT REPORT CARD', { align: 'center' });
-        doc.moveDown();
+      template
+        .render(doc, data)
+        .then(() => doc.end())
+        .catch(reject);
+    });
+  }
 
-        doc.fontSize(10).font('Helvetica');
-        doc.text(`Student: ${studentName}`);
-        doc.text(`Admission No: ${student.admissionNumber}`);
-        doc.text(`Class: ${className}`);
-        doc.text(`Term: ${termName}`);
-        doc.moveDown();
+  async generateClassReportCardsZip(
+    classId: string,
+    termId: string,
+    schoolId: string,
+  ): Promise<Buffer> {
+    const classData = await this.prisma.class.findFirst({
+      where: { id: classId, schoolId },
+      include: {
+        enrollments: {
+          where: { termId },
+          include: { student: true },
+        },
+      },
+    });
 
-        const tableTop = doc.y;
-        doc.fontSize(10).font('Helvetica-Bold');
-        doc.text('Subject', 50, tableTop, { width: 200 });
-        doc.text('Total Score', 250, tableTop, { width: 80, align: 'center' });
-        doc.text('Grade', 330, tableTop, { width: 60, align: 'center' });
-        doc.text('Remark', 390, tableTop, { width: 100, align: 'center' });
-        doc.moveDown();
-        doc.moveTo(50, doc.y).lineTo(550, doc.y).stroke();
-        doc.moveDown(0.5);
+    if (!classData) {
+      throw new Error('Class not found');
+    }
 
-        doc.font('Helvetica').fontSize(9);
-        let totalScore = 0;
-        let subjectCount = 0;
-        const resultsForGPA: { points: number | null }[] = [];
+    // eslint-disable-next-line @typescript-eslint/no-var-requires
+    const archiver = require('archiver');
+    const archive = archiver('zip', { zlib: { level: 9 } });
+    const chunks: Buffer[] = [];
 
-        for (const result of student.results) {
-          const { grade, remark, points } =
-            result.grade !== null
-              ? { grade: result.grade, remark: result.remark, points: result.points }
-              : resolveGrade(result.totalScore, gradeScales);
-          totalScore += result.totalScore;
-          subjectCount++;
-          resultsForGPA.push({ points });
+    archive.on('data', (chunk: Buffer) => chunks.push(chunk));
 
-          doc.text(result.subject.name, 50, doc.y, { width: 200 });
-          doc.text(result.totalScore.toFixed(1), 250, doc.y - 11, { width: 80, align: 'center' });
-          doc.text(grade ?? '-', 330, doc.y - 11, { width: 60, align: 'center' });
-          doc.text(remark ?? '-', 390, doc.y - 11, { width: 100, align: 'center' });
-          doc.moveDown();
-        }
+    const done = new Promise<void>((resolve, reject) => {
+      archive.on('end', () => resolve());
+      archive.on('error', reject);
+    });
 
-        doc.moveDown();
-        doc.moveTo(50, doc.y).lineTo(550, doc.y).stroke();
-        doc.moveDown(0.5);
-        doc.font('Helvetica-Bold').fontSize(10);
-        const average = subjectCount > 0 ? totalScore / subjectCount : 0;
-        const gpa = calculateGPA(resultsForGPA);
-        const overallGrade = resolveGrade(average, gradeScales).grade;
-        doc.text(`Total Subjects: ${subjectCount}`);
-        doc.text(`Average Score: ${average.toFixed(1)}`);
-        doc.text(`Overall Grade: ${overallGrade ?? '-'}`);
-        doc.text(`Term GPA: ${gpa.toFixed(2)}`);
-
-        doc.moveDown(2);
-        doc.font('Helvetica').fontSize(8).fillColor('gray');
-        doc.text('________________________________', { align: 'center' });
-        doc.fontSize(8).fillColor('gray');
-        doc.text('School Stamp / Signature', { align: 'center' });
-
-        const schoolSignature = (student.school as any).signatureUrl;
-        if (schoolSignature) {
-          this.addSignatureImage(doc, schoolSignature, doc.y + 10);
-        }
-
-        this.addFooterWithQR(doc, qrDataUrl, 0).then(() => {
-          doc.end();
-        });
+    for (const enrollment of classData.enrollments) {
+      const pdf = await this.generateReportCard(enrollment.studentId, termId, schoolId);
+      archive.append(pdf, {
+        name: `${enrollment.student.firstName}-${enrollment.student.lastName}-report-card.pdf`,
       });
+    }
+
+    await archive.finalize();
+    await done;
+
+    return Buffer.concat(chunks);
+  }
+
+  async generatePreviewReportCard(schoolId: string): Promise<Buffer> {
+    const school = await this.prisma.school.findFirst({
+      where: { id: schoolId },
+    });
+
+    if (!school) {
+      throw new Error('School not found');
+    }
+
+    const gradeScales = await this.getActiveGradeScales(schoolId);
+    const branding = await this.getBranding(schoolId);
+
+    const sampleSubjects = ['Mathematics', 'English Language', 'Basic Science', 'Social Studies'];
+    const sampleScores = [82, 74, 68, 91];
+
+    const rows: ReportCardResultRow[] = sampleSubjects.map((subjectName, i) => {
+      const score = sampleScores[i];
+      const resolved = resolveGrade(score, gradeScales);
+      return {
+        subjectName,
+        totalScore: score,
+        grade: resolved.grade,
+        remark: resolved.remark,
+        points: resolved.points,
+      };
+    });
+
+    const totalScore = rows.reduce((s, r) => s + r.totalScore, 0);
+    const subjectCount = rows.length;
+    const average = subjectCount > 0 ? totalScore / subjectCount : 0;
+    const gpa = calculateGPA(rows.map((r) => ({ points: r.points })));
+    const overallGrade = resolveGrade(average, gradeScales).grade;
+
+    const data: ReportCardData = {
+      school: {
+        name: school.name,
+        logo: school.logo ?? null,
+        address: school.address ?? null,
+        phone: school.phone ?? null,
+        email: school.email ?? null,
+        signatureUrl: school.signatureUrl ?? null,
+      },
+      student: {
+        firstName: 'Sample',
+        lastName: 'Student',
+        admissionNumber: 'SAMPLE-001',
+      },
+      className: 'Sample Class',
+      termName: 'First Term',
+      sessionName: '2025/2026',
+      results: rows,
+      summary: {
+        subjectCount,
+        totalScore,
+        average,
+        gpa,
+        overallGrade,
+        position: 3,
+        classSize: 25,
+        cumulativeGpa: 3.4,
+      },
+      branding,
+      gradeScales,
+      qrDataUrl: null,
+    };
+
+    const template = getTemplate(branding.template);
+
+    return new Promise((resolve, reject) => {
+      const doc = new PDFDocument({ size: 'A4', margin: 50 });
+      const chunks: Buffer[] = [];
+      doc.on('data', (chunk: Buffer) => chunks.push(chunk));
+      doc.on('end', () => resolve(Buffer.concat(chunks)));
+      doc.on('error', reject);
+
+      this.addWatermark(doc);
+
+      template
+        .render(doc, data)
+        .then(() => doc.end())
+        .catch(reject);
     });
   }
 

@@ -26,6 +26,7 @@ import { NotificationsModule } from './modules/notifications/notifications.modul
 import { AnnouncementsModule } from './modules/announcements/announcements.module';
 import { SuperAdminModule } from './modules/super-admin/super-admin.module';
 import { VerifyModule } from './common/verify/verify.module';
+import { ReportCardConfigModule } from './modules/report-card-config/report-card-config.module';
 import { configValidationSchema } from './config/config.validation';
 import { RateLimitGuard } from './common/guards/rate-limit.guard';
 import { PermissionsGuard } from './common/guards/permissions.guard';
@@ -88,6 +89,7 @@ import { DomainEventsModule } from './common/events/domain-events.module';
     AnnouncementsModule,
     SuperAdminModule,
     VerifyModule,
+    ReportCardConfigModule,
   ],
   providers: [
     {

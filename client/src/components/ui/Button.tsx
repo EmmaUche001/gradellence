@@ -1,5 +1,4 @@
-import { ButtonHTMLAttributes, ReactNode } from 'react';
-import { Loader2 } from 'lucide-react';
+import { ButtonHTMLAttributes, ReactNode, useEffect, useRef } from 'react';
 
 // Design system:
 // Primary   — blue bg, white text, 48px height, 10px radius, hover darker blue
@@ -45,13 +44,66 @@ export function Button({
   fullWidth = false,
   className = '',
   disabled,
+  onClick,
   ...props
 }: ButtonProps) {
+  const buttonRef = useRef<HTMLButtonElement>(null);
+
+  const handleClick = (e: React.MouseEvent<HTMLButtonElement>) => {
+    if (!buttonRef.current) return;
+    
+    const button = buttonRef.current;
+    const rect = button.getBoundingClientRect();
+    const size = Math.max(rect.width, rect.height);
+    const x = e.clientX - rect.left - size / 2;
+    const y = e.clientY - rect.top - size / 2;
+
+    const ripple = document.createElement('span');
+    ripple.style.cssText = `
+      position: absolute;
+      width: ${size}px;
+      height: ${size}px;
+      left: ${x}px;
+      top: ${y}px;
+      background: currentColor;
+      opacity: 0.3;
+      border-radius: 50%;
+      transform: scale(0);
+      animation: ripple 0.6s ease-out;
+      pointer-events: none;
+    `;
+
+    button.style.position = 'relative';
+    button.style.overflow = 'hidden';
+    button.appendChild(ripple);
+
+    setTimeout(() => ripple.remove(), 600);
+
+    onClick?.(e);
+  };
+
+  useEffect(() => {
+    const style = document.createElement('style');
+    style.textContent = `
+      @keyframes ripple {
+        to {
+          transform: scale(4);
+          opacity: 0;
+        }
+      }
+    `;
+    document.head.appendChild(style);
+    return () => {
+      document.head.removeChild(style);
+    };
+  }, []);
+
   const classes = [
     'inline-flex items-center justify-center font-medium rounded-btn',
-    'transition-colors duration-150',
+    'transition-all duration-150',
     'focus:outline-none focus:ring-2 focus:ring-offset-2',
     'disabled:opacity-50 disabled:cursor-not-allowed',
+    'active:scale-[0.97] active:brightness-95',
     variantClasses[variant],
     sizeClasses[size],
     fullWidth ? 'w-full' : '',
@@ -61,8 +113,20 @@ export function Button({
     .join(' ');
 
   return (
-    <button className={classes} disabled={disabled || loading} {...props}>
-      {loading && <Loader2 className="animate-spin shrink-0" size={16} />}
+    <button
+      ref={buttonRef}
+      className={classes}
+      disabled={disabled || loading}
+      onClick={handleClick}
+      {...props}
+    >
+      {loading && (
+        <span className="flex items-center gap-1 shrink-0">
+          <span className="w-1.5 h-1.5 rounded-full bg-current animate-dot-pulse" style={{ animationDelay: '0s' }} />
+          <span className="w-1.5 h-1.5 rounded-full bg-current animate-dot-pulse" style={{ animationDelay: '0.2s' }} />
+          <span className="w-1.5 h-1.5 rounded-full bg-current animate-dot-pulse" style={{ animationDelay: '0.4s' }} />
+        </span>
+      )}
       {children}
     </button>
   );

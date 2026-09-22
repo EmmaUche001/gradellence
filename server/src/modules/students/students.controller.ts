@@ -23,6 +23,7 @@ import {
   ApiConsumes,
   ApiQuery,
 } from '@nestjs/swagger';
+import { IsArray, IsUUID, ArrayNotEmpty, ArrayMaxSize } from 'class-validator';
 import { FileInterceptor } from '@nestjs/platform-express';
 import { StudentsService } from './students.service';
 import { CreateStudentDto } from './dto/create-student.dto';
@@ -38,6 +39,14 @@ import { Cache } from '../../common/decorators/cache.decorator';
 import { RateLimit } from '../../common/decorators/rate-limit.decorator';
 import { RATE_LIMIT_PRESETS } from '../../common/constants/rate-limit.constants';
 import { ExportService } from '../../common/export/export.service';
+
+class BulkDeleteStudentsDto {
+  @IsArray()
+  @ArrayNotEmpty()
+  @ArrayMaxSize(500)
+  @IsUUID('4', { each: true })
+  ids!: string[];
+}
 
 @ApiTags('Students')
 @Controller('students')
@@ -86,6 +95,18 @@ export class StudentsController {
   ) {
     const data = await this.studentsService.export(req.user.schoolId, classId, termId);
     return this.exportService.toCsvStream(data, 'students');
+  }
+
+  @Delete('bulk')
+  @Roles(ROLES.SUPER_ADMIN, ROLES.SCHOOL_ADMIN)
+  @RateLimit(RATE_LIMIT_PRESETS.BULK)
+  @ApiOperation({ summary: 'Bulk delete students (soft delete + enrollment cleanup)' })
+  @ApiResponse({ status: 200, description: 'Students deleted successfully' })
+  async bulkRemove(
+    @Body() dto: BulkDeleteStudentsDto,
+    @Request() req: AuthenticatedRequest,
+  ) {
+    return this.studentsService.bulkRemove(dto.ids, req.user);
   }
 
   @Get(':id')
@@ -150,11 +171,18 @@ export class StudentsController {
   async importStudents(
     @Request() req: AuthenticatedRequest,
     @UploadedFile() file: { buffer: Buffer; originalname: string; mimetype: string },
+    @Body('classId') classId?: string,
+    @Body('termId')  termId?: string,
   ) {
     if (!file?.buffer) {
       return { success: false, error: { message: 'No CSV file uploaded' } };
     }
     const csvContent = file.buffer.toString('utf-8');
-    return this.studentsService.importCsv(req.user.schoolId, csvContent);
+    return this.studentsService.importCsv(
+      req.user.schoolId,
+      csvContent,
+      classId || undefined,
+      termId  || undefined,
+    );
   }
 }

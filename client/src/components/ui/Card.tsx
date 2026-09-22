@@ -18,10 +18,10 @@ export function Card({ children, className = '', noPadding = false, hoverable = 
     <div
       className={[
         'bg-surface rounded-card shadow-sm',
+        'transition-all duration-150',
+        'hover:shadow-md hover:-translate-y-0.5',
         noPadding ? '' : 'p-6',
-        hoverable
-          ? 'transition-transform duration-150 hover:-translate-y-1 hover:shadow-md cursor-pointer'
-          : '',
+        hoverable ? 'cursor-pointer hover:-translate-y-1' : '',
         className,
       ]
         .filter(Boolean)

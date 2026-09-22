@@ -21,3 +21,23 @@ export interface CreateGradeScaleData {
 }
 
 export interface UpdateGradeScaleData extends Partial<CreateGradeScaleData> {}
+
+// Batch update types
+export interface UpdateGradeScaleEntry {
+  id: string;
+  grade?: string;
+  minScore?: number;
+  maxScore?: number;
+  remark?: string;
+  points?: number;
+  isActive?: boolean;
+}
+
+export interface BatchUpdateGradeScaleData {
+  scales: UpdateGradeScaleEntry[];
+  validateOnly?: boolean;
+}
+
+export interface BatchCreateGradeScaleData {
+  scales: CreateGradeScaleData[];
+}

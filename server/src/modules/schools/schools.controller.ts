@@ -10,11 +10,20 @@ import {
   Query,
   DefaultValuePipe,
   ParseIntPipe,
+  NotFoundException,
+  UseInterceptors,
+  UploadedFile,
+  BadRequestException,
 } from '@nestjs/common';
-import { ApiTags, ApiOperation, ApiResponse, ApiBearerAuth } from '@nestjs/swagger';
+import { FileInterceptor } from '@nestjs/platform-express';
+import { diskStorage } from 'multer';
+import { extname, join } from 'path';
+import { existsSync, mkdirSync } from 'fs';
+import { ApiTags, ApiOperation, ApiResponse, ApiBearerAuth, ApiConsumes, ApiBody } from '@nestjs/swagger';
 import { SchoolsService } from './schools.service';
 import { CreateSchoolDto } from './dto/create-school.dto';
 import { UpdateSchoolDto } from './dto/update-school.dto';
+import { UpdateAcademicSettingsDto } from './dto/academic-settings.dto';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
 import { RolesGuard } from '../../common/guards/roles.guard';
 import { Roles } from '../../common/decorators/roles.decorator';
@@ -84,5 +93,87 @@ export class SchoolsController {
   @ApiResponse({ status: 404, description: 'School not found' })
   async remove(@Param('id') id: string) {
     return this.schoolsService.remove(id);
+  }
+
+  @Get(':id/settings')
+  @Roles(ROLES.SUPER_ADMIN, ROLES.SCHOOL_ADMIN)
+  @ApiOperation({ summary: 'Get school academic settings' })
+  @ApiResponse({ status: 200, description: 'Settings retrieved successfully' })
+  @ApiResponse({ status: 404, description: 'School not found' })
+  async getSettings(@Param('id') id: string, @CurrentUser() user: AuthenticatedUser) {
+    // Ensure user can only access their own school's settings
+    if (!user.roles.includes(ROLES.SUPER_ADMIN) && id !== user.schoolId) {
+      throw new NotFoundException('School not found');
+    }
+    return this.schoolsService.getSettings(id);
+  }
+
+  @Patch(':id/settings')
+  @Roles(ROLES.SUPER_ADMIN, ROLES.SCHOOL_ADMIN)
+  @RateLimit(RATE_LIMIT_PRESETS.WRITE)
+  @ApiOperation({ summary: 'Update school academic settings' })
+  @ApiResponse({ status: 200, description: 'Settings updated successfully' })
+  @ApiResponse({ status: 400, description: 'Bad request' })
+  @ApiResponse({ status: 404, description: 'School not found' })
+  async updateSettings(
+    @Param('id') id: string,
+    @Body() dto: UpdateAcademicSettingsDto,
+    @CurrentUser() user: AuthenticatedUser,
+  ) {
+    // Ensure user can only update their own school's settings
+    if (!user.roles.includes(ROLES.SUPER_ADMIN) && id !== user.schoolId) {
+      throw new NotFoundException('School not found');
+    }
+    return this.schoolsService.updateSettings(id, dto);
+  }
+
+  @Post(':id/logo')
+  @Roles(ROLES.SUPER_ADMIN, ROLES.SCHOOL_ADMIN)
+  @RateLimit(RATE_LIMIT_PRESETS.WRITE)
+  @ApiOperation({ summary: 'Upload school logo' })
+  @ApiConsumes('multipart/form-data')
+  @ApiBody({
+    schema: {
+      type: 'object',
+      properties: {
+        file: { type: 'string', format: 'binary' },
+      },
+    },
+  })
+  @ApiResponse({ status: 200, description: 'Logo uploaded successfully' })
+  @ApiResponse({ status: 400, description: 'Invalid file type' })
+  @UseInterceptors(
+    FileInterceptor('file', {
+      storage: diskStorage({
+        destination: (req, file, cb) => {
+          const dir = join(process.cwd(), 'uploads', 'logos');
+          if (!existsSync(dir)) mkdirSync(dir, { recursive: true });
+          cb(null, dir);
+        },
+        filename: (req, file, cb) => {
+          const schoolId = req.params.id;
+          cb(null, `${schoolId}${extname(file.originalname)}`);
+        },
+      }),
+      fileFilter: (req, file, cb) => {
+        if (!file.mimetype.match(/\/(jpg|jpeg|png|webp|svg\+xml)$/)) {
+          return cb(new BadRequestException('Only image files are allowed'), false);
+        }
+        cb(null, true);
+      },
+      limits: { fileSize: 2 * 1024 * 1024 }, // 2MB
+    }),
+  )
+  async uploadLogo(
+    @Param('id') id: string,
+    @UploadedFile() file: Express.Multer.File,
+    @CurrentUser() user: AuthenticatedUser,
+  ) {
+    if (!user.roles.includes(ROLES.SUPER_ADMIN) && id !== user.schoolId) {
+      throw new NotFoundException('School not found');
+    }
+    const logoUrl = `/uploads/logos/${file.filename}`;
+    await this.schoolsService.update(id, { logo: logoUrl }, user);
+    return { logoUrl };
   }
 }

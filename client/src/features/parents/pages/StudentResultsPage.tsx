@@ -7,6 +7,7 @@ import { Badge, BadgeVariant } from '../../../components/ui/Badge';
 import { EmptyState } from '../../../components/ui/EmptyState';
 import { SkeletonTable } from '../../../components/ui/SkeletonLoader';
 import { Button } from '../../../components/ui/Button';
+import { useToastStore } from '../../../store/toastStore';
 
 interface Result {
   subject: string;
@@ -43,6 +44,7 @@ const StudentResultsPage: React.FC = () => {
   const [downloadingTermId, setDownloadingTermId] = useState<string | null>(null);
   const [downloadingTranscript, setDownloadingTranscript] = useState(false);
   const [downloadingSummary, setDownloadingSummary] = useState(false);
+  const { addToast } = useToastStore();
 
   useEffect(() => {
     if (!studentId) return;
@@ -51,9 +53,13 @@ const StudentResultsPage: React.FC = () => {
         setStudent(data.student);
         setResults(data.results);
       })
-      .catch(err => setError(err?.response?.data?.message || 'Failed to load results'))
+      .catch(err => {
+        const msg = err?.response?.data?.message || 'Failed to load results';
+        setError(msg);
+        addToast('error', msg);
+      })
       .finally(() => setLoading(false));
-  }, [studentId]);
+  }, [studentId, addToast]);
 
   const handleDownloadReportCard = async (termId: string) => {
     if (!studentId) return;
@@ -69,8 +75,11 @@ const StudentResultsPage: React.FC = () => {
       link.click();
       link.remove();
       window.URL.revokeObjectURL(url);
+      addToast('success', 'Report card downloaded successfully');
     } catch (err) {
-      setError((err as any)?.response?.data?.message || 'Failed to download report card');
+      const msg = (err as any)?.response?.data?.message || 'Failed to download report card';
+      setError(msg);
+      addToast('error', msg);
     } finally {
       setDownloadingTermId(null);
     }
@@ -89,8 +98,11 @@ const StudentResultsPage: React.FC = () => {
       link.click();
       link.remove();
       window.URL.revokeObjectURL(url);
+      addToast('success', 'Transcript downloaded successfully');
     } catch (err) {
-      setError((err as any)?.response?.data?.message || 'Failed to download transcript');
+      const msg = (err as any)?.response?.data?.message || 'Failed to download transcript';
+      setError(msg);
+      addToast('error', msg);
     } finally {
       setDownloadingTranscript(false);
     }
@@ -109,8 +121,11 @@ const StudentResultsPage: React.FC = () => {
       link.click();
       link.remove();
       window.URL.revokeObjectURL(url);
+      addToast('success', 'Academic summary downloaded successfully');
     } catch (err) {
-      setError((err as any)?.response?.data?.message || 'Failed to download academic summary');
+      const msg = (err as any)?.response?.data?.message || 'Failed to download academic summary';
+      setError(msg);
+      addToast('error', msg);
     } finally {
       setDownloadingSummary(false);
     }
@@ -140,6 +155,7 @@ const StudentResultsPage: React.FC = () => {
                 variant="secondary"
                 onClick={handleDownloadSummary}
                 loading={downloadingSummary}
+                className="!border-success-200 !text-success-700 hover:!bg-success-50"
               >
                 {downloadingSummary ? <Loader2 className="animate-spin" size={16} /> : <Download size={16} />}
                 Academic Summary
@@ -148,6 +164,7 @@ const StudentResultsPage: React.FC = () => {
                 variant="primary"
                 onClick={handleDownloadTranscript}
                 loading={downloadingTranscript}
+                className="!bg-success-600 hover:!bg-success-700 !rounded-xl"
               >
                 {downloadingTranscript ? <Loader2 className="animate-spin" size={16} /> : <Download size={16} />}
                 Transcript
@@ -176,8 +193,8 @@ const StudentResultsPage: React.FC = () => {
         ) : (
           Object.entries(grouped).map(([termKey, data]) => (
             <div key={termKey} className="bg-surface rounded-card shadow-sm border border-border overflow-hidden">
-              <div className="px-5 py-3.5 bg-gray-50 border-b border-border flex items-center justify-between">
-                <h3 className="text-sm font-semibold text-gray-700">{termKey}</h3>
+              <div className="px-5 py-3.5 bg-success-50 border-b border-success-200 flex items-center justify-between">
+                <h3 className="text-sm font-semibold text-success-800">{termKey}</h3>
                 <Button
                   variant="secondary"
                   size="sm"

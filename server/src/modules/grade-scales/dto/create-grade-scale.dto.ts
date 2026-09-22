@@ -1,5 +1,5 @@
 import { IsString, IsInt, IsNumber, Min, Max, IsOptional, IsBoolean } from 'class-validator';
-import { ApiProperty } from '@nestjs/swagger';
+import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 
 export class CreateGradeScaleDto {
   @ApiProperty({ example: 'A' })
@@ -31,6 +31,7 @@ export class CreateGradeScaleDto {
   @IsOptional()
   @IsNumber()
   @Min(0)
+  @Max(10)
   points?: number;
 
   @ApiProperty({ example: true, required: false })

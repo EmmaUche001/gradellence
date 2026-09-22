@@ -64,7 +64,7 @@ export function Modal({
     >
       {/* Backdrop */}
       <div
-        className="absolute inset-0 bg-gray-900/50 backdrop-blur-[2px] animate-fade-in"
+        className="absolute inset-0 bg-gray-900/60 backdrop-blur-sm animate-backdrop-in"
         onClick={disableBackdropClose ? undefined : onClose}
       />
 
@@ -74,7 +74,7 @@ export function Modal({
         tabIndex={-1}
         className={[
           'relative w-full bg-surface rounded-modal shadow-lg flex flex-col',
-          'max-h-[90vh] overflow-hidden animate-fade-in',
+          'max-h-[90vh] overflow-hidden animate-modal-spring',
           'focus:outline-none',
           sizeClasses[size],
         ].join(' ')}

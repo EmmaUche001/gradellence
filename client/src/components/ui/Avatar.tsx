@@ -5,6 +5,8 @@ interface AvatarProps {
   name?: string;
   /** Size in pixels — maps to Tailwind sizes */
   size?: 'xs' | 'sm' | 'md' | 'lg' | 'xl';
+  /** Show pulsing green status indicator (online/active) */
+  status?: 'online' | 'offline';
   className?: string;
 }
 
@@ -40,34 +42,58 @@ function colorFromName(name: string): string {
   return bgColors[Math.abs(hash) % bgColors.length];
 }
 
-export function Avatar({ src, name = '', size = 'md', className = '' }: AvatarProps) {
+export function Avatar({ src, name = '', size = 'md', status, className = '' }: AvatarProps) {
   const sizeClass = sizeClasses[size];
 
   if (src) {
     return (
-      <img
-        src={src}
-        alt={name || 'Avatar'}
-        className={['rounded-avatar object-cover shrink-0', sizeClass, className].join(' ')}
-      />
+      <div className={['relative overflow-hidden rounded-avatar shrink-0 group', sizeClass, className].join(' ')}>
+        <img
+          src={src}
+          alt={name || 'Avatar'}
+          className="w-full h-full object-cover"
+        />
+        {/* Shimmer sweep on hover */}
+        <div className="absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity duration-200 pointer-events-none"
+             style={{
+               background: 'linear-gradient(105deg, transparent 40%, rgba(255,255,255,0.5) 50%, transparent 60%)',
+               backgroundSize: '200% 100%',
+               animation: 'shimmer-sweep 0.6s ease-out',
+             }} />
+      </div>
     );
   }
 
-  const initials = name ? getInitials(name) : '?';
+  const initials   = name ? getInitials(name) : '?';
   const colorClass = name ? colorFromName(name) : 'bg-gray-200 text-gray-600';
 
   return (
     <div
       className={[
-        'rounded-avatar flex items-center justify-center font-semibold shrink-0 select-none',
-        sizeClass,
-        colorClass,
-        className,
+        'relative overflow-hidden rounded-avatar flex items-center justify-center font-semibold shrink-0 select-none group cursor-default',
+        'transition-transform duration-150 hover:scale-110',
+        sizeClass, colorClass, className,
       ].join(' ')}
       aria-label={name || 'User avatar'}
       role="img"
     >
       {initials}
+      {/* Status indicator pulse */}
+      {status && (
+        <span className={`
+          absolute -bottom-0.5 -right-0.5 w-3 h-3 rounded-full border-2 border-surface
+          ${status === 'online' ? 'bg-success-500 animate-[statusPulse_2s_ease-in-out_infinite]' : 'bg-gray-400'}
+        `} />
+      )}
+      {/* Shimmer sweep on hover */}
+      <div className="absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity duration-150 pointer-events-none rounded-avatar overflow-hidden">
+        <div style={{
+          position: 'absolute', inset: 0,
+          background: 'linear-gradient(105deg, transparent 30%, rgba(255,255,255,0.45) 50%, transparent 70%)',
+          backgroundSize: '200% 100%',
+          animation: 'shimmer-sweep 0.55s ease-out',
+        }} />
+      </div>
     </div>
   );
 }

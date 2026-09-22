@@ -7,6 +7,12 @@ import { Avatar } from '../../../components/ui/Avatar';
 import { Badge } from '../../../components/ui/Badge';
 import { EmptyState } from '../../../components/ui/EmptyState';
 import { SkeletonCard } from '../../../components/ui/SkeletonLoader';
+import { useAnimatedCounter } from '../../../hooks/useAnimatedCounter';
+
+function AnimatedNumber({ value, suffix = '' }: { value: number; suffix?: string }) {
+  const { display, elementRef } = useAnimatedCounter({ end: value, duration: 1200 });
+  return <span ref={elementRef}>{display}{suffix}</span>;
+}
 
 interface Student {
   id: string;
@@ -48,13 +54,22 @@ const ParentDashboard: React.FC = () => {
       .finally(() => setLoading(false));
   }, [navigate]);
 
+  const getGreeting = () => {
+    const hour = new Date().getHours();
+    if (hour < 12) return 'Good morning';
+    if (hour < 17) return 'Good afternoon';
+    return 'Good evening';
+  };
+
   return (
     <ParentPortalLayout>
-      <div className="space-y-6">
+      <div className="space-y-6" style={{ minHeight: '100%' }}>
         {/* Heading */}
         <div>
           <h1 className="text-page-title text-gray-900">My Children</h1>
-          <p className="mt-1 text-sm text-gray-500">Track academic results and performance for each child.</p>
+          <p className="mt-1 text-sm text-gray-500">
+            {getGreeting()}! Track academic results and performance for each child.
+          </p>
         </div>
 
         {error && (
@@ -78,9 +93,16 @@ const ParentDashboard: React.FC = () => {
           </div>
         ) : (
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
-            {students.map(student => (
-              <div key={student.id}
-                className="bg-surface rounded-card p-6 shadow-sm border border-border hover:-translate-y-0.5 hover:shadow-md transition-all duration-150">
+            {students.map((student, index) => (
+              <div
+                key={student.id}
+                className="rounded-[20px] p-6 shadow-sm hover:-translate-y-1 hover:shadow-lg transition-all duration-200 cursor-pointer opacity-0 animate-slideUp"
+                style={{
+                  background: '#FFFFFF',
+                  border: '1px solid #E8EDE8',
+                  animationDelay: `${index * 100}ms`,
+                  animationFillMode: 'forwards'
+                }}>
                 {/* Avatar + name */}
                 <div className="flex items-center gap-3 mb-4">
                   <Avatar name={`${student.firstName} ${student.lastName}`} size="md" />
@@ -108,7 +130,7 @@ const ParentDashboard: React.FC = () => {
                     <div className="flex items-center justify-between text-sm">
                       <span className="text-gray-500">Latest avg.</span>
                       <Badge variant={avgBadge(student.latestAverage)}>
-                        {student.latestAverage.toFixed(1)}%
+                        <AnimatedNumber value={Math.round(student.latestAverage)} suffix="%" />
                       </Badge>
                     </div>
                   )}
@@ -117,11 +139,17 @@ const ParentDashboard: React.FC = () => {
                 {/* CTAs */}
                 <div className="grid grid-cols-2 gap-2">
                   <Link to={`/parent/students/${student.id}/results`}
-                    className="flex items-center justify-center gap-1.5 h-9 text-xs font-semibold text-primary-600 bg-primary-50 rounded-lg hover:bg-primary-100 transition-colors">
+                    className="flex items-center justify-center gap-1.5 h-10 text-xs font-semibold rounded-xl transition-colors"
+                    style={{ color: '#15803d', background: '#f0fdf4' }}
+                    onMouseEnter={e => (e.currentTarget.style.background = '#dcfce7')}
+                    onMouseLeave={e => (e.currentTarget.style.background = '#f0fdf4')}>
                     <BarChart3 size={13} /> Results
                   </Link>
                   <Link to={`/parent/students/${student.id}/analytics`}
-                    className="flex items-center justify-center gap-1.5 h-9 text-xs font-semibold text-success-600 bg-success-50 rounded-lg hover:bg-success-100 transition-colors">
+                    className="flex items-center justify-center gap-1.5 h-10 text-xs font-semibold rounded-xl transition-colors"
+                    style={{ color: '#15803d', background: '#f0fdf4' }}
+                    onMouseEnter={e => (e.currentTarget.style.background = '#dcfce7')}
+                    onMouseLeave={e => (e.currentTarget.style.background = '#f0fdf4')}>
                     <TrendingUp size={13} /> Analytics
                   </Link>
                 </div>

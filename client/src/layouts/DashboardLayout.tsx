@@ -1,18 +1,20 @@
 import { useState, useEffect, useRef } from 'react';
+import { gsap } from 'gsap';
 import { Outlet, Link, useLocation, useNavigate } from 'react-router-dom';
 import {
   LayoutDashboard, Users, GraduationCap, BookOpen, School,
   ClipboardCheck, BarChart3, Shield, Settings, CreditCard,
-  ChevronDown, LogOut, Menu,
+  ChevronDown, LogOut, Menu, Search,
   BookMarked, CalendarDays, ScrollText, Layers, Megaphone,
-  KeyRound, UserCheck,
+  KeyRound, UserCheck, FileText, Building2,
 } from 'lucide-react';
 import { useAuthStore } from '../store/authStore';
 import { ToastContainer } from '../components/ui/Toast';
 import { Avatar } from '../components/ui/Avatar';
 import { ChangePasswordModal } from '../components/ui/ChangePasswordModal';
-import { GlobalSearch } from '../components/ui/GlobalSearch';
 import { NotificationDropdown } from '../components/ui/NotificationDropdown';
+import { PageTransition } from '../components/ui/PageTransition';
+import { CommandPalette } from '../components/ui/CommandPalette';
 import { subscriptionService } from '../services/subscriptionService';
 
 const ROLES = {
@@ -78,6 +80,8 @@ const navGroups: NavGroup[] = [
       { label: 'Billing',       path: '/billing',       icon: <CreditCard   size={iconSize} />, roles: [ROLES.SUPER_ADMIN, ROLES.SCHOOL_ADMIN] },
       { label: 'Subscriptions', path: '/subscriptions', icon: <UserCheck    size={iconSize} />, roles: [ROLES.SUPER_ADMIN, ROLES.SCHOOL_ADMIN] },
       { label: 'Settings',      path: '/settings',      icon: <Settings     size={iconSize} />, roles: [ROLES.SUPER_ADMIN, ROLES.SCHOOL_ADMIN] },
+      { label: 'Report Card',   path: '/settings/report-card', icon: <FileText size={iconSize} />, roles: [ROLES.SUPER_ADMIN, ROLES.SCHOOL_ADMIN] },
+      { label: 'School Profile',path: '/settings',      icon: <Building2   size={iconSize} />, roles: [ROLES.SUPER_ADMIN, ROLES.SCHOOL_ADMIN] },
     ],
   },
 ];
@@ -90,6 +94,23 @@ export function DashboardLayout() {
     () => localStorage.getItem('sidebar-collapsed') === 'true'
   );
   const [mobileOpen, setMobileOpen] = useState(false);
+  const [cmdOpen, setCmdOpen]       = useState(false);
+  
+  // Sliding pill for active sidebar item
+  const pillRef = useRef<HTMLDivElement>(null);
+  const navRef = useRef<HTMLElement>(null);
+
+  // Cmd+K / Ctrl+K opens the command palette
+  useEffect(() => {
+    const handler = (e: KeyboardEvent) => {
+      if ((e.metaKey || e.ctrlKey) && e.key === 'k') {
+        e.preventDefault();
+        setCmdOpen(v => !v);
+      }
+    };
+    window.addEventListener('keydown', handler);
+    return () => window.removeEventListener('keydown', handler);
+  }, []);
 
   // Dynamic school name + plan
   const [schoolName, setSchoolName] = useState<string | null>(null);
@@ -163,6 +184,46 @@ export function DashboardLayout() {
       : location.pathname.startsWith(fullPath);
   };
 
+  // Animate sliding pill to active item
+  useEffect(() => {
+    if (!pillRef.current || !navRef.current || collapsed) return;
+
+    const activeLink = navRef.current.querySelector('[data-active="true"]') as HTMLElement | null;
+    if (!activeLink) return;
+
+    // offsetTop of the link relative to the nav container, accounting for scroll
+    const navScrollTop = navRef.current.scrollTop;
+    const navTop = navRef.current.getBoundingClientRect().top;
+    const linkTop = activeLink.getBoundingClientRect().top;
+    const relativeTop = linkTop - navTop + navScrollTop;
+
+    gsap.to(pillRef.current, {
+      y: relativeTop,
+      height: activeLink.offsetHeight,
+      duration: 0.3, // Unified to 300ms across all nav animations
+      ease: 'back.out(1.1)', // Softer spring for consistent feel
+    });
+  }, [location.pathname, collapsed]);
+
+  // Set pill initial position without animation on mount / sidebar expand
+  const setPillInstant = () => {
+    if (!pillRef.current || !navRef.current || collapsed) return;
+    const activeLink = navRef.current.querySelector('[data-active="true"]') as HTMLElement | null;
+    if (!activeLink) return;
+    const navScrollTop = navRef.current.scrollTop;
+    const navTop = navRef.current.getBoundingClientRect().top;
+    const linkTop = activeLink.getBoundingClientRect().top;
+    const relativeTop = linkTop - navTop + navScrollTop;
+    gsap.set(pillRef.current, { y: relativeTop, height: activeLink.offsetHeight, opacity: 1 });
+  };
+
+  // On mount and when sidebar expands, snap pill into place immediately
+  useEffect(() => {
+    // Small RAF to let the DOM settle after collapse toggle
+    const id = requestAnimationFrame(setPillInstant);
+    return () => cancelAnimationFrame(id);
+  }, [collapsed]); // eslint-disable-line react-hooks/exhaustive-deps
+
   const sidebarWidth = collapsed ? 'w-[88px]' : 'w-[280px]';
 
   const SidebarContent = () => (
@@ -206,7 +267,7 @@ export function DashboardLayout() {
                 {schoolName ?? 'Your School'}
               </p>
               {planName && (
-                <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-semibold bg-primary-600 text-white mt-0.5">
+                <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium bg-primary-50 text-primary-600 border border-primary-100 mt-0.5">
                   {planName}
                 </span>
               )}
@@ -229,14 +290,22 @@ export function DashboardLayout() {
       )}
 
       {/* Nav */}
-      <nav className="flex-1 overflow-y-auto py-3 px-3 space-y-1 scrollbar-thin scrollbar-track-transparent scrollbar-thumb-gray-200">
+      <nav ref={navRef} className="flex-1 overflow-y-auto py-3 px-3 space-y-1 scrollbar-thin scrollbar-track-transparent scrollbar-thumb-gray-200 relative">
+        {/* Sliding pill behind active item */}
+        {!collapsed && (
+          <div
+            ref={pillRef}
+            className="absolute left-3 right-3 h-9 bg-primary-50 rounded-lg pointer-events-none"
+            style={{ boxShadow: 'inset 0 0 0 1px rgba(37,99,235,0.12)', zIndex: 0, top: 0, opacity: 0 }}
+          />
+        )}
         {navGroups.map((group) => {
           const visible = group.items.filter((item) =>
             item.roles.some((r) => userRoles.includes(r))
           );
           if (visible.length === 0) return null;
           return (
-            <div key={group.heading} className="mb-1">
+            <div key={group.heading} className="mb-1 relative" style={{ zIndex: 1 }}>
               {!collapsed && (
                 <p className="px-3 mb-1 text-[10px] font-semibold text-gray-400 uppercase tracking-widest">
                   {group.heading}
@@ -248,20 +317,32 @@ export function DashboardLayout() {
                   <Link
                     key={item.path}
                     to={item.path}
-                    title={collapsed ? item.label : undefined}
+                    title={undefined}
                     onClick={() => setMobileOpen(false)}
+                    data-active={active ? 'true' : undefined}
                     className={[
-                      'flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium transition-all duration-150',
+                      'flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium transition-colors duration-150 relative group',
                       collapsed ? 'justify-center' : '',
                       active
-                        ? 'bg-primary-50 text-primary-700'
-                        : 'text-gray-600 hover:bg-gray-100 hover:text-gray-900',
+                        ? 'text-primary-700'
+                        : 'text-gray-600 hover:bg-gray-100/80 hover:text-gray-900',
                     ].join(' ')}
                   >
                     <span className={`shrink-0 ${active ? 'text-primary-600' : ''}`}>
                       {item.icon}
                     </span>
                     {!collapsed && <span>{item.label}</span>}
+                    {/* Custom tooltip when collapsed */}
+                    {collapsed && (
+                      <span className="absolute left-full ml-3 px-2.5 py-1.5 text-xs font-semibold
+                        text-white bg-gray-900 rounded-lg whitespace-nowrap pointer-events-none
+                        opacity-0 group-hover:opacity-100 translate-x-1 group-hover:translate-x-0
+                        transition-all duration-150 z-50 shadow-md">
+                        {item.label}
+                        <span className="absolute right-full top-1/2 -translate-y-1/2 border-4
+                          border-transparent border-r-gray-900" />
+                      </span>
+                    )}
                   </Link>
                 );
               })}
@@ -317,8 +398,8 @@ export function DashboardLayout() {
       {/* Mobile drawer */}
       {mobileOpen && (
         <div className="lg:hidden fixed inset-0 z-50 flex">
-          <div className="absolute inset-0 bg-gray-900/50" onClick={() => setMobileOpen(false)} />
-          <aside className="relative w-[280px] bg-surface flex flex-col h-full shadow-lg animate-slide-in">
+          <div className="absolute inset-0 bg-gray-900/50 animate-backdrop-fade-in" onClick={() => setMobileOpen(false)} />
+          <aside className="relative w-[280px] bg-surface flex flex-col h-full shadow-lg animate-drawer-in">
             <SidebarContent />
           </aside>
         </div>
@@ -337,8 +418,23 @@ export function DashboardLayout() {
             <Menu size={20} />
           </button>
 
-          {/* Search */}
-          <GlobalSearch />
+          {/* Search — opens command palette */}
+          <button
+            onClick={() => setCmdOpen(true)}
+            className="flex items-center gap-3 h-9 px-4 rounded-lg border border-border bg-gray-50
+              text-sm text-gray-400 hover:bg-white hover:border-primary-300 hover:text-gray-500
+              transition-all duration-200 ease-out
+              w-52 hover:w-72 focus:w-72
+              group"
+          >
+            <Search size={14} className="shrink-0" />
+            <span className="flex-1 text-left text-xs truncate">Search pages & actions…</span>
+            <kbd className="hidden sm:flex items-center gap-0.5 px-1.5 py-0.5 text-[10px] font-semibold
+              text-gray-400 bg-gray-200 rounded group-hover:bg-primary-100 group-hover:text-primary-600
+              transition-colors shrink-0">
+              ⌘K
+            </kbd>
+          </button>
 
           <div className="ml-auto flex items-center gap-2">
             {/* Notifications */}
@@ -371,7 +467,7 @@ export function DashboardLayout() {
 
               {/* Dropdown */}
               {showProfileMenu && (
-                <div className="absolute right-0 top-full mt-2 w-52 bg-surface rounded-xl shadow-md border border-border py-1.5 z-50 animate-fade-in">
+                <div className="absolute right-0 top-full mt-2 w-52 bg-surface rounded-xl shadow-md border border-border py-1.5 z-50 animate-dropdown-in">
                   {/* User info */}
                   <div className="px-4 py-2.5 border-b border-border">
                     <p className="text-sm font-semibold text-gray-900 truncate">
@@ -408,13 +504,16 @@ export function DashboardLayout() {
         {/* Page content */}
         <main className="flex-1 overflow-auto">
           <div className="max-w-[1440px] mx-auto p-6">
-            <Outlet />
+            <PageTransition>
+              <Outlet />
+            </PageTransition>
           </div>
         </main>
       </div>
 
       <ChangePasswordModal isOpen={showChangePwd} onClose={() => setShowChangePwd(false)} />
       <ToastContainer />
+      <CommandPalette open={cmdOpen} onClose={() => setCmdOpen(false)} />
     </div>
   );
 }

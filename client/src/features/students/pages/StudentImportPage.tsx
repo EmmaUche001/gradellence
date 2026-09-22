@@ -1,12 +1,14 @@
-import { useState, useRef } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
   Upload, FileText, CheckCircle2, AlertCircle,
-  ChevronRight, Download, X, GraduationCap,
+  ChevronRight, Download, X, GraduationCap, Info,
 } from 'lucide-react';
 import { studentImportApi } from '../services/studentImportApi';
 import { Button } from '../../../components/ui/Button';
+import { Select } from '../../../components/ui/Select';
 import { useToastStore } from '../../../store/toastStore';
+import apiClient from '../../../services/apiClient';
 
 interface ImportError {
   row: number;
@@ -18,6 +20,12 @@ interface ImportResult {
   successCount: number;
   failureCount: number;
   errors?: ImportError[];
+  enrolled?: number;
+}
+
+interface SelectOption {
+  value: string;
+  label: string;
 }
 
 // CSV template content
@@ -40,10 +48,41 @@ export function StudentImportPage() {
   const navigate     = useNavigate();
   const { addToast } = useToastStore();
   const inputRef     = useRef<HTMLInputElement>(null);
+
   const [file, setFile]         = useState<File | null>(null);
   const [dragOver, setDragOver] = useState(false);
   const [loading, setLoading]   = useState(false);
   const [result, setResult]     = useState<ImportResult | null>(null);
+
+  // Class + term for optional auto-enrollment
+  const [classOptions, setClassOptions]   = useState<SelectOption[]>([]);
+  const [termOptions, setTermOptions]     = useState<SelectOption[]>([]);
+  const [selectedClassId, setSelectedClassId] = useState('');
+  const [selectedTermId, setSelectedTermId]   = useState('');
+  const [optionsLoading, setOptionsLoading]   = useState(true);
+
+  // Load class + term options
+  useEffect(() => {
+    setOptionsLoading(true);
+    Promise.all([
+      apiClient.get('/v1/classes?page=1&limit=100'),
+      apiClient.get('/v1/sessions?page=1&limit=100'),
+    ])
+      .then(([classRes, sessionRes]) => {
+        setClassOptions(
+          (classRes.data?.data ?? []).map((c: any) => ({ value: c.id, label: c.name }))
+        );
+        const terms: SelectOption[] = [];
+        for (const session of sessionRes.data?.data ?? []) {
+          for (const term of session.terms ?? []) {
+            terms.push({ value: term.id, label: `${term.name} — ${session.name}` });
+          }
+        }
+        setTermOptions(terms);
+      })
+      .catch(() => {})
+      .finally(() => setOptionsLoading(false));
+  }, []);
 
   const handleFile = (f: File) => {
     if (!f.name.endsWith('.csv')) {
@@ -64,14 +103,26 @@ export function StudentImportPage() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!file) return;
+
+    // If only one of class/term is selected, require both
+    if ((selectedClassId && !selectedTermId) || (!selectedClassId && selectedTermId)) {
+      addToast('warning', 'Please select both a class and a term to auto-enroll, or leave both empty to skip enrollment');
+      return;
+    }
+
     setLoading(true);
     setResult(null);
     try {
-      const res = await studentImportApi.uploadCsv(file);
+      const res = await studentImportApi.uploadCsv(
+        file,
+        selectedClassId || undefined,
+        selectedTermId  || undefined,
+      );
       const data = res.data?.data ?? res.data;
       setResult(data);
       if (data?.successCount > 0) {
-        addToast('success', `${data.successCount} student${data.successCount !== 1 ? 's' : ''} imported successfully`);
+        const enrollMsg = data.enrolled > 0 ? ` and enrolled ${data.enrolled} into class` : '';
+        addToast('success', `${data.successCount} student${data.successCount !== 1 ? 's' : ''} imported${enrollMsg}`);
       }
     } catch (err: any) {
       addToast('error', err?.response?.data?.error?.message || err?.response?.data?.message || 'Import failed');
@@ -80,7 +131,11 @@ export function StudentImportPage() {
     }
   };
 
-  const reset = () => { setFile(null); setResult(null); if (inputRef.current) inputRef.current.value = ''; };
+  const reset = () => {
+    setFile(null);
+    setResult(null);
+    if (inputRef.current) inputRef.current.value = '';
+  };
 
   return (
     <div className="max-w-3xl mx-auto space-y-6 pb-10">
@@ -96,7 +151,7 @@ export function StudentImportPage() {
         </nav>
         <h1 className="text-page-title text-gray-900">Import Students</h1>
         <p className="mt-1 text-sm text-gray-500">
-          Upload a CSV file to bulk-add students. Download the template to see the required format.
+          Upload a CSV file to bulk-add students. Optionally enroll them into a class and term immediately.
         </p>
       </div>
 
@@ -112,7 +167,7 @@ export function StudentImportPage() {
           </p>
         </div>
         <Button variant="secondary" size="sm" onClick={downloadTemplate} className="shrink-0">
-          <Download size={14} /> Download Template
+          <Download size={14} /> Template
         </Button>
       </div>
 
@@ -168,12 +223,48 @@ export function StudentImportPage() {
                   <Upload size={22} className="text-gray-400" />
                 </div>
                 <div className="text-center">
-                  <p className="text-sm font-semibold text-gray-700">
-                    Drag & drop your CSV here
-                  </p>
+                  <p className="text-sm font-semibold text-gray-700">Drag & drop your CSV here</p>
                   <p className="text-xs text-gray-400 mt-0.5">or click to browse — CSV files only</p>
                 </div>
               </>
+            )}
+          </div>
+
+          {/* Optional auto-enrollment */}
+          <div className="rounded-xl border border-border bg-gray-50 p-4 space-y-3">
+            <div className="flex items-center gap-2">
+              <Info size={15} className="text-primary-500 shrink-0" />
+              <p className="text-sm font-semibold text-gray-800">Auto-enroll into a class (optional)</p>
+            </div>
+            <p className="text-xs text-gray-500">
+              Select a class and term to automatically enroll all imported students. If left empty, students are created
+              but not enrolled — you'll need to enroll them manually before entering scores.
+            </p>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <Select
+                id="classId"
+                label="Class"
+                placeholder={optionsLoading ? 'Loading…' : 'Skip — enroll later'}
+                options={classOptions}
+                value={selectedClassId}
+                onChange={e => setSelectedClassId(e.target.value)}
+                disabled={optionsLoading}
+              />
+              <Select
+                id="termId"
+                label="Term"
+                placeholder={optionsLoading ? 'Loading…' : 'Skip — enroll later'}
+                options={termOptions}
+                value={selectedTermId}
+                onChange={e => setSelectedTermId(e.target.value)}
+                disabled={optionsLoading}
+              />
+            </div>
+            {selectedClassId && selectedTermId && (
+              <p className="text-xs text-success-700 flex items-center gap-1.5">
+                <CheckCircle2 size={13} />
+                Students will be imported <strong>and</strong> enrolled automatically
+              </p>
             )}
           </div>
 
@@ -191,7 +282,7 @@ export function StudentImportPage() {
 
       {/* Results */}
       {result && (
-        <div className="bg-surface rounded-card border border-border shadow-sm overflow-hidden space-y-0">
+        <div className="bg-surface rounded-card border border-border shadow-sm overflow-hidden">
 
           {/* Summary row */}
           <div className="px-6 py-5 border-b border-border flex flex-wrap gap-6">
@@ -204,6 +295,17 @@ export function StudentImportPage() {
                 <p className="text-xs text-gray-500">Imported successfully</p>
               </div>
             </div>
+            {(result.enrolled ?? 0) > 0 && (
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-full bg-primary-100 flex items-center justify-center">
+                  <GraduationCap size={18} className="text-primary-600" />
+                </div>
+                <div>
+                  <p className="text-xl font-bold text-primary-700">{result.enrolled}</p>
+                  <p className="text-xs text-gray-500">Auto-enrolled</p>
+                </div>
+              </div>
+            )}
             {result.failureCount > 0 && (
               <div className="flex items-center gap-3">
                 <div className="w-10 h-10 rounded-full bg-danger-100 flex items-center justify-center">
@@ -216,6 +318,23 @@ export function StudentImportPage() {
               </div>
             )}
           </div>
+
+          {/* Enrollment hint when no auto-enroll happened */}
+          {result.successCount > 0 && (result.enrolled ?? 0) === 0 && (
+            <div className="px-6 py-3 bg-warning-50 border-b border-warning-100 flex items-start gap-2">
+              <AlertCircle size={15} className="text-warning-600 shrink-0 mt-0.5" />
+              <p className="text-xs text-warning-800">
+                <strong>Next step:</strong> These students are not enrolled in any class yet. Go to{' '}
+                <button
+                  onClick={() => navigate('/enrollments')}
+                  className="underline font-semibold hover:text-warning-900"
+                >
+                  Enrollments
+                </button>{' '}
+                to assign them to a class and term before entering scores.
+              </p>
+            </div>
+          )}
 
           {/* Error table */}
           {result.errors && result.errors.length > 0 && (
@@ -248,14 +367,21 @@ export function StudentImportPage() {
 
           {/* CTA after success */}
           {result.successCount > 0 && (
-            <div className="px-6 py-4 bg-success-50 border-t border-success-100 flex items-center justify-between">
+            <div className="px-6 py-4 bg-success-50 border-t border-success-100 flex items-center justify-between gap-3 flex-wrap">
               <div className="flex items-center gap-2 text-sm text-success-700">
                 <GraduationCap size={16} />
                 <span>{result.successCount} student{result.successCount !== 1 ? 's' : ''} added to your school</span>
               </div>
-              <Button variant="primary" size="sm" onClick={() => navigate('/students')}>
-                View Students
-              </Button>
+              <div className="flex items-center gap-2">
+                {(result.enrolled ?? 0) > 0 && (
+                  <Button variant="secondary" size="sm" onClick={() => navigate('/assessments/score-entry')}>
+                    Enter Scores
+                  </Button>
+                )}
+                <Button variant="primary" size="sm" onClick={() => navigate('/students')}>
+                  View Students
+                </Button>
+              </div>
             </div>
           )}
         </div>

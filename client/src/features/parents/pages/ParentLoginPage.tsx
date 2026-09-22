@@ -16,15 +16,19 @@ const ParentLoginPage: React.FC = () => {
   const [showPwd, setShowPwd] = useState(false);
   const [error, setError]     = useState('');
   const [loading, setLoading] = useState(false);
+  const [shake, setShake]     = useState(false);
 
   const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault(); setError(''); setLoading(true);
+    e.preventDefault(); setError(''); setShake(false); setLoading(true);
     try {
       const result = await parentAuth.login({ email, password });
       localStorage.setItem('parent_token', result.accessToken);
       navigate('/parent/dashboard');
     } catch (err: any) {
-      setError(err?.response?.data?.message || 'Invalid email or password.');
+      const msg = err?.response?.data?.message || 'Invalid email or password.';
+      setError(msg);
+      setShake(true);
+      setTimeout(() => setShake(false), 500);
     } finally { setLoading(false); }
   };
 
@@ -49,7 +53,7 @@ const ParentLoginPage: React.FC = () => {
         </div>
       )}
 
-      <form onSubmit={handleSubmit} className="space-y-4" noValidate>
+      <form onSubmit={handleSubmit} className={`space-y-4 ${shake ? 'animate-shake' : ''}`} noValidate>
         <Input id="email" type="email" label="Email address" placeholder="you@example.com"
           value={email} onChange={e => setEmail(e.target.value)} autoComplete="email" required />
 
@@ -65,7 +69,7 @@ const ParentLoginPage: React.FC = () => {
           } />
 
         <Button type="submit" variant="primary" fullWidth loading={loading}
-          className="!bg-success-600 hover:!bg-success-700 focus:ring-success-500">
+          className="!bg-success-600 hover:!bg-success-700 focus:!ring-success-500 !rounded-xl !h-12 !text-base">
           Sign in
         </Button>
       </form>

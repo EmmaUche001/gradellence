@@ -3,10 +3,12 @@ import {
   NotFoundException,
   ConflictException,
   ForbiddenException,
+  BadRequestException,
 } from '@nestjs/common';
 import { PrismaService } from '../../database/prisma.service';
 import { CreateSchoolDto } from './dto/create-school.dto';
 import { UpdateSchoolDto } from './dto/update-school.dto';
+import { UpdateAcademicSettingsDto } from './dto/academic-settings.dto';
 import { AuthenticatedUser } from '../../common/types/express.types';
 import { ROLES } from '../../common/constants/roles.constants';
 
@@ -169,6 +171,61 @@ export class SchoolsService {
     return {
       success: true,
       message: 'School deleted successfully',
+    };
+  }
+
+  async getSettings(schoolId: string) {
+    const settings = await this.prisma.schoolSettings.findUnique({
+      where: { schoolId },
+    });
+
+    if (!settings) {
+      // Return default settings if none exist
+      return {
+        success: true,
+        message: 'Default settings retrieved',
+        data: {
+          gradingSystem: 'PERCENTAGE',
+          passMark: 40,
+          caWeight: 30,
+          examWeight: 70,
+          maxScore: 100,
+          showPosition: true,
+          showGrade: true,
+          showRemark: true,
+          resultTemplate: 'STANDARD',
+        },
+      };
+    }
+
+    return {
+      success: true,
+      message: 'Settings retrieved successfully',
+      data: settings,
+    };
+  }
+
+  async updateSettings(schoolId: string, dto: UpdateAcademicSettingsDto) {
+    // Validate CA + Exam weights sum to 100
+    if (dto.caWeight !== undefined && dto.examWeight !== undefined) {
+      if (dto.caWeight + dto.examWeight !== 100) {
+        throw new BadRequestException('CA weight and Exam weight must sum to 100');
+      }
+    }
+
+    const settings = await this.prisma.schoolSettings.upsert({
+      where: { schoolId },
+      update: dto,
+      create: {
+        schoolId,
+        ...dto,
+      },
+    });
+
+    return {
+      success: true,
+      message: 'Settings updated successfully',
+      data: settings,
     };
   }
 }

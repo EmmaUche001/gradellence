@@ -80,7 +80,27 @@ export function StudentFormPage() {
   const onSubmit = async (data: FormData) => {
     setSaving(true); setError(null);
     try {
-      isEdit && id ? await studentService.update(id, data) : await studentService.create(data);
+      const { classId, ...studentData } = data;
+
+      if (isEdit && id) {
+        await studentService.update(id, studentData);
+        // Handle class assignment via enrollment if a class is selected
+        if (classId) {
+          const currentTerm = terms.find(t => t.isCurrent);
+          if (currentTerm) {
+            try {
+              const { enrollmentService } = await import('../../../services/enrollmentService');
+              await enrollmentService.create({
+                studentId: id,
+                classId,
+                termId: currentTerm.id,
+              });
+            } catch { /* non-fatal — enrollment may already exist */ }
+          }
+        }
+      } else {
+        await studentService.create({ ...studentData, classId });
+      }
       navigate('/students');
     } catch (e: any) { setError(e.response?.data?.message || 'Failed to save'); }
     finally { setSaving(false); }

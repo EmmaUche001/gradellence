@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
-  School, Plus, Search, ChevronRight, Users, BookOpen,
+  School, Plus, Search, Users, BookOpen,
   MoreVertical, Pencil, Trash2, BookMarked, GraduationCap,
   RefreshCw, ChevronLeft, ChevronRight as ChevronRightIcon,
   X, Check,
@@ -11,7 +11,6 @@ import { subjectService } from '../../../services/subjectService';
 import { Class } from '../../../types/class';
 import { Subject } from '../../../types/subject';
 import { Button } from '../../../components/ui/Button';
-import { Badge } from '../../../components/ui/Badge';
 import { EmptyState } from '../../../components/ui/EmptyState';
 import { SkeletonTable } from '../../../components/ui/SkeletonLoader';
 import { ConfirmDialog } from '../../../components/ui/ConfirmDialog';
@@ -26,7 +25,7 @@ function KpiCard({
   sub?: string; color: string;
 }) {
   return (
-    <div className="bg-surface rounded-card border border-border shadow-sm p-5 flex items-center gap-4">
+    <div className="kpi-card bg-surface rounded-card border border-border shadow-sm p-5 flex items-center gap-4">
       <div className={`w-11 h-11 rounded-xl flex items-center justify-center shrink-0 ${color}`}>
         {icon}
       </div>
@@ -54,7 +53,7 @@ function levelColor(level: number) {
 
 // ─── Row overflow menu ──────────────────────────────────────────────────────
 function RowMenu({
-  cls, onEdit, onAssign, onDelete,
+  onEdit, onAssign, onDelete,
 }: {
   cls: Class;
   onEdit: () => void;
@@ -220,13 +219,6 @@ export function ClassesListPage() {
 
       {/* ── Header ─────────────────────────────────────────────────────────── */}
       <div>
-        <nav className="flex items-center gap-1.5 text-xs text-gray-400 mb-2">
-          <span>Dashboard</span>
-          <ChevronRight size={12} />
-          <span>Academics</span>
-          <ChevronRight size={12} />
-          <span className="text-gray-700 font-medium">Classes</span>
-        </nav>
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
           <div>
             <h1 className="text-page-title text-gray-900">Classes</h1>

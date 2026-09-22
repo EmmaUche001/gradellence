@@ -1,8 +1,8 @@
+import { useRef, useCallback, useState } from 'react';
 import { AlertTriangle } from 'lucide-react';
+import gsap from 'gsap';
 import { Modal } from './Modal';
 import { Button } from './Button';
-
-// Design system: confirmation dialog variant of Modal
 
 interface ConfirmDialogProps {
   isOpen: boolean;
@@ -17,16 +17,37 @@ interface ConfirmDialogProps {
 }
 
 export function ConfirmDialog({
-  isOpen,
-  onClose,
-  onConfirm,
-  title = 'Are you sure?',
-  message,
-  confirmLabel = 'Confirm',
-  cancelLabel = 'Cancel',
-  variant = 'danger',
-  loading = false,
+  isOpen, onClose, onConfirm,
+  title = 'Are you sure?', message,
+  confirmLabel = 'Confirm', cancelLabel = 'Cancel',
+  variant = 'danger', loading = false,
 }: ConfirmDialogProps) {
+  const panelRef = useRef<HTMLDivElement>(null);
+  const [shakeScheduled, setShakeScheduled] = useState(false);
+
+  // Shake the panel when user hovers over the confirm button — subtle warning
+  const handleConfirmHover = useCallback(() => {
+    if (variant !== 'danger' || !panelRef.current || shakeScheduled) return;
+    
+    setShakeScheduled(true);
+    gsap.killTweensOf(panelRef.current);
+    gsap.fromTo(panelRef.current,
+      { x: 0 },
+      {
+        x: 5,
+        duration: 0.07,
+        ease: 'power1.inOut',
+        yoyo: true,
+        repeat: 5,
+        overwrite: 'auto', // Prevent animation restart if user re-hovers
+        onComplete: () => {
+          gsap.set(panelRef.current!, { x: 0 });
+          setShakeScheduled(false);
+        },
+      },
+    );
+  }, [variant, shakeScheduled]);
+
   return (
     <Modal
       isOpen={isOpen}
@@ -37,13 +58,18 @@ export function ConfirmDialog({
           <Button variant="ghost" onClick={onClose} disabled={loading}>
             {cancelLabel}
           </Button>
-          <Button variant={variant} onClick={onConfirm} loading={loading}>
+          <Button
+            variant={variant}
+            onClick={onConfirm}
+            loading={loading}
+            onMouseEnter={handleConfirmHover}
+          >
             {confirmLabel}
           </Button>
         </>
       }
     >
-      <div className="flex gap-4">
+      <div ref={panelRef} className="flex gap-4">
         {variant === 'danger' && (
           <div className="shrink-0 flex items-center justify-center w-10 h-10 rounded-full bg-danger-50">
             <AlertTriangle size={20} className="text-danger-600" />

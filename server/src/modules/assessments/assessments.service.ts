@@ -29,26 +29,24 @@ export class AssessmentsService {
     const student = await this.prisma.student.findFirst({
       where: { id: dto.studentId, schoolId: currentUser.schoolId, deletedAt: null },
     });
-
-    if (!student) {
-      throw new NotFoundException('Student not found');
-    }
+    if (!student) throw new NotFoundException('Student not found');
 
     const subject = await this.prisma.subject.findFirst({
       where: { id: dto.subjectId, schoolId: currentUser.schoolId, deletedAt: null },
     });
-
-    if (!subject) {
-      throw new NotFoundException('Subject not found');
-    }
+    if (!subject) throw new NotFoundException('Subject not found');
 
     const term = await this.prisma.term.findFirst({
       where: { id: dto.termId, schoolId: currentUser.schoolId, deletedAt: null },
     });
+    if (!term) throw new NotFoundException('Term not found');
 
-    if (!term) {
-      throw new NotFoundException('Term not found');
-    }
+    // Resolve teacher record — currentUser.id is a User ID, not a Teacher ID
+    const teacherRecord = await this.prisma.teacher.findFirst({
+      where: { userId: currentUser.id, schoolId: currentUser.schoolId, deletedAt: null },
+      select: { id: true },
+    });
+    const resolvedTeacherId = teacherRecord?.id ?? null;
 
     const existingAssessment = await this.prisma.assessment.findFirst({
       where: {
@@ -71,15 +69,15 @@ export class AssessmentsService {
 
     const assessment = await this.prisma.assessment.create({
       data: {
-        schoolId: currentUser.schoolId,
+        schoolId:  currentUser.schoolId,
         studentId: dto.studentId,
         subjectId: dto.subjectId,
-        termId: dto.termId,
-        teacherId: currentUser.id,
-        type: dto.type,
-        score: dto.score,
-        maxScore: dto.maxScore,
-        weight: dto.weight ?? 1.0,
+        termId:    dto.termId,
+        teacherId: resolvedTeacherId,  // ← Teacher record ID, not User ID
+        type:      dto.type,
+        score:     dto.score,
+        maxScore:  dto.maxScore,
+        weight:    dto.weight ?? 1.0,
         createdBy: currentUser.id,
       },
       include: {
@@ -144,17 +142,32 @@ export class AssessmentsService {
       throw new NotFoundException('Term not found');
     }
 
+    // Resolve the teacher record for this user.
+    // currentUser.id is a User ID — the Assessment model needs a Teacher record ID.
+    // School admins have no teacher record, so resolvedTeacherId can be null.
+    const teacherRecord = await this.prisma.teacher.findFirst({
+      where: { userId: currentUser.id, schoolId: currentUser.schoolId, deletedAt: null },
+      select: { id: true },
+    });
+    const resolvedTeacherId = teacherRecord?.id ?? null;
+
     const studentIds = dto.assessments.map((a) => a.studentId);
+    const uniqueStudentIds = [...new Set(studentIds.filter(id => !!id))];
+
     const students = await this.prisma.student.findMany({
       where: {
-        id: { in: studentIds },
+        id: { in: uniqueStudentIds },
         schoolId: currentUser.schoolId,
         deletedAt: null,
       },
     });
 
-    if (students.length !== studentIds.length) {
-      throw new NotFoundException('One or more students not found');
+    if (students.length !== uniqueStudentIds.length) {
+      const foundIds = new Set(students.map(s => s.id));
+      const missingIds = uniqueStudentIds.filter(id => !foundIds.has(id));
+      throw new NotFoundException(
+        `One or more students not found. Total sent: ${studentIds.length}, Unique valid IDs: ${uniqueStudentIds.length}, Found: ${students.length}, Missing: ${missingIds.join(', ')} | schoolId: ${currentUser.schoolId}`
+      );
     }
 
     const results = {
@@ -186,22 +199,24 @@ export class AssessmentsService {
 
         await this.prisma.assessment.create({
           data: {
-            schoolId: currentUser.schoolId,
+            schoolId:  currentUser.schoolId,
             studentId: assessment.studentId,
             subjectId: dto.subjectId,
-            termId: dto.termId,
-            teacherId: currentUser.id,
-            type: assessment.type,
-            score: assessment.score,
-            maxScore: assessment.maxScore,
-            weight: 1.0,
+            termId:    dto.termId,
+            teacherId: resolvedTeacherId,  // ← Teacher record ID, not User ID
+            type:      assessment.type,
+            score:     assessment.score,
+            maxScore:  assessment.maxScore,
+            weight:    1.0,
             createdBy: currentUser.id,
           },
         });
 
         results.success++;
-      } catch (error) {
-        results.errors.push(`Failed to create assessment for student ${assessment.studentId}`);
+      } catch (error: any) {
+        results.errors.push(
+          `Failed for student ${assessment.studentId}: ${error?.message ?? 'unknown'}`
+        );
       }
     }
 
@@ -565,7 +580,10 @@ export class AssessmentsService {
       where: {
         classId,
         termId,
-        student: { schoolId: currentUser.schoolId },
+        student: {
+          schoolId: currentUser.schoolId,
+          deletedAt: null,           // ← exclude soft-deleted students
+        },
       },
       include: {
         student: {

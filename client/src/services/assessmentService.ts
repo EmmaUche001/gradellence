@@ -4,11 +4,21 @@ import { Assessment, CreateAssessmentData, UpdateAssessmentData, BulkAssessmentD
 const BASE = '/v1/assessments';
 
 export const assessmentService = {
-  async getAll(page = 1, limit = 20, filters?: { classId?: string; subjectId?: string; termId?: string }): Promise<ApiResponse<Assessment[]>> {
+  async getAll(
+    page = 1,
+    limit = 20,
+    filters?: {
+      subjectId?: string;
+      termId?: string;
+      type?: string;
+      studentId?: string;
+    },
+  ): Promise<ApiResponse<Assessment[]>> {
     const params = new URLSearchParams({ page: String(page), limit: String(limit) });
-    if (filters?.classId) params.append('classId', filters.classId);
-    if (filters?.subjectId) params.append('subjectId', filters.subjectId);
-    if (filters?.termId) params.append('termId', filters.termId);
+    if (filters?.subjectId)  params.append('subjectId',  filters.subjectId);
+    if (filters?.termId)     params.append('termId',     filters.termId);
+    if (filters?.type)       params.append('type',       filters.type);
+    if (filters?.studentId)  params.append('studentId',  filters.studentId);
     const { data } = await apiClient.get(`${BASE}?${params}`);
     return data;
   },

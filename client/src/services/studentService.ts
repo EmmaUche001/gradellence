@@ -30,4 +30,9 @@ export const studentService = {
     const { data } = await apiClient.delete(`${BASE}/${id}`);
     return data;
   },
+
+  async bulkRemove(ids: string[]): Promise<ApiResponse<{ deleted: number; notFound: number }>> {
+    const { data } = await apiClient.delete(`${BASE}/bulk`, { data: { ids } });
+    return data;
+  },
 };

@@ -45,13 +45,14 @@ parentApi.interceptors.response.use(
     try {
       // REQ 7.3 — call the refresh endpoint
       const { data } = await parentApi.post('/parents/refresh', { refreshToken });
+      const payload = data?.data ?? data;
 
       // REQ 7.4 — store new tokens
-      localStorage.setItem('parent_token', data.accessToken);
-      localStorage.setItem('parent_refresh_token', data.refreshToken);
+      localStorage.setItem('parent_token', payload.accessToken);
+      localStorage.setItem('parent_refresh_token', payload.refreshToken);
 
       // Retry the original request with the new access token
-      originalRequest.headers.Authorization = `Bearer ${data.accessToken}`;
+      originalRequest.headers.Authorization = `Bearer ${payload.accessToken}`;
       return parentApi(originalRequest);
     } catch {
       // REQ 7.5 — refresh failed, clear storage and redirect
@@ -76,26 +77,26 @@ export const parentAuth = {
 
   login: (data: { email: string; password: string }) =>
     parentApi.post('/parents/login', data).then((r) => {
-      const { accessToken, refreshToken } = r.data;
-      // REQ 7.1 — store both tokens on successful login
+      const payload = r.data?.data ?? r.data;
+      const { accessToken, refreshToken } = payload;
       if (accessToken) {
         localStorage.setItem('parent_token', accessToken);
       }
       if (refreshToken) {
         localStorage.setItem('parent_refresh_token', refreshToken);
       }
-      return r.data;
+      return payload;
     }),
 };
 
 export const parentDashboard = {
-  getStudents: () => parentApi.get('/parents/students').then((r) => r.data),
+  getStudents: () => parentApi.get('/parents/students').then((r) => r.data?.data ?? r.data),
 
   getStudentResults: (studentId: string) =>
-    parentApi.get(`/parents/students/${studentId}/results`).then((r) => r.data),
+    parentApi.get(`/parents/students/${studentId}/results`).then((r) => r.data?.data ?? r.data),
 
   getStudentAnalytics: (studentId: string) =>
-    parentApi.get(`/parents/students/${studentId}/analytics`).then((r) => r.data),
+    parentApi.get(`/parents/students/${studentId}/analytics`).then((r) => r.data?.data ?? r.data),
 
   downloadReportCard: (studentId: string, termId: string) =>
     parentApi.get(`/parents/students/${studentId}/report-card/${termId}`, {

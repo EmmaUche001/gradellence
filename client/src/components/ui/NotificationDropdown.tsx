@@ -43,6 +43,7 @@ export function NotificationDropdown() {
   const [hasUnread, setHasUnread]    = useState(false);
   const [notifications, setNotifs]   = useState<Notification[]>([]);
   const [loading, setLoading]        = useState(false);
+  const [isPulsing, setIsPulsing]    = useState(false);
 
   // ── Poll unread count every 30 s ─────────────────────────────────────────
   const fetchCount = useCallback(async () => {
@@ -105,6 +106,14 @@ export function NotificationDropdown() {
     setHasUnread(false);
   };
 
+  // Pulse badge when new notification arrives
+  useEffect(() => {
+    if (hasUnread) {
+      setIsPulsing(true);
+      setTimeout(() => setIsPulsing(false), 400);
+    }
+  }, [hasUnread]);
+
   return (
     <div className="relative" ref={panelRef}>
       {/* Bell button */}
@@ -115,7 +124,10 @@ export function NotificationDropdown() {
       >
         <Bell size={20} />
         {hasUnread && (
-          <span className="absolute top-1.5 right-1.5 w-2 h-2 rounded-full bg-danger-500 ring-2 ring-surface" />
+          <span className={`
+            absolute top-1.5 right-1.5 w-2 h-2 rounded-full bg-danger-500 ring-2 ring-surface
+            ${isPulsing ? 'animate-badge-pulse' : ''}
+          `} />
         )}
       </button>
 
@@ -160,14 +172,16 @@ export function NotificationDropdown() {
               </div>
             ) : (
               <ul className="divide-y divide-border">
-                {notifications.map(n => (
+                {notifications.map((n, i) => (
                   <li
                     key={n.id}
                     onClick={() => handleClick(n)}
                     className={[
                       'flex items-start gap-3 px-4 py-3.5 cursor-pointer transition-colors',
+                      'animate-stagger-fade-in',
                       n.isRead ? 'hover:bg-gray-50' : 'bg-primary-50/40 hover:bg-primary-50',
                     ].join(' ')}
+                    style={{ animationDelay: `${i * 50}ms` }}
                   >
                     <TypeIcon type={n.type} />
                     <div className="flex-1 min-w-0">

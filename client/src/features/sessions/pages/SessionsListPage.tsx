@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { CalendarDays, Plus, ChevronDown, ChevronRight, AlertCircle } from 'lucide-react';
+import { CalendarDays, Plus, ChevronDown, ChevronRight, AlertCircle, CheckCircle2, Clock, XCircle } from 'lucide-react';
 import { sessionService } from '../../../services/sessionService';
 import { Session } from '../../../types/session';
 import { PageHeader } from '../../../components/ui/PageHeader';
@@ -75,10 +75,39 @@ export function SessionsListPage() {
 
   const fmt = (d: string) => new Date(d).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' });
 
+  // Derived stats
+  const currentSession = sessions.find(s => s.isCurrent);
+  const completedSessions = sessions.filter(s => !s.isCurrent).length;
+  const totalTerms = sessions.reduce((sum, s) => sum + (s.terms?.length ?? 0), 0);
+
   return (
     <div className="space-y-6">
       <PageHeader title="Academic Sessions" description="Manage sessions and their terms"
         actions={<Button variant="primary" size="sm" onClick={() => navigate('/sessions/new')}><Plus size={15} /> Add Session</Button>} />
+
+      {/* ── KPI Cards ────────────────────────────────────────────── */}
+      {!isLoading && sessions.length > 0 && (
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
+          {[
+            { label: 'Total Sessions', value: sessions.length, icon: <CheckCircle2 size={20} />, color: 'bg-primary-50 text-primary-600' },
+            { label: 'Current', value: currentSession?.name ?? 'None', icon: <CalendarDays size={20} />, color: 'bg-success-50 text-success-600' },
+            { label: 'Completed', value: completedSessions, icon: <XCircle size={20} />, color: 'bg-gray-100 text-gray-600' },
+            { label: 'Total Terms', value: totalTerms, icon: <Clock size={20} />, color: 'bg-info-50 text-info-600' },
+          ].map((kpi, i) => (
+            <div key={kpi.label}
+              className="kpi-card animate-content-fade-in bg-surface rounded-card p-5 shadow-sm border border-border flex items-center gap-4"
+              style={{ animationDelay: `${i * 70}ms` }}>
+              <div className={`w-11 h-11 rounded-xl flex items-center justify-center shrink-0 ${kpi.color}`}>
+                {kpi.icon}
+              </div>
+              <div className="min-w-0">
+                <p className="text-xs font-medium text-gray-500">{kpi.label}</p>
+                <p className="text-2xl font-bold text-gray-900 tabular-nums truncate">{typeof kpi.value === 'number' ? kpi.value.toLocaleString() : kpi.value}</p>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
 
       {error && (
         <div className="flex items-start gap-3 px-4 py-3 rounded-xl bg-danger-50 border border-danger-100">

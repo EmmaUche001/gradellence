@@ -212,6 +212,30 @@ export class ResultsController {
     res.send(pdfBuffer);
   }
 
+  @Get('report-cards/class/:classId/:termId')
+  @Roles('SCHOOL_ADMIN')
+  @ApiOperation({ summary: 'Download all report cards for a class as ZIP' })
+  async downloadClassReportCards(
+    @Param('classId') classId: string,
+    @Param('termId') termId: string,
+    @CurrentUser() user: AuthenticatedUser,
+    @Res() res: Response,
+  ) {
+    const zipBuffer = await this.pdfService.generateClassReportCardsZip(
+      classId,
+      termId,
+      user.schoolId,
+    );
+
+    res.set({
+      'Content-Type': 'application/zip',
+      'Content-Disposition': `attachment; filename="report-cards-class-${classId}.zip"`,
+      'Content-Length': zipBuffer.length,
+    });
+
+    res.send(zipBuffer);
+  }
+
   @Get('broadsheet-pdf/:classId/:termId')
   @Roles('SCHOOL_ADMIN')
   @ApiOperation({ summary: 'Generate PDF broadsheet for a class in a term' })

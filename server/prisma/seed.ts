@@ -19,7 +19,7 @@ async function main() {
         description: 'Perfect for small private schools and nursery schools',
         priceNGN: 15000, // ₦15,000/month
         duration: 30,
-        maxStudents: 500,
+        maxStudents: 100, // Reduced from 500 to 100
         maxUsers: 50,
         maxBranches: 1,
         storageGB: 10, // Changed from 5 to 10 GB as requested
@@ -35,6 +35,8 @@ async function main() {
           parentPortal: false,
           communication: false,
           analyticsDashboard: true,
+          ANALYTICS: true, // Basic analytics features
+          ADVANCED_ANALYTICS: false, // Premium analytics features
           multiBranch: false,
           bulkOperations: false,
         },
@@ -62,23 +64,25 @@ async function main() {
         description: 'Ideal for medium-sized schools and secondary schools',
         priceNGN: 50000, // ₦50,000/month
         duration: 30,
-        maxStudents: 2000,
+        maxStudents: 500, // Reduced from 2000 to 500
         maxUsers: 200,
-        maxBranches: 3,
+        maxBranches: 1, // Single branch only (multi-branch is Premium only)
         storageGB: 50,
         features: {
-          aiRemarks: true,
-          aiStudentSummary: true,
-          aiTeacherInsights: true,
+          aiRemarks: false, // Premium only feature
+          aiStudentSummary: false, // Premium only feature
+          aiTeacherInsights: false, // Premium only feature
           aiAcademicAdvisor: false,
           aiRiskPrediction: false,
           aiForecasting: false,
           aiChatAssistant: false,
           aiExecutiveReports: false,
-          parentPortal: true,
+          parentPortal: 'read-only', // Limited access for Standard plan
           communication: true,
           analyticsDashboard: true,
-          multiBranch: true,
+          ANALYTICS: true, // Basic analytics features
+          ADVANCED_ANALYTICS: true, // Premium analytics features
+          multiBranch: false, // Premium only feature
           bulkOperations: true,
         },
       },
@@ -97,7 +101,7 @@ async function main() {
     premium = await prisma.subscriptionPlan.create({
       data: {
         name: 'Premium',
-        description: 'Enterprise solution for large schools and school groups',
+        description: 'Enterprise solution with AI features, full parent portal, and multi-branch support for large schools and school groups',
         priceNGN: 150000, // ₦150,000/month
         duration: 30,
         maxStudents: 99999, // Effectively unlimited
@@ -116,7 +120,9 @@ async function main() {
           parentPortal: true,
           communication: true,
           analyticsDashboard: true,
-          multiBranch: true,
+          ANALYTICS: true, // Basic analytics features
+          ADVANCED_ANALYTICS: true, // Premium analytics features
+          multiBranch: true, // Premium only feature
           bulkOperations: true,
         },
       },

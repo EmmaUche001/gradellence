@@ -44,8 +44,83 @@ model School {
   invoices     Invoice[]
   announcements Announcement[]
   notifications Notification[]
+  settings      SchoolSettings?
+  reportCardConfig ReportCardConfig?
 
   @@map("schools")
+}
+
+// ============================================
+// REPORT CARD CONFIG
+// ============================================
+model ReportCardConfig {
+  id                  String   @id @default(uuid()) @map("id")
+  schoolId            String   @unique @map("school_id")
+
+  // Template
+  template            String   @default("classic") @map("template")
+  accentColor         String   @default("#1a56db") @map("accent_color")
+
+  // School Identity
+  motto               String?  @map("motto")
+  principalName       String?  @map("principal_name")
+  principalSignature  String?  @map("principal_signature")
+  schoolStamp         String?  @map("school_stamp")
+
+  // Section Toggles
+  showRanking         Boolean  @default(true) @map("show_ranking")
+  showCumulative      Boolean  @default(true) @map("show_cumulative")
+  showAffective       Boolean  @default(false) @map("show_affective")
+  showPsychomotor     Boolean  @default(false) @map("show_psychomotor")
+  showTeacherRemark   Boolean  @default(true) @map("show_teacher_remark")
+  showPrincipalRemark Boolean  @default(true) @map("show_principal_remark")
+  showResumptionDate  Boolean  @default(true) @map("show_resumption_date")
+  showStamp           Boolean  @default(true) @map("show_stamp")
+  showPoweredBy       Boolean  @default(true) @map("show_powered_by")
+
+  // Affective Domain
+  affectiveTraits     Json?    @map("affective_traits")
+
+  // Psychomotor Domain
+  psychomotorTraits   Json?    @map("psychomotor_traits")
+
+  // Footer
+  footerText          String?  @map("footer_text")
+  nextTermDate        String?  @map("next_term_date")
+
+  // Audit
+  createdAt           DateTime @default(now()) @map("created_at")
+  updatedAt           DateTime @updatedAt @map("updated_at")
+
+  // Relations
+  school School @relation(fields: [schoolId], references: [id], onDelete: Cascade)
+
+  @@map("report_card_configs")
+}
+
+// ============================================
+// SCHOOL SETTINGS
+// ============================================
+model SchoolSettings {
+  id            String   @id @default(uuid()) @map("id")
+  schoolId      String   @unique @map("school_id")
+  school        School   @relation(fields: [schoolId], references: [id], onDelete: Cascade)
+
+  // Academic Settings
+  gradingSystem    String   @default("PERCENTAGE") @map("grading_system")
+  passMark         Int      @default(40) @map("pass_mark")
+  caWeight         Int      @default(30) @map("ca_weight")
+  examWeight       Int      @default(70) @map("exam_weight")
+  maxScore         Int      @default(100) @map("max_score")
+  showPosition     Boolean  @default(true) @map("show_position")
+  showGrade        Boolean  @default(true) @map("show_grade")
+  showRemark       Boolean  @default(true) @map("show_remark")
+  resultTemplate   String   @default("STANDARD") @map("result_template")
+
+  createdAt     DateTime @default(now()) @map("created_at")
+  updatedAt     DateTime @updatedAt @map("updated_at")
+
+  @@map("school_settings")
 }
 
 // ============================================
@@ -465,7 +540,7 @@ model Assessment {
   studentId String   @map("student_id")
   subjectId String   @map("subject_id")
   termId    String   @map("term_id")
-  teacherId String   @map("teacher_id")
+  teacherId String?  @map("teacher_id")
   type      String   @map("type") // CA1, CA2, CA3, EXAM
   score     Float    @map("score")
   maxScore  Float    @map("max_score")
@@ -480,7 +555,7 @@ model Assessment {
   student Student @relation(fields: [studentId], references: [id])
   subject Subject @relation(fields: [subjectId], references: [id])
   term    Term    @relation(fields: [termId], references: [id])
-  teacher Teacher @relation(fields: [teacherId], references: [id])
+  teacher Teacher? @relation(fields: [teacherId], references: [id])
 
   @@index([schoolId])
   @@index([studentId])

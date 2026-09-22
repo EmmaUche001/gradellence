@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { AlertCircle, CheckCircle2, Calculator, Send, Download } from 'lucide-react';
 import { downloadPdf } from '../../../utils/downloadPdf';
+import { useToastStore } from '../../../store/toastStore';
 import { resultService } from '../../../services/resultService';
 import { classService } from '../../../services/classService';
 import { sessionService } from '../../../services/sessionService';
@@ -30,6 +31,7 @@ function gradeBadge(grade: string | null): BadgeVariant {
 
 export function BroadsheetPage() {
   const navigate = useNavigate();
+  const { addToast } = useToastStore();
   const [classes, setClasses]   = useState<Class[]>([]);
   const [terms, setTerms]       = useState<Term[]>([]);
   const [subjects, setSubjects] = useState<Subject[]>([]);
@@ -40,6 +42,7 @@ export function BroadsheetPage() {
   const [isPublishing, setIsPublishing]     = useState(false);
   const [showPublishConfirm, setPublishConfirm] = useState(false);
   const [downloadingPdf, setDownloadingPdf] = useState(false);
+  const [downloadingZip, setDownloadingZip] = useState(false);
   const [error, setError]                   = useState<string | null>(null);
   const [success, setSuccess]               = useState<string | null>(null);
 
@@ -105,6 +108,52 @@ export function BroadsheetPage() {
 
   const toggleSubject = (id: string) =>
     setSelectedSubjectIds(prev => prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id]);
+
+  // handleDownloadReportCard - not implemented yet
+  // const handleDownloadReportCard = async () => {
+  //   if (!selectedClassId || !selectedTermId) { setError('Select a class and term first.'); return; }
+  //   setDownloadingPdf(true);
+  //   try {
+  //     const response = await resultService.getBroadsheet(selectedClassId, selectedTermId);
+  //     // response.data is Blob (from axios with responseType: 'blob')
+  //     const blob = response.data as Blob;
+  //     const url  = URL.createObjectURL(blob);
+  //     const link = document.createElement('a');
+  //     link.href = url;
+  //     link.download = `broadsheet-${broadsheet?.class?.name ?? 'class'}.pdf`;
+  //     document.body.appendChild(link);
+  //     link.click();
+  //     link.remove();
+  //     URL.revokeObjectURL(url);
+  //     addToast('success', 'Broadsheet PDF downloaded successfully');
+  //   } catch (err: any) {
+  //     const msg = err.response?.data?.message || 'Failed to download broadsheet PDF';
+  //     setError(msg);
+  //     addToast('error', msg);
+  //   } finally { setDownloadingPdf(false); }
+  // };
+
+  const handleDownloadZip = async () => {
+    if (!selectedClassId || !selectedTermId) { setError('Select a class and term first.'); return; }
+    setDownloadingZip(true);
+    try {
+      const response = await resultService.downloadClassReportCards(selectedClassId, selectedTermId);
+      const blob = new Blob([response.data], { type: 'application/zip' });
+      const url  = URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = `report-cards-${broadsheet?.class?.name ?? 'class'}-${selectedTermId}.zip`;
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      URL.revokeObjectURL(url);
+      addToast('success', 'All report cards downloaded successfully');
+    } catch (err: any) {
+      const msg = err.response?.data?.message || 'Failed to download report cards ZIP';
+      setError(msg);
+      addToast('error', msg);
+    } finally { setDownloadingZip(false); }
+  };
 
   return (
     <div className="space-y-6">
@@ -210,6 +259,14 @@ export function BroadsheetPage() {
             >
               <Download size={15} /> Download PDF
             </Button>
+            <Button
+              variant="secondary"
+              onClick={handleDownloadZip}
+              disabled={!selectedClassId || !selectedTermId || !downloadingZip}
+              className="ml-2"
+            >
+              <Download size={15} /> Download All ZIP
+            </Button>
           </div>
         </div>
       </FormSection>
@@ -256,7 +313,7 @@ export function BroadsheetPage() {
                   <th className="px-4 py-3 text-center text-xs font-semibold text-gray-700 uppercase tracking-wider bg-primary-50">Avg</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-border">
+              <tbody>
                 {broadsheet.students.length === 0 ? (
                   <tr>
                     <td colSpan={broadsheet.subjects.length + 4} className="px-5 py-12 text-center">
@@ -271,7 +328,7 @@ export function BroadsheetPage() {
                     <td className="px-4 py-3 font-bold text-center text-gray-700 sticky left-0 bg-surface">{entry.position}</td>
                     <td className="px-4 py-3 sticky left-12 bg-surface">
                       <p className="font-semibold text-gray-900">{entry.student.firstName} {entry.student.lastName}</p>
-                      <p className="text-xs text-gray-400">{entry.student.admissionNumber}</p>
+                      <p className="text-xs text-gray-40">{entry.student.admissionNumber}</p>
                     </td>
                     {broadsheet.subjects.map(s => {
                       const score = entry.subjectScores[s.code];

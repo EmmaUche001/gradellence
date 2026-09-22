@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { ClipboardList } from 'lucide-react';
+import gsap from 'gsap';
 import apiClient from '../../../services/apiClient';
 import { useToastStore } from '../../../store/toastStore';
 import { useAuthStore } from '../../../store/authStore';
@@ -207,18 +208,25 @@ export function ScoreEntryPage() {
   }, [selectedClassId, selectedSubjectId, selectedTermId, fetchGridData]);
 
   // ---- score cell change handler ----
-  const handleScoreChange = (studentId: string, type: string, value: string) => {
+  const handleScoreChange = (studentId: string, type: string, value: string, inputEl?: HTMLInputElement) => {
     setScoreGrid((prev) => ({
       ...prev,
       [studentId]: {
         ...prev[studentId],
-        [type]: {
-          ...prev[studentId][type],
-          value,
-          isDirty: true,
-        },
+        [type]: { ...prev[studentId][type], value, isDirty: true },
       },
     }));
+
+    // Flash the input green if valid, red if invalid
+    if (inputEl && value !== '') {
+      const n = parseFloat(value);
+      const maxScore = assessmentTypes.find(t => t.type === type)?.maxScore ?? 100;
+      const isValid = !isNaN(n) && n >= 0 && n <= maxScore;
+      gsap.fromTo(inputEl,
+        { borderColor: isValid ? '#22c55e' : '#ef4444', backgroundColor: isValid ? '#f0fdf4' : '#fef2f2' },
+        { borderColor: '', backgroundColor: '', duration: 0.6, ease: 'power2.out', clearProps: 'borderColor,backgroundColor' },
+      );
+    }
   };
 
   // ---- save handler ----
@@ -237,8 +245,7 @@ export function ScoreEntryPage() {
     setIsSaving(true);
     try {
       const bulkItems: Array<{
-        studentId: string; subjectId: string; classId: string;
-        termId: string; type: string; score: number; maxScore: number;
+        studentId: string; type: string; score: number; maxScore: number;
       }> = [];
       const updatePromises: Promise<any>[] = [];
 
@@ -252,9 +259,6 @@ export function ScoreEntryPage() {
           if (!cell.assessmentId) {
             bulkItems.push({
               studentId: student.id,
-              subjectId: selectedSubjectId,
-              classId: selectedClassId,
-              termId: selectedTermId,
               type, score, maxScore,
             });
           } else if (cell.isDirty) {
@@ -267,7 +271,11 @@ export function ScoreEntryPage() {
 
       const requests: Promise<any>[] = [...updatePromises];
       if (bulkItems.length > 0) {
-        requests.push(apiClient.post('/v1/assessments/bulk', { assessments: bulkItems }));
+        requests.push(apiClient.post('/v1/assessments/bulk', {
+          subjectId: selectedSubjectId,
+          termId: selectedTermId,
+          assessments: bulkItems,
+        }));
       }
 
       if (requests.length === 0) { addToast('info', 'No changes to save'); return; }
@@ -288,11 +296,11 @@ export function ScoreEntryPage() {
   return (
     <div className="space-y-6">
       <PageHeader
-        title="Score Entry"
+        title="Bulk Score Entry"
         description="Enter assessment scores for an entire class in one go"
         breadcrumbs={[
           { label: 'Assessments', onClick: () => navigate('/assessments') },
-          { label: 'Score Entry' },
+          { label: 'Bulk Score Entry' },
         ]}
       />
 
@@ -393,7 +401,7 @@ export function ScoreEntryPage() {
                                   max={maxScore}
                                   value={cell.value}
                                   onChange={(e) =>
-                                    handleScoreChange(student.id, type, e.target.value)
+                                    handleScoreChange(student.id, type, e.target.value, e.target)
                                   }
                                   className={[
                                     'w-20 h-9 rounded-input border px-3 text-sm text-center',

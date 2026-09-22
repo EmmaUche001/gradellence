@@ -19,6 +19,30 @@ export function Skeleton({ className = '', style }: SkeletonProps) {
   );
 }
 
+/** Shimmer skeleton with gradient sweep animation */
+export function SkeletonShimmer({ className = '', style }: SkeletonProps) {
+  return (
+    <div
+      className={['bg-gray-200 rounded relative overflow-hidden', className].join(' ')}
+      style={style}
+      aria-hidden="true"
+    >
+      <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/40 to-transparent animate-shimmer" />
+    </div>
+  );
+}
+
+/** Skeleton that morphs into content (use with transition) */
+export function SkeletonMorph({ className = '', style }: SkeletonProps) {
+  return (
+    <div
+      className={['bg-gray-200 rounded animate-skeleton-morph', className].join(' ')}
+      style={style}
+      aria-hidden="true"
+    />
+  );
+}
+
 /** Single-line text skeleton */
 export function SkeletonText({ className = '' }: SkeletonProps) {
   return <Skeleton className={`h-4 w-full ${className}`} />;

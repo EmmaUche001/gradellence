@@ -42,6 +42,7 @@ import { AuditLogsListPage } from '../features/audit-logs/pages/AuditLogsListPag
 import { AnnouncementsPage } from '../features/announcements/pages/AnnouncementsPage';
 import { BillingPage } from '../features/billing/pages/BillingPage';
 import { SchoolSettingsPage } from '../features/schools/pages/SchoolSettingsPage';
+import { ReportCardSettingsPage } from '../features/settings/pages/ReportCardSettingsPage';
 import { AnalyticsDashboardPage } from '../features/analytics/pages/AnalyticsDashboardPage';
 import ParentLoginPage from '../features/parents/pages/ParentLoginPage';
 import ParentRegisterPage from '../features/parents/pages/ParentRegisterPage';
@@ -53,6 +54,7 @@ import { StudentImportPage } from '../features/students/pages/StudentImportPage'
 import { ScoreImportPage } from '../features/assessments/pages/ScoreImportPage';
 import { ScoreEntryPage } from '../features/assessments/pages/ScoreEntryPage';
 import { MyResultsPage } from '../features/results/pages/MyResultsPage';
+import LandingPage from '@pages/LandingPage/LandingPage';
 
 function RedirectToDashboard() {
   const location = useLocation();
@@ -98,6 +100,7 @@ const routes = [
   { path: 'announcements', element: <AnnouncementsPage /> },
   { path: 'billing', element: <BillingPage /> },
   { path: 'settings', element: <SchoolSettingsPage /> },
+  { path: 'settings/report-card', element: <ReportCardSettingsPage /> },
   { path: 'analytics', element: <AnalyticsDashboardPage /> },
   { path: 'assessments/score-entry', element: <ScoreEntryPage /> },
   { path: 'my-results', element: <MyResultsPage /> },
@@ -109,6 +112,10 @@ export function Routes() {
   return (
     <RouterRoutes>
       {/* Public Routes */}
+      <Route
+        path="/"
+        element={<LandingPage />}
+      />
       <Route
         path="/login"
         element={!isAuthenticated ? <LoginPage /> : <Navigate to="/dashboard" />}
@@ -167,7 +174,7 @@ export function Routes() {
       </Route>
 
       {/* Default redirect */}
-      <Route path="*" element={<Navigate to={isAuthenticated ? '/dashboard' : '/login'} />} />
+      <Route path="*" element={<Navigate to={isAuthenticated ? '/dashboard' : '/'} />} />
     </RouterRoutes>
   );
 }

@@ -47,7 +47,7 @@ export class SubscriptionsService {
         description: 'Perfect for small private schools and nursery schools',
         priceNGN: 15000,
         duration: 30,
-        maxStudents: 500,
+        maxStudents: 100, // Reduced from 500 to 100
         maxUsers: 50,
         maxBranches: 1,
         storageGB: 10,
@@ -72,29 +72,29 @@ export class SubscriptionsService {
         description: 'Ideal for growing schools with multiple classes',
         priceNGN: 50000,
         duration: 30,
-        maxStudents: 2000,
+        maxStudents: 500, // Reduced from 2000 to 500
         maxUsers: 200,
-        maxBranches: 3,
+        maxBranches: 1, // Single branch only (multi-branch is Premium only)
         storageGB: 50,
         features: {
-          aiRemarks: true,
-          aiStudentSummary: true,
-          aiTeacherInsights: true,
+          aiRemarks: false, // Premium only feature
+          aiStudentSummary: false, // Premium only feature
+          aiTeacherInsights: false, // Premium only feature
           aiAcademicAdvisor: false,
           aiRiskPrediction: false,
           aiForecasting: false,
           aiChatAssistant: false,
           aiExecutiveReports: false,
-          parentPortal: true,
+          parentPortal: 'read-only', // Limited access for Standard plan
           communication: true,
           analyticsDashboard: true,
-          multiBranch: true,
+          multiBranch: false, // Premium only feature
           bulkOperations: true,
         },
       },
       {
         name: 'Premium',
-        description: 'For large institutions requiring unlimited access',
+        description: 'For large institutions and school groups requiring unlimited access and multi-branch support',
         priceNGN: 150000,
         duration: 30,
         maxStudents: 999999,

@@ -16,6 +16,14 @@ export interface Student {
   isActive: boolean;
   createdAt: string;
   updatedAt: string;
+  /** Most recent enrollment — included by the server's findAll query */
+  enrollments?: Array<{
+    id: string;
+    classId: string;
+    termId: string;
+    class: { id: string; name: string; level: number } | null;
+    term:  { id: string; name: string } | null;
+  }>;
 }
 
 export interface CreateStudentData {

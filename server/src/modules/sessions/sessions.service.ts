@@ -105,6 +105,18 @@ export class SessionsService {
           _count: {
             select: { terms: true },
           },
+          terms: {
+            where: { deletedAt: null },
+            orderBy: { startDate: 'asc' },
+            select: {
+              id: true,
+              name: true,
+              startDate: true,
+              endDate: true,
+              isCurrent: true,
+              isActive: true,
+            },
+          },
         },
       }),
       this.prisma.session.count({

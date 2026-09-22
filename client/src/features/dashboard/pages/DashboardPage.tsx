@@ -28,6 +28,7 @@ import type { Class } from '../../../types/class';
 import type { SchoolSubscription } from '../../../types/subscription';
 import type { Announcement } from '../../../types/announcement';
 import { TeacherDashboard } from '../components/TeacherDashboard';
+import { useCountUp } from '../../../hooks/useCountUp';
 
 // ── Helpers ─────────────────────────────────────────────────────────────────
 function getGreeting() {
@@ -76,13 +77,19 @@ interface KpiProps {
 
 function KpiCard({ icon, iconBg, title, value, change, trend = 'neutral', sub, to }: KpiProps) {
   const navigate = useNavigate();
+  // Animate numeric values with count-up
+  const numericTarget = typeof value === 'number' ? value : 0;
+  const isNumeric = typeof value === 'number';
+  const countedValue = useCountUp(numericTarget, 0.8, isNumeric);
+  const displayValue = isNumeric ? countedValue : value;
+
   return (
     <div onClick={() => to && navigate(to)}
-      className={`bg-surface rounded-card p-5 shadow-sm border border-border transition-all duration-150 ${to ? 'cursor-pointer hover:-translate-y-0.5 hover:shadow-md' : ''}`}>
+      className={`kpi-card bg-surface rounded-card p-5 shadow-sm border border-border transition-all duration-200 ${to ? 'cursor-pointer' : ''}`}>
       <div className="flex items-start justify-between gap-3">
         <div className="flex-1 min-w-0">
           <p className="text-xs font-medium text-gray-500 mb-1">{title}</p>
-          <p className="text-2xl font-bold text-gray-900 tabular-nums">{value}</p>
+          <p className="text-2xl font-bold text-gray-900 tabular-nums">{displayValue}</p>
           {change && (
             <div className={`mt-1.5 flex items-center gap-1 text-xs font-medium ${trend === 'up' ? 'text-success-600' : trend === 'down' ? 'text-danger-600' : 'text-gray-500'}`}>
               {trend === 'up' ? <TrendingUp size={12} /> : trend === 'down' ? <TrendingDown size={12} /> : null}
@@ -91,7 +98,7 @@ function KpiCard({ icon, iconBg, title, value, change, trend = 'neutral', sub, t
           )}
           {sub && !change && <p className="mt-1.5 text-xs text-warning-600 font-medium">{sub}</p>}
         </div>
-        <div className={`w-11 h-11 rounded-xl flex items-center justify-center shrink-0 ${iconBg}`}>{icon}</div>
+        <div className={`w-11 h-11 rounded-xl flex items-center justify-center shrink-0 transition-transform duration-200 group-hover:scale-110 ${iconBg}`}>{icon}</div>
       </div>
     </div>
   );
@@ -308,24 +315,36 @@ export function DashboardPage() {
         {kpiLoading
           ? Array.from({ length: 6 }).map((_, i) => <SkeletonKpiCard key={i} />)
           : <>
-              <KpiCard icon={<GraduationCap size={20} className="text-primary-600" />} iconBg="bg-primary-50"
-                title="Students" value={totalStudents !== null ? totalStudents.toLocaleString() : '—'} to="/students" />
-              <KpiCard icon={<Users size={20} className="text-success-600" />} iconBg="bg-success-50"
-                title="Teachers" value={totalTeachers !== null ? totalTeachers : '—'} to="/teachers" />
-              <KpiCard icon={<School size={20} className="text-warning-600" />} iconBg="bg-warning-50"
-                title="Classes" value={totalClasses !== null ? totalClasses : '—'} to="/classes" />
-              <KpiCard icon={<BookOpen size={20} className="text-info-600" />} iconBg="bg-info-50"
-                title="Subjects" value={totalSubjects !== null ? totalSubjects : '—'} to="/subjects" />
-              <KpiCard icon={<ClipboardCheck size={20} className="text-danger-600" />} iconBg="bg-danger-50"
-                title="Assessments"
-                value={pendingAssessments !== null ? pendingAssessments : totalAssessments !== null ? totalAssessments : '—'}
-                sub={pendingAssessments !== null ? `${pendingAssessments} pending` : undefined}
-                to="/assessments" />
-              <KpiCard icon={<BarChart2 size={20} className="text-primary-600" />} iconBg="bg-primary-50"
-                title="Published Results"
-                value={totalResults !== null ? `${publishedResults ?? 0} / ${totalResults}` : '—'}
-                sub={totalResults !== null ? 'This term' : undefined}
-                to="/results" />
+              <div className="animate-content-fade-in" style={{ animationDelay: '50ms' }}>
+                <KpiCard icon={<GraduationCap size={20} className="text-primary-600" />} iconBg="bg-primary-50"
+                  title="Students" value={totalStudents !== null ? totalStudents.toLocaleString() : '—'} to="/students" />
+              </div>
+              <div className="animate-content-fade-in" style={{ animationDelay: '100ms' }}>
+                <KpiCard icon={<Users size={20} className="text-success-600" />} iconBg="bg-success-50"
+                  title="Teachers" value={totalTeachers !== null ? totalTeachers : '—'} to="/teachers" />
+              </div>
+              <div className="animate-content-fade-in" style={{ animationDelay: '150ms' }}>
+                <KpiCard icon={<School size={20} className="text-warning-600" />} iconBg="bg-warning-50"
+                  title="Classes" value={totalClasses !== null ? totalClasses : '—'} to="/classes" />
+              </div>
+              <div className="animate-content-fade-in" style={{ animationDelay: '200ms' }}>
+                <KpiCard icon={<BookOpen size={20} className="text-info-600" />} iconBg="bg-info-50"
+                  title="Subjects" value={totalSubjects !== null ? totalSubjects : '—'} to="/subjects" />
+              </div>
+              <div className="animate-content-fade-in" style={{ animationDelay: '250ms' }}>
+                <KpiCard icon={<ClipboardCheck size={20} className="text-danger-600" />} iconBg="bg-danger-50"
+                  title="Assessments"
+                  value={pendingAssessments !== null ? pendingAssessments : totalAssessments !== null ? totalAssessments : '—'}
+                  sub={pendingAssessments !== null ? `${pendingAssessments} pending` : undefined}
+                  to="/assessments" />
+              </div>
+              <div className="animate-content-fade-in" style={{ animationDelay: '300ms' }}>
+                <KpiCard icon={<BarChart2 size={20} className="text-primary-600" />} iconBg="bg-primary-50"
+                  title="Published Results"
+                  value={totalResults !== null ? `${publishedResults ?? 0} / ${totalResults}` : '—'}
+                  sub={totalResults !== null ? 'This term' : undefined}
+                  to="/results" />
+              </div>
             </>}
       </div>
 
@@ -333,7 +352,7 @@ export function DashboardPage() {
       <div className="grid grid-cols-1 xl:grid-cols-[1fr_380px] gap-6">
 
         {/* Enrollment history bar chart */}
-        <div className="bg-surface rounded-card p-6 shadow-sm border border-border">
+        <div className="bg-surface rounded-card p-6 shadow-sm border border-border animate-slide-up-spring" style={{ animationDelay: '150ms' }}>
           <div className="flex items-center justify-between mb-5">
             <div>
               <h3 className="text-card-title text-gray-900">Student Enrollment</h3>
@@ -379,7 +398,7 @@ export function DashboardPage() {
         </div>
 
         {/* Academic Performance donut — real grade distribution */}
-        <div className="bg-surface rounded-card p-6 shadow-sm border border-border">
+        <div className="bg-surface rounded-card p-6 shadow-sm border border-border animate-slide-up-spring" style={{ animationDelay: '200ms' }}>
           <div className="flex items-center justify-between mb-4">
             <h3 className="text-card-title text-gray-900">Academic Performance</h3>
             <span className="text-xs text-gray-400 bg-gray-100 rounded-lg px-2.5 py-1">
@@ -436,7 +455,7 @@ export function DashboardPage() {
 
       {/* ── Quick Actions + Recent Activity ──────────────────────── */}
       <div className="grid grid-cols-1 xl:grid-cols-[1fr_380px] gap-6">
-        <div className="bg-surface rounded-card p-6 shadow-sm border border-border">
+        <div className="bg-surface rounded-card p-6 shadow-sm border border-border animate-slide-up-spring" style={{ animationDelay: '250ms' }}>
           <h3 className="text-card-title text-gray-900 mb-4">Quick Actions</h3>
           <div className="grid grid-cols-3 sm:grid-cols-6 gap-3">
             {([
@@ -459,7 +478,7 @@ export function DashboardPage() {
         </div>
 
         {/* Recent Activity — real audit logs */}
-        <div className="bg-surface rounded-card p-6 shadow-sm border border-border">
+        <div className="bg-surface rounded-card p-6 shadow-sm border border-border animate-slide-up-spring" style={{ animationDelay: '300ms' }}>
           <div className="flex items-center justify-between mb-4">
             <h3 className="text-card-title text-gray-900">Recent Activity</h3>
             <button onClick={() => navigate('/audit-logs')}
@@ -498,7 +517,7 @@ export function DashboardPage() {
       <div className="grid grid-cols-1 xl:grid-cols-[1fr_380px] gap-6">
 
         {/* Real classes */}
-        <div className="bg-surface rounded-card shadow-sm border border-border overflow-hidden">
+        <div className="bg-surface rounded-card shadow-sm border border-border overflow-hidden animate-slide-up-spring" style={{ animationDelay: '350ms' }}>
           <div className="flex items-center justify-between px-6 py-4 border-b border-border">
             <h3 className="text-card-title text-gray-900">Classes Overview</h3>
             <button onClick={() => navigate('/classes')}
@@ -544,7 +563,7 @@ export function DashboardPage() {
         </div>
 
         {/* School Overview — real subscription */}
-        <div className="bg-surface rounded-card p-6 shadow-sm border border-border">
+        <div className="bg-surface rounded-card p-6 shadow-sm border border-border animate-slide-up-spring" style={{ animationDelay: '400ms' }}>
           <h3 className="text-card-title text-gray-900 mb-4">School Overview</h3>
           <div className="space-y-3">
             <div className="flex items-center justify-between py-1">
@@ -601,7 +620,7 @@ export function DashboardPage() {
       <div className="grid grid-cols-1 xl:grid-cols-[1fr_380px] gap-6 pb-6">
 
         {/* Assessment progress — real counts */}
-        <div className="bg-surface rounded-card p-6 shadow-sm border border-border">
+        <div className="bg-surface rounded-card p-6 shadow-sm border border-border animate-slide-up-spring" style={{ animationDelay: '450ms' }}>
           <div className="flex items-center justify-between mb-5">
             <div>
               <h3 className="text-card-title text-gray-900">Assessment Progress</h3>
@@ -647,7 +666,7 @@ export function DashboardPage() {
         </div>
 
         {/* Announcements — real data from API */}
-        <div className="bg-surface rounded-card p-6 shadow-sm border border-border">
+        <div className="bg-surface rounded-card p-6 shadow-sm border border-border animate-slide-up-spring" style={{ animationDelay: '500ms' }}>
           <div className="flex items-center justify-between mb-4">
             <h3 className="text-card-title text-gray-900">Announcements</h3>
             <div className="flex items-center gap-2">

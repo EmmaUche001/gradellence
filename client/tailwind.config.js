@@ -68,6 +68,11 @@ export default {
         surface: '#FFFFFF',
         'surface-alt': '#F1F5F9',
         border: '#E2E8F0',
+
+        // Parent portal surface tokens (warmer)
+        'parent-bg':      '#FAFAF8',
+        'parent-surface': '#FFFFFF',
+        'parent-border':  '#E8EDE8',
       },
       fontFamily: {
         sans: ['Inter', 'system-ui', 'sans-serif'],
@@ -153,13 +158,78 @@ export default {
           '0%, 100%': { opacity: '1' },
           '50%':      { opacity: '0.4' },
         },
+        // Page transition — content fades up on route change
+        'page-enter': {
+          '0%':   { opacity: '0', transform: 'translateY(12px)' },
+          '100%': { opacity: '1', transform: 'translateY(0)' },
+        },
+        // Modal spring — panel scales from slightly small
+        'modal-spring': {
+          '0%':   { opacity: '0', transform: 'scale(0.95) translateY(8px)' },
+          '60%':  { opacity: '1', transform: 'scale(1.01) translateY(-1px)' },
+          '100%': { opacity: '1', transform: 'scale(1) translateY(0)' },
+        },
+        // Backdrop fade in
+        'backdrop-in': {
+          '0%':   { opacity: '0', backdropFilter: 'blur(0px)' },
+          '100%': { opacity: '1', backdropFilter: 'blur(4px)' },
+        },
+        // Button press — subtle scale down
+        'btn-press': {
+          '0%':   { transform: 'scale(1)' },
+          '50%':  { transform: 'scale(0.96)' },
+          '100%': { transform: 'scale(1)' },
+        },
+        // Row stagger entry
+        'row-enter': {
+          '0%':   { opacity: '0', transform: 'translateX(-6px)' },
+          '100%': { opacity: '1', transform: 'translateX(0)' },
+        },
+        // KPI count-up shimmer sweep
+        'shimmer-sweep': {
+          '0%':   { backgroundPosition: '-200% 0' },
+          '100%': { backgroundPosition: '200% 0' },
+        },
+        // Float for empty state icons
+        'float': {
+          '0%, 100%': { transform: 'translateY(0px)' },
+          '50%':      { transform: 'translateY(-6px)' },
+        },
+        // Shake for destructive confirmations
+        'shake': {
+          '0%, 100%': { transform: 'translateX(0)' },
+          '20%':      { transform: 'translateX(-5px)' },
+          '40%':      { transform: 'translateX(5px)' },
+          '60%':      { transform: 'translateX(-3px)' },
+          '80%':      { transform: 'translateX(3px)' },
+        },
       },
       animation: {
         'fade-in':       'fade-in 150ms ease-out',
         'slide-in':      'slide-in 150ms ease-out',
         'skeleton-pulse':'skeleton-pulse 1.5s ease-in-out infinite',
+        'page-enter':    'page-enter 220ms cubic-bezier(0,0,0.2,1)',
+        'modal-spring':  'modal-spring 300ms cubic-bezier(0.34,1.56,0.64,1)',
+        'backdrop-in':   'backdrop-in 200ms ease-out',
+        'btn-press':     'btn-press 120ms ease-out',
+        'row-enter':     'row-enter 180ms ease-out both',
+        'float':         'float 3s ease-in-out infinite',
+        'shake':         'shake 400ms ease-in-out',
       },
     },
   },
-  plugins: [],
+  plugins: [
+    function ({ addUtilities, e }) {
+      // Disable all animations under prefers-reduced-motion
+      addUtilities({
+        '@media (prefers-reduced-motion: reduce)': {
+          '*, *::before, *::after': {
+            'animation-duration': '0.01ms !important',
+            'animation-iteration-count': '1 !important',
+            'transition-duration': '0.01ms !important',
+          },
+        },
+      });
+    },
+  ],
 };

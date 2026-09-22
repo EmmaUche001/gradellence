@@ -3,7 +3,7 @@ import { useNavigate, useParams } from 'react-router-dom';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
-import { AlertCircle } from 'lucide-react';
+import { AlertCircle, Info } from 'lucide-react';
 import { gradeScaleService } from '../../../services/gradeScaleService';
 import { PageHeader } from '../../../components/ui/PageHeader';
 import { Input } from '../../../components/ui/Input';
@@ -50,6 +50,8 @@ export function GradeScaleFormPage() {
   const [saving, setSaving]     = useState(false);
   const [fetching, setFetching] = useState(isEdit);
   const [error, setError]       = useState<string | null>(null);
+  const [existingScales, setExistingScales] = useState<Array<{ minScore: number; maxScore: number }>>([]);
+  const [overlappingWarning, setOverlappingWarning] = useState<string | null>(null);
 
   const { register, handleSubmit, reset, watch, formState: { errors } } = useForm<FormData>({
     resolver: zodResolver(schema),
@@ -72,7 +74,40 @@ export function GradeScaleFormPage() {
       .finally(() => setFetching(false));
   }, [id, reset]);
 
+  // Fetch all active scales to check for overlaps
+  useEffect(() => {
+    gradeScaleService.getAll(1, 100)
+      .then(res => {
+        const active = res.data.filter((s: any) => s.isActive);
+        setExistingScales(active.map((s: any) => ({ minScore: s.minScore, maxScore: s.maxScore })));
+      })
+      .catch(() => {}); // Ignore errors
+  }, []);
+
+  // Check for overlaps when score range changes
+  useEffect(() => {
+    if (minScore >= maxScore) return;
+    
+    const overlaps = existingScales.some(
+      (scale) => minScore <= scale.maxScore && maxScore >= scale.minScore
+    );
+    
+    if (overlaps && !isEdit) {
+      setOverlappingWarning('This range overlaps with an existing grade scale');
+    } else if (overlaps && isEdit) {
+      setOverlappingWarning('This range overlaps with another scale - updates may fail');
+    } else {
+      setOverlappingWarning(null);
+    }
+  }, [minScore, maxScore, existingScales, isEdit]);
+
   const onSubmit = async (data: FormData) => {
+    // Final validation before submit
+    if (minScore >= maxScore) {
+      setError('Min score must be less than max score');
+      return;
+    }
+
     setSaving(true); setError(null);
     try {
       isEdit && id ? await gradeScaleService.update(id, data) : await gradeScaleService.create(data);
@@ -90,7 +125,9 @@ export function GradeScaleFormPage() {
     <div className="max-w-lg mx-auto space-y-6">
       <PageHeader
         title={isEdit ? 'Edit Grade Scale' : 'Add Grade Scale'}
-        description="Define a score range, grade letter, and remark"
+        description={isEdit 
+          ? 'Update this grade scale. Score ranges may not overlap with other active scales.'
+          : 'Define a score range, grade letter, and remark for GPA calculation'}
         breadcrumbs={[{ label: 'Grade Scales', onClick: () => navigate('/grade-scales') }, { label: isEdit ? 'Edit' : 'New' }]}
       />
 
@@ -98,6 +135,13 @@ export function GradeScaleFormPage() {
         <div className="flex items-start gap-3 px-4 py-3 rounded-xl bg-danger-50 border border-danger-100">
           <AlertCircle size={16} className="text-danger-600 shrink-0 mt-0.5" />
           <p className="text-sm text-danger-700">{error}</p>
+        </div>
+      )}
+
+      {overlappingWarning && (
+        <div className="flex items-start gap-3 px-4 py-3 rounded-xl bg-warning-50 border border-warning-100">
+          <Info size={16} className="text-warning-600 shrink-0 mt-0.5" />
+          <p className="text-sm text-warning-700">{overlappingWarning}</p>
         </div>
       )}
 
@@ -146,11 +190,22 @@ export function GradeScaleFormPage() {
             <Input {...register('remark')} id="remark" label="Remark *"
               placeholder="e.g. Excellent, Very Good, Pass, Fail" error={errors.remark?.message} />
 
-            <div>
-              <Input {...register('points')} id="points" type="number" label="Grade Points (0–10)"
+            <div className="relative">
+              <Input {...register('points')} id="points" type="number" step="0.5" label="Grade Points (0–10)"
                 placeholder="e.g. 5.0 for A, 4.0 for B"
-                helperText="Used for GPA / CGPA calculation" />
+                helperText="Used for GPA / CGPA calculation on transcripts" />
               {errors.points && <p className="mt-1 text-xs text-danger-600">{errors.points.message}</p>}
+              
+              {/* Grade points explanation */}
+              <div className="mt-2 p-3 bg-blue-50 rounded-lg border border-blue-100 text-xs">
+                <p className="font-semibold text-blue-800 mb-1">Why Grade Points?</p>
+                <p className="text-blue-700">
+                  Grade points are the numerical values used to calculate GPA (Grade Point Average) and CGPA (Cumulative GPA). 
+                  Each grade letter is assigned a point value, and your average across all subjects gives your GPA.
+                  <br />
+                  <span className="text-blue-600 mt-1 block">Example: A=5.0, B=4.0, C=3.0 → GPA = (5+4+3)/3 = 4.0</span>
+                </p>
+              </div>
             </div>
 
             {/* Active toggle */}

@@ -204,7 +204,10 @@ export class EnrollmentsService {
     const skip = (page - 1) * limit;
 
     const where: any = {
-      student: { schoolId: currentUser.schoolId },
+      student: {
+        schoolId: currentUser.schoolId,
+        deletedAt: null,             // ← exclude soft-deleted students
+      },
     };
 
     if (classId) {
@@ -271,7 +274,10 @@ export class EnrollmentsService {
     const enrollment = await this.prisma.enrollment.findFirst({
       where: {
         id,
-        student: { schoolId: currentUser.schoolId },
+        student: {
+          schoolId: currentUser.schoolId,
+          deletedAt: null,           // ← exclude soft-deleted students
+        },
       },
       include: {
         student: {
@@ -319,7 +325,10 @@ export class EnrollmentsService {
     const enrollment = await this.prisma.enrollment.findFirst({
       where: {
         id,
-        student: { schoolId: currentUser.schoolId },
+        student: {
+          schoolId: currentUser.schoolId,
+          deletedAt: null,
+        },
       },
     });
 
@@ -398,7 +407,10 @@ export class EnrollmentsService {
     const enrollment = await this.prisma.enrollment.findFirst({
       where: {
         id,
-        student: { schoolId: currentUser.schoolId },
+        student: {
+          schoolId: currentUser.schoolId,
+          deletedAt: null,
+        },
       },
     });
 
@@ -431,6 +443,7 @@ export class EnrollmentsService {
         termId,
         student: {
           schoolId: currentUser.schoolId,
+          deletedAt: null,           // ← CRITICAL: exclude soft-deleted students
         },
       },
       include: {

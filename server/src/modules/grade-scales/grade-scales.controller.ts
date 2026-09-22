@@ -15,6 +15,7 @@ import { ApiTags, ApiOperation, ApiBearerAuth } from '@nestjs/swagger';
 import { GradeScalesService } from './grade-scales.service';
 import { CreateGradeScaleDto } from './dto/create-grade-scale.dto';
 import { UpdateGradeScaleDto } from './dto/update-grade-scale.dto';
+import { BatchUpdateGradeScaleDto, BatchCreateGradeScaleDto } from './dto/batch-grade-scale.dto';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
 import { RolesGuard } from '../../common/guards/roles.guard';
 import { TenantGuard } from '../../common/guards/tenant.guard';
@@ -38,6 +39,22 @@ export class GradeScalesController {
   @ApiOperation({ summary: 'Create a new grade scale' })
   create(@Body() dto: CreateGradeScaleDto, @CurrentUser() user: AuthenticatedUser) {
     return this.gradeScalesService.create(dto, user);
+  }
+
+  @Post('/batch')
+  @Roles('SCHOOL_ADMIN')
+  @RateLimit(RATE_LIMIT_PRESETS.WRITE)
+  @ApiOperation({ summary: 'Create multiple grade scales in batch' })
+  createBatch(@Body() dto: BatchCreateGradeScaleDto, @CurrentUser() user: AuthenticatedUser) {
+    return this.gradeScalesService.createBatch(dto, user);
+  }
+
+  @Put('/batch')
+  @Roles('SCHOOL_ADMIN')
+  @RateLimit(RATE_LIMIT_PRESETS.WRITE)
+  @ApiOperation({ summary: 'Update multiple grade scales in batch (validates all together)' })
+  updateBatch(@Body() dto: BatchUpdateGradeScaleDto, @CurrentUser() user: AuthenticatedUser) {
+    return this.gradeScalesService.updateBatch(dto, user);
   }
 
   @Get()
@@ -65,7 +82,7 @@ export class GradeScalesController {
   @Put(':id')
   @Roles('SCHOOL_ADMIN')
   @RateLimit(RATE_LIMIT_PRESETS.WRITE)
-  @ApiOperation({ summary: 'Update a grade scale' })
+  @ApiOperation({ summary: 'Update a single grade scale' })
   update(
     @Param('id') id: string,
     @Body() dto: UpdateGradeScaleDto,

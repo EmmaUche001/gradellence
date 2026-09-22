@@ -85,7 +85,7 @@ const ParentRegisterPage: React.FC = () => {
           helperText="Found on the student's report card" />
 
         <Button type="submit" variant="primary" fullWidth loading={loading}
-          className="!bg-success-600 hover:!bg-success-700 focus:ring-success-500 mt-2">
+          className="!bg-success-600 hover:!bg-success-700 focus:!ring-success-500 !rounded-xl !h-12 !text-base mt-2">
           Create Account
         </Button>
       </form>

@@ -60,4 +60,60 @@ export class AnalyticsController {
   getGradeDistribution(@CurrentUser() user: AuthenticatedUser, @Query('termId') termId?: string) {
     return this.analyticsService.getGradeDistribution(user.schoolId, termId);
   }
+
+  // ── Premium Analytics Features ──────────────────────────────────────────────
+  
+  @Get('performance-trends')
+  @Roles(ROLES.SCHOOL_ADMIN, ROLES.TEACHER)
+  @RequiresFeature('ADVANCED_ANALYTICS')
+  @ApiOperation({ summary: 'Get cross-term performance trends (Premium Feature)' })
+  getPerformanceTrends(
+    @CurrentUser() user: AuthenticatedUser,
+    @Query('studentId') studentId?: string,
+    @Query('subjectId') subjectId?: string,
+    @Query('termCount') termCount?: string,
+  ) {
+    const termCountNumber = termCount ? parseInt(termCount, 10) : 3;
+    return this.analyticsService.getPerformanceTrends(
+      user.schoolId,
+      studentId,
+      subjectId,
+      termCountNumber,
+    );
+  }
+
+  @Get('score-predictions')
+  @Roles(ROLES.SCHOOL_ADMIN, ROLES.TEACHER)
+  @RequiresFeature('ADVANCED_ANALYTICS')
+  @ApiOperation({ summary: 'Get score predictions based on historical performance (Premium Feature)' })
+  getScorePredictions(
+    @CurrentUser() user: AuthenticatedUser,
+    @Query('studentId') studentId: string,
+    @Query('subjectId') subjectId?: string,
+    @Query('futureTermCount') futureTermCount?: string,
+  ) {
+    const futureTermCountNumber = futureTermCount ? parseInt(futureTermCount, 10) : 1;
+    return this.analyticsService.getScorePredictions(
+      user.schoolId,
+      studentId,
+      subjectId,
+      futureTermCountNumber,
+    );
+  }
+
+  @Get('comparative-analytics')
+  @Roles(ROLES.SCHOOL_ADMIN)
+  @RequiresFeature('ADVANCED_ANALYTICS')
+  @ApiOperation({ summary: 'Get comparative analytics against benchmarks (Premium Feature)' })
+  getComparativeAnalytics(
+    @CurrentUser() user: AuthenticatedUser,
+    @Query('classId') classId?: string,
+    @Query('termId') termId?: string,
+  ) {
+    return this.analyticsService.getComparativeAnalytics(
+      user.schoolId,
+      classId,
+      termId,
+    );
+  }
 }

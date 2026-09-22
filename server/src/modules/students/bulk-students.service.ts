@@ -18,6 +18,9 @@ interface StudentImportRow {
   parentPhone?: string;
 }
 
+// Extend the base result with enrollment count
+type StudentImportResult = ImportResult & { enrolled: number };
+
 // ── Flexible header aliases ─────────────────────────────────────────────────
 // Maps any reasonable variant a user might use → our internal camelCase key
 const HEADER_ALIASES: Record<string, keyof StudentImportRow> = {
@@ -97,7 +100,7 @@ export class BulkStudentsService extends BaseImportService {
     super();
   }
 
-  async importStudents(schoolId: string, csvContent: string): Promise<ImportResult> {
+  async importStudents(schoolId: string, csvContent: string, classId?: string, termId?: string): Promise<StudentImportResult> {
     // ── Step 1: Parse with auto delimiter detection ──────────────────────────
     const rawResult = Papa.parse<Record<string, string>>(csvContent.trim(), {
       header: true,
@@ -114,10 +117,10 @@ export class BulkStudentsService extends BaseImportService {
     }
 
     if (rawResult.data.length === 0) {
-      return this.failure([
+      return { ...this.failure([
         ...parseErrors,
         { row: 1, message: 'No data rows found in CSV. Make sure the file is not empty.' },
-      ]);
+      ]), enrolled: 0 };
     }
 
     // ── Step 2: Normalize headers via alias map ──────────────────────────────
@@ -130,14 +133,14 @@ export class BulkStudentsService extends BaseImportService {
 
     if (!hasFirst || !hasLast) {
       const detected = (rawResult.meta.fields ?? []).join(', ') || '(none)';
-      return this.failure([{
+      return { ...this.failure([{
         row: 1,
         message:
           `Could not map required columns. ` +
           `Headers detected in your file: [${detected}]. ` +
           `Your file needs at minimum: "firstName" and "lastName" columns ` +
           `(any spelling variant is accepted, e.g. "First Name", "first_name", "FIRSTNAME").`,
-      }]);
+      }]), enrolled: 0 };
     }
 
     // ── Step 4: Load existing admission numbers to avoid duplicates ──────────
@@ -224,16 +227,57 @@ export class BulkStudentsService extends BaseImportService {
 
     // ── Step 6: Execute in batches of 50 ────────────────────────────────────
     let successCount = 0;
+    const createdStudentIds: string[] = [];
     const batchSize = 50;
     for (let b = 0; b < operations.length; b += batchSize) {
       const batch   = operations.slice(b, b + batchSize);
       const created = await this.prisma.$transaction(batch);
       successCount += created.length;
+      for (const s of created as any[]) {
+        createdStudentIds.push(s.id);
+      }
+    }
+
+    // ── Step 7: Auto-enroll if classId + termId provided ────────────────────
+    let enrolledCount = 0;
+    if (classId && termId && createdStudentIds.length > 0) {
+      // Validate class and term exist for this school
+      const [classEntity, termEntity] = await Promise.all([
+        this.prisma.class.findFirst({ where: { id: classId, schoolId, deletedAt: null } }),
+        this.prisma.term.findFirst({ where: { id: termId, schoolId, deletedAt: null } }),
+      ]);
+
+      if (classEntity && termEntity) {
+        for (const studentId of createdStudentIds) {
+          try {
+            // Skip if already enrolled in this term (unique constraint: studentId_termId)
+            const existing = await this.prisma.enrollment.findUnique({
+              where: { studentId_termId: { studentId, termId } },
+            });
+            if (existing) continue;
+
+            await this.prisma.enrollment.create({
+              data: { studentId, classId, termId },
+            });
+            enrolledCount++;
+          } catch {
+            // Non-fatal — student was still created, just not enrolled
+            this.logger.warn(`Could not auto-enroll student ${studentId} into class ${classId}`);
+          }
+        }
+      } else {
+        this.logger.warn(
+          `Auto-enrollment skipped: class ${classId} or term ${termId} not found for school ${schoolId}`
+        );
+      }
     }
 
     const allErrors = [...parseErrors, ...rowErrors];
-    return allErrors.length > 0
+    const baseResult = allErrors.length > 0
       ? this.failure(allErrors, successCount)
       : this.success(successCount);
+
+    // Attach enrollment count to the result object
+    return { ...baseResult, enrolled: enrolledCount };
   }
 }

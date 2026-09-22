@@ -31,6 +31,7 @@ export function Badge({ children, variant = 'gray', className = '' }: BadgeProps
     <span
       className={[
         'inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium',
+        'transition-all duration-150 hover:scale-105 hover:shadow-sm cursor-default',
         variantClasses[variant],
         className,
       ].join(' ')}

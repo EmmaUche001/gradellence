@@ -86,7 +86,7 @@ export function UsersListPage() {
       const allRoles = rolesRes.data || [];
       setRoles(allRoles);
       // userRolesRes.data contains { roles: [...] } with role objects
-      const userRoles = userRolesRes.data?.roles ?? [];
+      const userRoles = userRolesRes.data?.roleIds ?? [];
       setSelectedRoleIds(userRoles.map((r: any) => r.id ?? r.roleId));
     } catch (err: any) { addToast('error', err.response?.data?.message || 'Failed to load roles'); }
     finally { setRolesLoading(false); }

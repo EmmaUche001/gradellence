@@ -2,8 +2,9 @@ import { useState, useEffect, useRef } from 'react';
 import {
   School, Phone, Mail, MapPin, Palette, GraduationCap,
   Settings, Sliders, Upload, Link2, Eye, CheckCircle2,
-  AlertCircle, ChevronRight, Lightbulb, Users, BookOpen,
+  Lightbulb, Users, BookOpen,
   Layers, CalendarDays, BookMarked, BadgeCheck,
+  Percent, Award, FileText, ToggleLeft, ToggleRight,
 } from 'lucide-react';
 import { useAuthStore } from '../../../store/authStore';
 import apiClient from '../../../services/apiClient';
@@ -11,8 +12,10 @@ import { analyticsService, OverviewData } from '../../../services/analyticsServi
 import { subscriptionService } from '../../../services/subscriptionService';
 import { Input } from '../../../components/ui/Input';
 import { Button } from '../../../components/ui/Button';
+import { Select } from '../../../components/ui/Select';
 import { SkeletonCard } from '../../../components/ui/SkeletonLoader';
 import { useToastStore } from '../../../store/toastStore';
+import { schoolSettingsApi, AcademicSettings } from '../services/schoolSettingsApi';
 
 // ─── Types ─────────────────────────────────────────────────────────────────
 
@@ -76,6 +79,181 @@ function ComingSoon({ title, description }: { title: string; description: string
       </div>
       <h3 className="text-base font-semibold text-gray-700 mb-1">{title}</h3>
       <p className="text-sm text-gray-400 max-w-sm">{description}</p>
+    </div>
+  );
+}
+
+// ─── Academic Settings Tab ──────────────────────────────────────────────────
+
+function AcademicSettingsTab({ schoolId }: { schoolId?: string }) {
+  const { addToast } = useToastStore();
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
+  const [settings, setSettings] = useState<AcademicSettings>({
+    gradingSystem: 'PERCENTAGE',
+    passMark: 40,
+    caWeight: 30,
+    examWeight: 70,
+    maxScore: 100,
+    showPosition: true,
+    showGrade: true,
+    showRemark: true,
+    resultTemplate: 'STANDARD',
+  });
+
+  useEffect(() => {
+    if (!schoolId) return;
+    setLoading(true);
+    schoolSettingsApi
+      .getSettings(schoolId)
+      .then((res) => {
+        if (res.data) setSettings(res.data);
+      })
+      .catch(() => {
+        // Use defaults if no settings exist yet
+      })
+      .finally(() => setLoading(false));
+  }, [schoolId]);
+
+  const handleSave = async () => {
+    if (!schoolId) return;
+    setSaving(true);
+    try {
+      await schoolSettingsApi.updateSettings(schoolId, settings);
+      addToast('success', 'Academic settings saved successfully');
+    } catch (err: any) {
+      addToast('error', err.response?.data?.message || 'Failed to save academic settings');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const update = <K extends keyof AcademicSettings>(key: K, value: AcademicSettings[K]) =>
+    setSettings((s) => ({ ...s, [key]: value }));
+
+  if (loading) {
+    return (
+      <div className="space-y-4">
+        <SkeletonCard />
+        <SkeletonCard />
+      </div>
+    );
+  }
+
+  return (
+    <div className="space-y-5">
+      {/* Grading System */}
+      <SectionCard icon={<Percent size={18} />} title="Grading System">
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          <Select
+            label="Grading System"
+            value={settings.gradingSystem}
+            onChange={(e) => update('gradingSystem', e.target.value as AcademicSettings['gradingSystem'])}
+            options={[
+              { value: 'PERCENTAGE', label: 'Percentage (0-100)' },
+              { value: 'GRADE_POINT', label: 'Grade Point (GPA)' },
+              { value: 'LETTER_GRADE', label: 'Letter Grade (A-F)' },
+            ]}
+          />
+          <Input
+            id="passMark"
+            label="Pass Mark"
+            type="number"
+            min={0}
+            max={100}
+            value={settings.passMark}
+            onChange={(e) => update('passMark', Number(e.target.value))}
+            helperText="Minimum score to pass a subject"
+          />
+        </div>
+      </SectionCard>
+
+      {/* Score Weights */}
+      <SectionCard icon={<Award size={18} />} title="Score Weights">
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+          <Input
+            id="caWeight"
+            label="CA Weight (%)"
+            type="number"
+            min={0}
+            max={100}
+            value={settings.caWeight}
+            onChange={(e) => update('caWeight', Number(e.target.value))}
+            helperText="Continuous assessment weight"
+          />
+          <Input
+            id="examWeight"
+            label="Exam Weight (%)"
+            type="number"
+            min={0}
+            max={100}
+            value={settings.examWeight}
+            onChange={(e) => update('examWeight', Number(e.target.value))}
+            helperText="Examination weight"
+          />
+          <Input
+            id="maxScore"
+            label="Max Score"
+            type="number"
+            min={1}
+            value={settings.maxScore}
+            onChange={(e) => update('maxScore', Number(e.target.value))}
+            helperText="Maximum obtainable score"
+          />
+        </div>
+        {settings.caWeight + settings.examWeight !== 100 && (
+          <p className="text-xs text-amber-600 bg-amber-50 rounded-lg px-3 py-2">
+            ⚠️ CA Weight + Exam Weight should equal 100%
+          </p>
+        )}
+      </SectionCard>
+
+      {/* Result Display Options */}
+      <SectionCard icon={<FileText size={18} />} title="Result Display Options">
+        <div className="space-y-4">
+          {[
+            { key: 'showPosition' as const, label: 'Show Position', desc: 'Display student position in class' },
+            { key: 'showGrade' as const, label: 'Show Grade', desc: 'Display letter grades on results' },
+            { key: 'showRemark' as const, label: 'Show Remark', desc: 'Display teacher remarks on results' },
+          ].map(({ key, label, desc }) => (
+            <div key={key} className="flex items-center justify-between py-2">
+              <div>
+                <p className="text-sm font-medium text-gray-800">{label}</p>
+                <p className="text-xs text-gray-500">{desc}</p>
+              </div>
+              <button
+                type="button"
+                onClick={() => update(key, !settings[key])}
+                className="text-primary-600 hover:text-primary-700 transition-colors"
+              >
+                {settings[key] ? <ToggleRight size={28} /> : <ToggleLeft size={28} className="text-gray-300" />}
+              </button>
+            </div>
+          ))}
+        </div>
+      </SectionCard>
+
+      {/* Result Template */}
+      <SectionCard icon={<FileText size={18} />} title="Result Template">
+        <Select
+          label="Template Style"
+          value={settings.resultTemplate}
+          onChange={(e) => update('resultTemplate', e.target.value as AcademicSettings['resultTemplate'])}
+          options={[
+            { value: 'STANDARD', label: 'Standard — Clean and simple layout' },
+            { value: 'DETAILED', label: 'Detailed — Includes all metrics and comments' },
+            { value: 'COMPACT', label: 'Compact — Minimal design for quick printing' },
+          ]}
+        />
+      </SectionCard>
+
+      {/* Save Button */}
+      <div className="flex items-center justify-end gap-3 pt-2">
+        <Button variant="primary" onClick={handleSave} loading={saving}>
+          <CheckCircle2 size={15} />
+          Save Academic Settings
+        </Button>
+      </div>
     </div>
   );
 }
@@ -213,14 +391,6 @@ export function SchoolSettingsPage() {
       {/* ── Header ─────────────────────────────────────────────────────────── */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>
-          {/* Breadcrumb */}
-          <nav className="flex items-center gap-1.5 text-xs text-gray-400 mb-2">
-            <span>Dashboard</span>
-            <ChevronRight size={12} />
-            <span>Settings</span>
-            <ChevronRight size={12} />
-            <span className="text-gray-700 font-medium">School Settings</span>
-          </nav>
           <h1 className="text-page-title text-gray-900">School Settings</h1>
           <p className="mt-1 text-sm text-gray-500">
             Manage your school profile, branding and preferences.
@@ -498,10 +668,7 @@ export function SchoolSettingsPage() {
       )}
 
       {activeTab === 'academic' && (
-        <ComingSoon
-          title="Academic Settings"
-          description="Configure grading systems, result templates, and academic preferences. Coming soon."
-        />
+        <AcademicSettingsTab schoolId={user?.schoolId} />
       )}
 
       {activeTab === 'system' && (

@@ -96,7 +96,7 @@ export function TabPanel({ id, children, className = '' }: TabPanelProps) {
       role="tabpanel"
       id={`tabpanel-${id}`}
       aria-labelledby={`tab-${id}`}
-      className={['pt-5 animate-fade-in', className].join(' ')}
+      className={['pt-5 animate-tab-crossfade', className].join(' ')}
     >
       {children}
     </div>

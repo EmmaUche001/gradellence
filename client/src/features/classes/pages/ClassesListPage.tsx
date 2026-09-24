@@ -330,7 +330,8 @@ export function ClassesListPage() {
           <EmptyState icon={<School size={40} />} title="No classes yet"
             description={search ? `No classes match "${search}".` : 'Create your first class to begin organising students.'}
             actionLabel={search ? undefined : 'Add Class'}
-            onAction={search ? undefined : () => navigate('/classes/new')} />
+            onAction={search ? undefined : () => navigate('/classes/new')}
+            animationType="fade" />
         ) : (
           <div className="overflow-x-auto">
             <table className="w-full">

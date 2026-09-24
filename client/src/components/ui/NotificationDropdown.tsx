@@ -1,8 +1,10 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Bell, CheckCheck, Megaphone, BookMarked, BarChart2, Shield, Info, X } from 'lucide-react';
+import gsap from 'gsap';
 import { notificationService, Notification } from '../../services/notificationService';
 import { useAuthStore } from '../../store/authStore';
+import { getPopoverOrigin } from '../../lib/motion.tokens';
 
 // ── Relative time helper ─────────────────────────────────────────────────────
 function relTime(dateStr: string) {
@@ -38,12 +40,14 @@ export function NotificationDropdown() {
   const navigate             = useNavigate();
   const { isAuthenticated }  = useAuthStore();
   const panelRef             = useRef<HTMLDivElement>(null);
+  const buttonRef            = useRef<HTMLButtonElement>(null);
 
   const [open, setOpen]              = useState(false);
   const [hasUnread, setHasUnread]    = useState(false);
   const [notifications, setNotifs]   = useState<Notification[]>([]);
   const [loading, setLoading]        = useState(false);
   const [isPulsing, setIsPulsing]    = useState(false);
+  const [transformOrigin, setTransformOrigin] = useState('right top');
 
   // ── Poll unread count every 30 s ─────────────────────────────────────────
   const fetchCount = useCallback(async () => {
@@ -72,7 +76,23 @@ export function NotificationDropdown() {
   }, []);
 
   useEffect(() => {
-    if (open) fetchInbox();
+    if (open && buttonRef.current) {
+      // Calculate transform-origin based on button position
+      setTransformOrigin(getPopoverOrigin(buttonRef.current));
+      fetchInbox();
+      
+      // GSAP animation for dropdown entrance
+      if (panelRef.current) {
+        const panel = panelRef.current.querySelector('[data-dropdown-panel]');
+        if (panel) {
+          gsap.fromTo(
+            panel,
+            { opacity: 0, scale: 0.95, y: -8 },
+            { opacity: 1, scale: 1, y: 0, duration: 0.2, ease: 'power2.out' }
+          );
+        }
+      }
+    }
   }, [open, fetchInbox]);
 
   // ── Close on outside click ───────────────────────────────────────────────
@@ -118,6 +138,7 @@ export function NotificationDropdown() {
     <div className="relative" ref={panelRef}>
       {/* Bell button */}
       <button
+        ref={buttonRef}
         onClick={() => setOpen(v => !v)}
         className="relative p-2 rounded-lg text-gray-500 hover:bg-gray-100 transition-colors"
         aria-label="Notifications"
@@ -133,7 +154,12 @@ export function NotificationDropdown() {
 
       {/* Panel */}
       {open && (
-        <div className="absolute right-0 top-full mt-2 w-[360px] bg-surface rounded-xl border border-border shadow-lg overflow-hidden z-50 animate-fade-in">
+        <div 
+          className="absolute right-0 top-full mt-2 w-[360px] bg-surface rounded-xl border border-border shadow-lg overflow-hidden z-50"
+          style={{ transformOrigin, opacity: 0 }}
+          data-dropdown-panel
+        >
+
 
           {/* Header */}
           <div className="flex items-center justify-between px-4 py-3 border-b border-border">

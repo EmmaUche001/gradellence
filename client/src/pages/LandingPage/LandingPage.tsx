@@ -1,5 +1,8 @@
 import { Button, Card } from '@/components/ui';
 import { ArrowRight, Check, Play, TrendingUp, Award, ChevronRight, FileText, Download, Percent, Users, Shield, Star, Gift, Headphones, MessageCircle } from 'lucide-react';
+import { useEffect, useRef } from 'react';
+import gsap from 'gsap';
+import { ScrollTrigger } from 'gsap/ScrollTrigger';
 
 const features = [
   {
@@ -48,6 +51,117 @@ function Logo() {
 }
 
 export default function LandingPage() {
+  const heroRef = useRef<HTMLDivElement>(null);
+  const floatingCardsRef = useRef<HTMLDivElement>(null);
+  const featuresGridRef = useRef<HTMLDivElement>(null);
+  const benefitsGridRef = useRef<HTMLDivElement>(null);
+  const partnershipSectionRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    gsap.registerPlugin(ScrollTrigger);
+
+    // Hero section stagger animation
+    if (heroRef.current) {
+      const heroElements = heroRef.current.querySelectorAll('[data-animate]');
+      gsap.fromTo(
+        heroElements,
+        { opacity: 0, y: 20 },
+        {
+          opacity: 1,
+          y: 0,
+          duration: 0.6,
+          ease: 'power2.out',
+          stagger: 0.1,
+          delay: 0.2,
+        }
+      );
+    }
+
+    // Floating cards simultaneous slide-in
+    if (floatingCardsRef.current) {
+      const cards = floatingCardsRef.current.querySelectorAll('[data-float-card]');
+      gsap.fromTo(
+        cards,
+        (index: number) => {
+          // Slide from different directions based on position
+          if (index === 0) return { opacity: 0, x: 40, y: 40 }; // bottom-right
+          return { opacity: 0, x: -40, y: -40 }; // top-left
+        },
+        {
+          opacity: 1,
+          x: 0,
+          y: 0,
+          duration: 0.7,
+          ease: 'power2.out',
+          delay: 0.4,
+        }
+      );
+    }
+
+    // Features grid stagger on scroll using ScrollTrigger
+    if (featuresGridRef.current) {
+      const cards = featuresGridRef.current.querySelectorAll('[data-feature-card]');
+      gsap.fromTo(
+        cards,
+        { opacity: 0, y: 30 },
+        {
+          opacity: 1,
+          y: 0,
+          duration: 0.6,
+          ease: 'power2.out',
+          stagger: 0.1,
+          scrollTrigger: {
+            trigger: featuresGridRef.current,
+            start: 'top 80%',
+            once: true,
+          },
+        }
+      );
+    }
+
+    // Benefits grid stagger on scroll using ScrollTrigger
+    if (benefitsGridRef.current) {
+      const cards = benefitsGridRef.current.querySelectorAll('[data-benefit-card]');
+      gsap.fromTo(
+        cards,
+        { opacity: 0, y: 30 },
+        {
+          opacity: 1,
+          y: 0,
+          duration: 0.6,
+          ease: 'power2.out',
+          stagger: 0.08,
+          scrollTrigger: {
+            trigger: benefitsGridRef.current,
+            start: 'top 80%',
+            once: true,
+          },
+        }
+      );
+    }
+
+    // Partnership section parallax on scroll
+    if (partnershipSectionRef.current) {
+      const blobs = partnershipSectionRef.current.querySelectorAll('[data-parallax]');
+      blobs.forEach((blob) => {
+        gsap.to(blob, {
+          y: 100,
+          scrollTrigger: {
+            trigger: partnershipSectionRef.current!,
+            start: 'top center',
+            end: 'bottom center',
+            scrub: 1,
+            markers: false,
+          },
+        });
+      });
+    }
+
+    return () => {
+      ScrollTrigger.getAll().forEach(trigger => trigger.kill());
+    };
+  }, []);
+
   return (
     <div className="min-h-screen bg-background">
       {/* Navigation */}
@@ -93,24 +207,24 @@ export default function LandingPage() {
         <section className="py-20 md:py-32 bg-gradient-to-b from-background to-surface-alt">
           <div className="container mx-auto px-6">
             <div className="grid md:grid-cols-2 gap-12 items-center">
-              <div className="text-center md:text-left">
-                <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-primary-50 text-primary-700 text-sm font-medium mb-6">
+              <div className="text-center md:text-left" ref={heroRef}>
+                <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-primary-50 text-primary-700 text-sm font-medium mb-6" data-animate>
                   Limited Early Adopter Programme
                 </div>
 
-                <h1 className="text-4xl md:text-5xl lg:text-6xl font-bold text-gray-900 mb-6">
+                <h1 className="text-4xl md:text-5xl lg:text-6xl font-bold text-gray-900 mb-6" data-animate>
                   The smarter way to
                   <span className="block bg-gradient-to-r from-primary-600 to-primary-400 bg-clip-text text-transparent">
                     manage school results.
                   </span>
                 </h1>
 
-                <p className="text-lg md:text-xl text-gray-600 mb-8 max-w-2xl">
+                <p className="text-lg md:text-xl text-gray-600 mb-8 max-w-2xl" data-animate>
                   Simplify result computation, reporting and academic performance management with Gradellence.
                 </p>
 
-                <div className="flex flex-col sm:flex-row gap-4 mb-6">
-                  <Button variant="primary" size="lg" className="w-full sm:w-auto">
+                <div className="flex flex-col sm:flex-row gap-4 mb-6" data-animate>
+                  <Button variant="primary" size="lg" className="w-full sm:w-auto hover-scale-shadow">
                     Get early access
                     <ArrowRight className="ml-2 w-5 h-5" />
                   </Button>
@@ -118,21 +232,21 @@ export default function LandingPage() {
                     href="/docs/gradellence-early-adopter-proposal.pdf" 
                     target="_blank" 
                     rel="noopener noreferrer"
-                    className="inline-flex items-center justify-center px-8 py-4 border border-primary-600 text-primary-600 font-medium rounded-btn hover:bg-primary-50 transition-colors w-full sm:w-auto"
+                    className="inline-flex items-center justify-center px-8 py-4 border border-primary-600 text-primary-600 font-medium rounded-btn hover:bg-primary-50 transition-colors w-full sm:w-auto hover-scale-shadow"
                   >
                     <FileText className="mr-2 w-5 h-5" />
                     View partnership proposal
                   </a>
                 </div>
 
-                <div className="flex items-center justify-center md:justify-start gap-2 text-sm text-gray-500">
+                <div className="flex items-center justify-center md:justify-start gap-2 text-sm text-gray-500" data-animate>
                   <Check className="w-4 h-4 text-success-500" />
                   Launching September 2026
                 </div>
               </div>
 
               {/* Product Demo Placeholder */}
-              <div className="relative">
+              <div className="relative" ref={floatingCardsRef}>
                 <Card className="overflow-hidden border-2 border-border">
                   <div className="bg-gray-100 px-4 py-3 flex items-center justify-between border-b border-border">
                     <div className="flex items-center gap-2">
@@ -161,7 +275,7 @@ export default function LandingPage() {
                 </Card>
 
                 {/* Floating Cards */}
-                <div className="absolute -bottom-6 -right-6 bg-surface border border-border rounded-card p-4 shadow-lg w-40">
+                <div className="absolute -bottom-6 -right-6 bg-surface border border-border rounded-card p-4 shadow-lg w-40" data-float-card>
                   <div className="flex items-center gap-3">
                     <div className="w-10 h-10 bg-primary-100 rounded-lg flex items-center justify-center">
                       <TrendingUp className="w-5 h-5 text-primary-600" />
@@ -173,7 +287,7 @@ export default function LandingPage() {
                   </div>
                 </div>
 
-                <div className="absolute -top-6 -left-6 bg-surface border border-border rounded-card p-4 shadow-lg w-48">
+                <div className="absolute -top-6 -left-6 bg-surface border border-border rounded-card p-4 shadow-lg w-48" data-float-card>
                   <div className="flex items-center gap-3">
                     <div className="w-10 h-10 bg-success-100 rounded-lg flex items-center justify-center">
                       <Check className="w-5 h-5 text-success-600" />
@@ -239,9 +353,9 @@ export default function LandingPage() {
               </p>
             </div>
 
-            <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-8">
+            <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-8" ref={featuresGridRef}>
               {features.map((feature) => (
-                <Card key={feature.number} hoverable className="h-full">
+                <Card key={feature.number} hoverable className="h-full" data-feature-card>
                   <div className="flex items-start justify-between mb-6">
                     <div className="text-3xl font-bold text-primary-100">{feature.number}</div>
                     <div className="w-12 h-12 bg-primary-50 rounded-lg flex items-center justify-center">
@@ -275,7 +389,7 @@ export default function LandingPage() {
               </p>
             </div>
 
-            <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-8">
+            <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-8" ref={benefitsGridRef}>
               {[
                 {
                   icon: <Percent className="w-6 h-6 text-success-600" />,
@@ -323,7 +437,7 @@ export default function LandingPage() {
                   description: "Your payment secures your spot now, subscription begins at official launch."
                 }
               ].map((benefit, index) => (
-                <Card key={index} className="text-center p-6">
+                <Card key={index} className="text-center p-6" data-benefit-card>
                   <div className="w-12 h-12 rounded-full bg-primary-50 flex items-center justify-center mx-auto mb-4">
                     {benefit.icon}
                   </div>
@@ -348,10 +462,10 @@ export default function LandingPage() {
         </section>
 
         {/* Partnership Proposal Section */}
-        <section className="py-20 bg-gradient-to-b from-blue-50 via-blue-25 to-blue-50 relative overflow-hidden">
+        <section className="py-20 bg-gradient-to-b from-blue-50 via-blue-25 to-blue-50 relative overflow-hidden" ref={partnershipSectionRef}>
           {/* Decorative background elements */}
-          <div className="absolute top-0 right-0 w-96 h-96 bg-primary-100 rounded-full opacity-20 -mr-48 -mt-48"></div>
-          <div className="absolute bottom-0 left-0 w-80 h-80 bg-blue-100 rounded-full opacity-15 -ml-40 -mb-40"></div>
+          <div className="absolute top-0 right-0 w-96 h-96 bg-primary-100 rounded-full opacity-20 -mr-48 -mt-48" data-parallax></div>
+          <div className="absolute bottom-0 left-0 w-80 h-80 bg-blue-100 rounded-full opacity-15 -ml-40 -mb-40" data-parallax></div>
           
           <div className="container mx-auto px-6 relative z-10">
             <div className="max-w-4xl mx-auto">

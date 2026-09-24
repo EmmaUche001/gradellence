@@ -183,12 +183,12 @@ export function AnalyticsDashboardPage() {
         </h2>
 
         {overviewLoading ? (
-          <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+          <div className="grid grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
             {Array.from({ length: 4 }).map((_, i) => <SkeletonKpiCard key={i} />)}
           </div>
         ) : isTeacher ? (
           /* ── Teacher KPIs ── */
-          <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+          <div className="grid grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
             <KpiCard title="My Classes"
               value={teacherProfile?.stats?.classCount ?? 0}
               icon={<School size={20} className="text-primary-600" />} iconColor="bg-primary-50 text-primary-600" />
@@ -205,7 +205,7 @@ export function AnalyticsDashboardPage() {
         ) : overview ? (
           /* ── School Admin KPIs ── */
           <>
-            <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+            <div className="grid grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
               <KpiCard title="Total Students" value={(overview.totalStudents ?? 0).toLocaleString()}
                 icon={<GraduationCap size={20} className="text-primary-600" />} iconColor="bg-primary-50 text-primary-600" />
               <KpiCard title="Total Teachers"  value={overview.totalTeachers ?? 0}
@@ -262,7 +262,7 @@ export function AnalyticsDashboardPage() {
         ) : stats ? (
           <div className="space-y-6">
             {/* Stat summary cards */}
-            <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+            <div className="grid grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
               <KpiCard title="Pass Rate" value={`${stats.passRate}%`}
                 trend={stats.passRate >= 70 ? 'up' : stats.passRate >= 50 ? 'neutral' : 'down'}
                 icon={<TrendingUp size={20} className={stats.passRate >= 70 ? 'text-success-600' : 'text-warning-600'} />}

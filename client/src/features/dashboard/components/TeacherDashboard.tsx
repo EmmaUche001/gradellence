@@ -125,7 +125,7 @@ export function TeacherDashboard() {
       </div>
 
       {/* KPI Cards */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-6 mb-8">
         {profileLoading ? (
           Array.from({ length: 4 }).map((_, i) => <SkeletonKpiCard key={i} />)
         ) : (

@@ -27,6 +27,12 @@ interface DataTableProps<T> {
   /** Number of skeleton rows shown while loading */
   skeletonRows?: number;
   className?: string;
+  /** Enable row selection with checkboxes */
+  selectable?: boolean;
+  /** Callback when rows are selected */
+  onSelectionChange?: (selectedKeys: string[]) => void;
+  /** Render bulk action toolbar */
+  bulkActionToolbar?: (selectedCount: number) => ReactNode;
 }
 
 function SortIcon({ column, sortKey, sortDir }: {
@@ -34,7 +40,7 @@ function SortIcon({ column, sortKey, sortDir }: {
   sortKey: string | null;
   sortDir: 'asc' | 'desc';
 }) {
-  if (sortKey !== column) return <ChevronsUpDown size={14} className="text-gray-300" />;
+  if (sortKey !== column) return <ChevronsUpDown size={14} className="text-gray-400 group-hover:text-primary-600 transition-colors duration-150" />;
   return sortDir === 'asc'
     ? <ChevronUp size={14} className="text-primary-600" />
     : <ChevronDown size={14} className="text-primary-600" />;
@@ -49,10 +55,14 @@ export function DataTable<T>({
   loading = false,
   skeletonRows = 5,
   className = '',
+  selectable = false,
+  onSelectionChange,
+  bulkActionToolbar,
 }: DataTableProps<T>) {
   const [page, setPage] = useState(0);
   const [sortKey, setSortKey] = useState<string | null>(null);
   const [sortDir, setSortDir] = useState<'asc' | 'desc'>('asc');
+  const [selectedKeys, setSelectedKeys] = useState<Set<string>>(new Set());
 
   const handleSort = (key: string) => {
     if (sortKey === key) {
@@ -61,6 +71,28 @@ export function DataTable<T>({
       setSortKey(key);
       setSortDir('asc');
       setPage(0);
+    }
+  };
+
+  const handleSelectRow = (key: string) => {
+    const newSelected = new Set(selectedKeys);
+    if (newSelected.has(key)) {
+      newSelected.delete(key);
+    } else {
+      newSelected.add(key);
+    }
+    setSelectedKeys(newSelected);
+    onSelectionChange?.(Array.from(newSelected));
+  };
+
+  const handleSelectAll = () => {
+    if (selectedKeys.size === pageData.length) {
+      setSelectedKeys(new Set());
+      onSelectionChange?.([]);
+    } else {
+      const newSelected = new Set(pageData.map(keyExtractor));
+      setSelectedKeys(newSelected);
+      onSelectionChange?.(Array.from(newSelected));
     }
   };
 
@@ -86,18 +118,39 @@ export function DataTable<T>({
 
   return (
     <div className={`w-full ${className}`}>
+      {/* Bulk action toolbar */}
+      {selectable && selectedKeys.size > 0 && (
+        <div className="mb-4 p-3 bg-primary-50 border border-primary-200 rounded-lg flex items-center justify-between">
+          <span className="text-sm font-medium text-primary-900">
+            {selectedKeys.size} item{selectedKeys.size !== 1 ? 's' : ''} selected
+          </span>
+          {bulkActionToolbar && bulkActionToolbar(selectedKeys.size)}
+        </div>
+      )}
+
       <div className="overflow-x-auto rounded-card border border-border">
         <table className="min-w-full divide-y divide-border">
-          {/* Header — design system: gray-100 bg, semibold */}
-          <thead>
+          {/* Header — design system: gray-100 bg, semibold — STICKY */}
+          <thead className="sticky top-0 z-10 shadow-sm">
             <tr className="bg-gray-100">
+              {selectable && (
+                <th className="w-12 px-4 py-3">
+                  <input
+                    type="checkbox"
+                    checked={selectedKeys.size === pageData.length && pageData.length > 0}
+                    onChange={handleSelectAll}
+                    className="rounded border-border cursor-pointer"
+                    aria-label="Select all rows on this page"
+                  />
+                </th>
+              )}
               {columns.map((col) => (
                 <th
                   key={col.key}
                   scope="col"
                   className={[
-                    'table-header',
-                    col.sortable !== false ? 'cursor-pointer select-none hover:bg-gray-200 transition-colors duration-150' : '',
+                    'table-header group',
+                    col.sortable !== false ? 'cursor-pointer select-none hover:bg-primary-50 transition-colors duration-150' : '',
                     col.className ?? '',
                   ].join(' ')}
                   onClick={() => col.sortable !== false && handleSort(col.key)}
@@ -119,6 +172,11 @@ export function DataTable<T>({
               // Skeleton rows
               Array.from({ length: skeletonRows }).map((_, i) => (
                 <tr key={i}>
+                  {selectable && (
+                    <td className="w-12 px-4 py-3">
+                      <div className="h-4 bg-gray-200 rounded animate-skeleton-pulse" />
+                    </td>
+                  )}
                   {columns.map((col) => (
                     <td key={col.key} className="table-cell">
                       <div className="h-4 bg-gray-200 rounded animate-skeleton-pulse" />
@@ -128,26 +186,40 @@ export function DataTable<T>({
               ))
             ) : pageData.length === 0 ? (
               <tr>
-                <td colSpan={columns.length} className="px-4 py-12 text-center">
+                <td colSpan={columns.length + (selectable ? 1 : 0)} className="px-4 py-12 text-center">
                   {emptyState ?? (
                     <span className="text-sm text-gray-400">No data available</span>
                   )}
                 </td>
               </tr>
             ) : (
-              pageData.map((item) => (
-                <tr
-                  key={keyExtractor(item)}
-                  // Design system: hover gray-50
-                  className="table-row"
-                >
-                  {columns.map((col) => (
-                    <td key={col.key} className={`table-cell ${col.className ?? ''}`}>
-                      {col.render ? col.render(item) : String((item as Record<string, unknown>)[col.key] ?? '')}
-                    </td>
-                  ))}
-                </tr>
-              ))
+              pageData.map((item) => {
+                const itemKey = keyExtractor(item);
+                return (
+                  <tr
+                    key={itemKey}
+                    // Design system: hover gray-50
+                    className="table-row"
+                  >
+                    {selectable && (
+                      <td className="w-12 px-4 py-3">
+                        <input
+                          type="checkbox"
+                          checked={selectedKeys.has(itemKey)}
+                          onChange={() => handleSelectRow(itemKey)}
+                          className="rounded border-border cursor-pointer"
+                          aria-label={`Select row`}
+                        />
+                      </td>
+                    )}
+                    {columns.map((col) => (
+                      <td key={col.key} className={`table-cell ${col.className ?? ''}`}>
+                        {col.render ? col.render(item) : String((item as Record<string, unknown>)[col.key] ?? '')}
+                      </td>
+                    ))}
+                  </tr>
+                );
+              })
             )}
           </tbody>
         </table>

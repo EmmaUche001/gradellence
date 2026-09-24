@@ -1,7 +1,7 @@
 import { useRef, useEffect, ReactNode } from 'react';
 import { useLocation } from 'react-router-dom';
 import gsap from 'gsap';
-import { GSAP_CONFIG, TRANSFORM, DURATION_QUICK } from '../../lib/motion.tokens';
+import { GSAP_CONFIG, DURATION_QUICK } from '../../lib/motion.tokens';
 
 interface PageTransitionProps {
   children: ReactNode;

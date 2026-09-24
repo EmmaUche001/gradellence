@@ -107,10 +107,30 @@ export function DashboardLayout() {
         e.preventDefault();
         setCmdOpen(v => !v);
       }
+      // Cmd+S / Ctrl+S → Go to Students
+      if ((e.metaKey || e.ctrlKey) && e.key === 's') {
+        e.preventDefault();
+        navigate('/dashboard/students');
+      }
+      // Cmd+C / Ctrl+C → Go to Classes
+      if ((e.metaKey || e.ctrlKey) && e.key === 'c') {
+        e.preventDefault();
+        navigate('/dashboard/classes');
+      }
+      // Cmd+T / Ctrl+T → Go to Staff (Teachers)
+      if ((e.metaKey || e.ctrlKey) && e.key === 't') {
+        e.preventDefault();
+        navigate('/dashboard/staff');
+      }
+      // Cmd+G / Ctrl+G → Go to Grades
+      if ((e.metaKey || e.ctrlKey) && e.key === 'g') {
+        e.preventDefault();
+        navigate('/dashboard/grades');
+      }
     };
     window.addEventListener('keydown', handler);
     return () => window.removeEventListener('keydown', handler);
-  }, []);
+  }, [navigate]);
 
   // Dynamic school name + plan
   const [schoolName, setSchoolName] = useState<string | null>(null);
@@ -241,7 +261,7 @@ export function DashboardLayout() {
             <div className="w-9 h-9 bg-primary-600 rounded-xl flex items-center justify-center shrink-0">
               <GraduationCap size={20} className="text-white" />
             </div>
-            <span className="text-base font-bold text-gray-900 tracking-tight">GRADELLENCE</span>
+            <span className="text-base font-bold text-gray-900 tracking-tight transition-opacity duration-200 opacity-100">GRADELLENCE</span>
           </Link>
         )}
         {!collapsed && (
@@ -257,7 +277,7 @@ export function DashboardLayout() {
 
       {/* School info (expanded only) */}
       {!collapsed && (
-        <div className="px-5 py-3 border-b border-gray-100 flex-shrink-0">
+        <div className="px-5 py-3 border-b border-gray-100 flex-shrink-0 transition-opacity duration-200 opacity-100">
           <div className="flex items-center gap-2.5">
             <div className="w-8 h-8 bg-primary-100 rounded-lg flex items-center justify-center shrink-0">
               <School size={16} className="text-primary-600" />
@@ -307,7 +327,7 @@ export function DashboardLayout() {
           return (
             <div key={group.heading} className="mb-1 relative" style={{ zIndex: 1 }}>
               {!collapsed && (
-                <p className="px-3 mb-1 text-[10px] font-semibold text-gray-400 uppercase tracking-widest">
+                <p className="px-3 mb-1 text-[10px] font-semibold text-gray-400 uppercase tracking-widest transition-opacity duration-200 opacity-100">
                   {group.heading}
                 </p>
               )}
@@ -322,16 +342,26 @@ export function DashboardLayout() {
                     data-active={active ? 'true' : undefined}
                     className={[
                       'flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium transition-colors duration-150 relative group',
+                      'border-l-4 border-transparent',
                       collapsed ? 'justify-center' : '',
                       active
-                        ? 'text-primary-700'
+                        ? 'text-primary-700 border-l-primary-600 bg-primary-50 ml-0 pl-2'
                         : 'text-gray-600 hover:bg-gray-100/80 hover:text-gray-900',
                     ].join(' ')}
                   >
                     <span className={`shrink-0 ${active ? 'text-primary-600' : ''}`}>
                       {item.icon}
                     </span>
-                    {!collapsed && <span>{item.label}</span>}
+                    {!collapsed && <span className="transition-opacity duration-200 opacity-100">{item.label}</span>}
+                    {/* Keyboard shortcut hint on hover */}
+                    {!collapsed && item.path !== '/dashboard' && (
+                      <span className="ml-auto text-[10px] font-medium text-gray-400 group-hover:text-primary-600 transition-colors opacity-0 group-hover:opacity-100 shrink-0">
+                        {item.path === '/students' && '⌘S'}
+                        {item.path === '/classes' && '⌘C'}
+                        {item.path === '/staff' && '⌘T'}
+                        {item.path === '/grades' && '⌘G'}
+                      </span>
+                    )}
                     {/* Custom tooltip when collapsed */}
                     {collapsed && (
                       <span className="absolute left-full ml-3 px-2.5 py-1.5 text-xs font-semibold
@@ -368,10 +398,10 @@ export function DashboardLayout() {
           <div className="flex items-center gap-2.5">
             <Avatar name={`${user?.firstName} ${user?.lastName}`} size="sm" />
             <div className="flex-1 min-w-0">
-              <p className="text-sm font-semibold text-gray-900 truncate leading-tight">
+              <p className="text-sm font-semibold text-gray-900 truncate leading-tight transition-opacity duration-200 opacity-100">
                 {user?.firstName} {user?.lastName}
               </p>
-              <p className="text-xs text-gray-500 truncate">{roleLabel}</p>
+              <p className="text-xs text-gray-500 truncate transition-opacity duration-200 opacity-100">{roleLabel}</p>
             </div>
             <button
               onClick={handleLogout}

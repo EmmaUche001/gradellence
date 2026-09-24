@@ -506,7 +506,7 @@ export function StudentsListPage() {
                   return (
                     <tr
                       key={s.id}
-                      className={`transition-colors duration-150 ${isSelected ? 'bg-primary-50/50' : 'hover:bg-gray-50'}`}
+                      className={`transition-all duration-150 ${isSelected ? 'bg-primary-50/50 animate-highlight-pulse' : 'hover:bg-gray-50'}`}
                     >
                       {/* Checkbox */}
                       <td className="px-4 py-3.5" onClick={e => e.stopPropagation()}>

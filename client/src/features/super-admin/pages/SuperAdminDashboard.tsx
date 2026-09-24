@@ -58,11 +58,11 @@ const SuperAdminDashboard: React.FC = () => {
       <section>
         <h2 className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-3">Platform Overview</h2>
         {loading ? (
-          <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+          <div className="grid grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
             {Array.from({ length: 4 }).map((_, i) => <SkeletonKpiCard key={i} />)}
           </div>
         ) : (
-          <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+          <div className="grid grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
             <KpiCard title="Total Schools"          value={(stats?.totalSchools ?? 0).toLocaleString()}
               icon={<School        size={20} className="text-primary-600" />} iconColor="bg-primary-50 text-primary-600" />
             <KpiCard title="Active Subscriptions"   value={(stats?.activeSubscriptions ?? 0).toLocaleString()}

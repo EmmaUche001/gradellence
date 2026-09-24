@@ -14,13 +14,14 @@ interface ConfirmDialogProps {
   cancelLabel?: string;
   variant?: 'danger' | 'primary';
   loading?: boolean;
+  itemCount?: number; // Show count of items being affected
 }
 
 export function ConfirmDialog({
   isOpen, onClose, onConfirm,
   title = 'Are you sure?', message,
   confirmLabel = 'Confirm', cancelLabel = 'Cancel',
-  variant = 'danger', loading = false,
+  variant = 'danger', loading = false, itemCount,
 }: ConfirmDialogProps) {
   const panelRef = useRef<HTMLDivElement>(null);
   const [shakeScheduled, setShakeScheduled] = useState(false);
@@ -77,6 +78,11 @@ export function ConfirmDialog({
         )}
         <div>
           <h3 className="text-base font-semibold text-gray-900">{title}</h3>
+          {itemCount && (
+            <p className="mt-1.5 text-sm font-medium text-danger-600">
+              {itemCount} item{itemCount !== 1 ? 's' : ''} will be affected
+            </p>
+          )}
           <p className="mt-1.5 text-sm text-gray-500">{message}</p>
         </div>
       </div>

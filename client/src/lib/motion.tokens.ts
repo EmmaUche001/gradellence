@@ -159,6 +159,32 @@ export const TRANSFORM = {
   CARD_LIFT: -2, // pixels
 } as const;
 
+// ─ Utility: Dynamic Transform Origin for Popovers ──────────────────────────
+/**
+ * Calculates the optimal transform-origin for a popover based on its trigger element's position.
+ * Prevents dropdowns from scaling off-screen when near screen edges.
+ * 
+ * Returns CSS string like "right top", "center top", "left top" based on trigger position.
+ */
+export function getPopoverOrigin(triggerElement: HTMLElement): string {
+  const rect = triggerElement.getBoundingClientRect();
+  const viewportWidth = window.innerWidth;
+  
+  // Calculate trigger center
+  const triggerCenterX = rect.left + rect.width / 2;
+  
+  // Determine horizontal origin based on position in viewport
+  let horizontalOrigin = 'center';
+  if (triggerCenterX < viewportWidth * 0.25) {
+    horizontalOrigin = 'left';
+  } else if (triggerCenterX > viewportWidth * 0.75) {
+    horizontalOrigin = 'right';
+  }
+  
+  // Vertical origin is always "top" (popover appears below trigger)
+  return `${horizontalOrigin} top`;
+}
+
 // ─ Shadow Values ──────────────────────────────────────────────────────────
 // Used for elevation feedback.
 

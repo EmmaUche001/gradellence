@@ -472,6 +472,16 @@
   animation: buttonPress 0.2s ease-out;
 }
 
+/* Row selection highlight pulse */
+@keyframes highlightPulse {
+  0% { background-color: rgba(37, 99, 235, 0.15); }
+  100% { background-color: rgba(37, 99, 235, 0.05); }
+}
+
+.animate-highlight-pulse {
+  animation: highlightPulse 0.6s ease-out;
+}
+
 /* ── Link underline draw ─────────────────────────────────────────────────── */
 /* Underline draws left-to-right on hover */
 .link-draw {
@@ -587,4 +597,17 @@
   .badge-danger   { @apply badge bg-danger-100 text-danger-700; }
   .badge-info     { @apply badge bg-info-100 text-info-700; }
   .badge-gray     { @apply badge bg-gray-100 text-gray-600; }
+}
+
+/* Landing page CTA button: scale + shadow on hover */
+@layer components {
+  .hover-scale-shadow {
+    @apply transition-all duration-150 ease-out;
+  }
+  .hover-scale-shadow:hover {
+    @apply scale-105 shadow-xl;
+  }
+  .hover-scale-shadow:active {
+    @apply scale-95;
+  }
 }

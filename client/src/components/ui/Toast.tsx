@@ -3,6 +3,7 @@ import { CheckCircle2, XCircle, AlertTriangle, Info, X } from 'lucide-react';
 import gsap from 'gsap';
 import { useToastStore, ToastType } from '../../store/toastStore';
 import { useReducedMotion } from '../../hooks/useReducedMotion';
+import { GSAP_CONFIG } from '../../lib/motion.tokens';
 
 const toastConfig: Record<ToastType, { icon: React.ReactNode; classes: string; bar: string; iconColor: string }> = {
   success: { icon: <CheckCircle2 size={17} className="shrink-0" />, classes: 'bg-gray-900 text-white', bar: 'bg-success-500', iconColor: 'text-success-400' },
@@ -28,10 +29,10 @@ function ToastItem({ toast, onRemove }: { toast: any; onRemove: (id: string) => 
         gsap.set(barRef.current, { scaleX: 1 });
       }
     } else {
-      // Standard animation: spring-in from right (reduced from 400ms to 250ms)
+      // Standard animation: fade-in from right using motion tokens
       gsap.fromTo(ref.current,
         { x: 80, opacity: 0, scale: 0.92 },
-        { x: 0, opacity: 1, scale: 1, duration: 0.25, ease: 'power2.out' },
+        { x: 0, opacity: 1, scale: 1, ...GSAP_CONFIG.toastIn },
       );
       if (barRef.current) {
         gsap.fromTo(barRef.current,
@@ -46,7 +47,7 @@ function ToastItem({ toast, onRemove }: { toast: any; onRemove: (id: string) => 
     if (!ref.current) { onRemove(toast.id); return; }
     gsap.to(ref.current, {
       x: 80, opacity: 0, scale: 0.92,
-      duration: 0.2, ease: 'power2.in',
+      ...GSAP_CONFIG.toastOut,
       onComplete: () => onRemove(toast.id),
     });
   };

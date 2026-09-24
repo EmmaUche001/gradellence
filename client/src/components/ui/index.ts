@@ -52,3 +52,11 @@ export { ConfirmDialog } from './ConfirmDialog';
 export { Tabs, TabList, TabTrigger, TabPanel } from './Tabs';
 
 export { FormSection, FormActions } from './FormSection';
+
+export { SidebarItem } from './SidebarItem';
+export type { } from './SidebarItem';
+
+export { SelectCustom } from './SelectCustom';
+export type { SelectOption } from './SelectCustom';
+
+export { Tooltip } from './Tooltip';

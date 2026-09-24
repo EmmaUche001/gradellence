@@ -80,7 +80,7 @@ const StudentAnalyticsPage: React.FC = () => {
 
         {loading ? (
           <>
-            <div className="grid grid-cols-2 gap-4">
+            <div className="grid grid-cols-2 gap-6 mb-8">
               <SkeletonKpiCard /><SkeletonKpiCard />
             </div>
             <SkeletonChart />
@@ -93,7 +93,7 @@ const StudentAnalyticsPage: React.FC = () => {
         ) : (
           <>
             {/* KPIs */}
-            <div className="grid grid-cols-2 gap-4">
+            <div className="grid grid-cols-2 gap-6 mb-8">
               <KpiCard title="Total Subjects" value={data.totalSubjects}
                 icon={<BookOpen size={20} className="text-primary-600" />} iconColor="bg-primary-50 text-primary-600" />
               {overallAvg !== null && (

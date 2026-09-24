@@ -185,6 +185,11 @@ export default {
           '0%':   { opacity: '0', transform: 'translateX(-6px)' },
           '100%': { opacity: '1', transform: 'translateX(0)' },
         },
+        // Scale in — for success indicators, icons
+        'scale-in': {
+          '0%':   { opacity: '0', transform: 'scale(0.8)' },
+          '100%': { opacity: '1', transform: 'scale(1)' },
+        },
         // KPI count-up shimmer sweep
         'shimmer-sweep': {
           '0%':   { backgroundPosition: '-200% 0' },
@@ -215,6 +220,7 @@ export default {
         'row-enter':     'row-enter 180ms ease-out both',
         'float':         'float 3s ease-in-out infinite',
         'shake':         'shake 400ms ease-in-out',
+        'scale-in':      'scale-in 150ms ease-out',
       },
     },
   },

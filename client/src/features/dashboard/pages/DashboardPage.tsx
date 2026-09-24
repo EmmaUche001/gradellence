@@ -311,7 +311,7 @@ export function DashboardPage() {
       </div>
 
       {/* ── KPI Cards ────────────────────────────────────────────── */}
-      <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-6 gap-4">
+      <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-6 gap-6 mb-8">
         {kpiLoading
           ? Array.from({ length: 6 }).map((_, i) => <SkeletonKpiCard key={i} />)
           : <>

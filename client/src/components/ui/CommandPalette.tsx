@@ -96,9 +96,11 @@ export function CommandPalette({ open, onClose }: CommandPaletteProps) {
     if (open) {
       setQuery('');
       setActive(0);
-      // Snap visible instantly
-      gsap.set(overlayRef.current, { opacity: 1 });
-      gsap.set(panelRef.current, { opacity: 1, scale: 1, y: 0 });
+      // Ensure initial opacity is 0, then snap to visible
+      gsap.set([overlayRef.current, panelRef.current], { opacity: 0 });
+      // Use a 0-duration tween to snap visible (bypasses any timing issues)
+      gsap.to(overlayRef.current, { opacity: 1, duration: 0 });
+      gsap.to(panelRef.current, { opacity: 1, scale: 1, y: 0, duration: 0 });
       setTimeout(() => inputRef.current?.focus(), 0);
     }
   }, [open]);

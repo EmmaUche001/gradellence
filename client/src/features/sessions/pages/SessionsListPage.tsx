@@ -122,7 +122,9 @@ export function SessionsListPage() {
         ) : sessions.length === 0 ? (
           <EmptyState icon={<CalendarDays size={40} />} title="No sessions yet"
             description="Create an academic session with 3 terms to start recording results."
-            actionLabel="Add Session" onAction={() => navigate('/sessions/new')} />
+            actionLabel="Add Session" onAction={() => navigate('/sessions/new')}
+            animationType="slide-up"
+          />
         ) : (
           <div className="overflow-x-auto">
             <table className="w-full">
